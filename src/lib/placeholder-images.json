@@ -1,0 +1,22 @@
+{
+  "placeholderImages": [
+    {
+      "id": "landing-background",
+      "description": "Een vrolijke, kleurrijke achtergrond met illustraties die passen bij klusjes in huis.",
+      "imageUrl": "https://weareimpact.nl/AchtergondKlusjes.jpg",
+      "imageHint": "colorful illustrated background"
+    },
+    {
+      "id": "child-login-avatar",
+      "description": "Crown avatar for the child login screen.",
+      "imageUrl": "https://weareimpact.nl/LogoKlusjeskoning4.png",
+      "imageHint": "crown illustration"
+    },
+    {
+      "id": "app-logo",
+      "description": "The official logo for the KlusjesKoning app.",
+      "imageUrl": "https://weareimpact.nl/LogoKlusjeskoning3.png",
+      "imageHint": "app logo"
+    }
+  ]
+}

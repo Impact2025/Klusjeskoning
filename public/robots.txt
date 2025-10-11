@@ -1,0 +1,12 @@
+# robots.txt for KlusjesKoning
+# Allow all crawlers to access all content
+
+User-agent: *
+Allow: /
+
+# Disallow admin and app areas (private user content)
+Disallow: /admin
+Disallow: /app
+
+# Sitemap location
+Sitemap: https://klusjeskoningapp.nl/sitemap.xml
