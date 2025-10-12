@@ -1,7 +1,3 @@
 {
-  "framework": null,
-  "buildCommand": "npm install && node build.js || echo 'Build completed with warnings'",
-  "outputDirectory": ".next",
-  "devCommand": "npm run dev",
-  "installCommand": null
+  "buildCommand": "npm run build:vercel"
 }
