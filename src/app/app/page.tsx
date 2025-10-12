@@ -13,13 +13,13 @@ import AdminLoginScreen from '@/components/app/screens/AdminLoginScreen';
 import AdminDashboard from '@/components/app/screens/AdminDashboard';
 import { Loader2 } from 'lucide-react';
 import type { Screen } from '@/lib/types';
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 
 // Force dynamic rendering for this page
 export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
-const ParentDashboard = dynamic(() => import('@/components/app/screens/ParentDashboard'), {
+const ParentDashboard = nextDynamic(() => import('@/components/app/screens/ParentDashboard'), {
   ssr: false,
   loading: () => (
     <div className="h-full w-full flex items-center justify-center bg-slate-50">
