@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 
 // Force dynamic rendering for this page
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // Admin page redirects to /app on the client
 export default function AdminPage() {

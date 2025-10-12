@@ -1,0 +1,15 @@
+{
+  "framework": "nextjs",
+  "routes": [
+    {
+      "src": "/app(.*)",
+      "dest": "/app$1",
+      "continue": true
+    },
+    {
+      "src": "/admin(.*)",
+      "dest": "/admin$1",
+      "continue": true
+    }
+  ]
+}

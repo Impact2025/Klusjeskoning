@@ -1,0 +1,2 @@
+# Ignore these paths during Vercel build
+# This helps avoid pre-render issues with Firebase

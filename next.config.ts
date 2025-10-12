@@ -8,9 +8,10 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Skip static generation for app and admin routes
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
+  // Increase serverComponentsExternalPackages to prevent bundling
+  serverComponentsExternalPackages: ['firebase', 'firebase-admin'],
   images: {
     remotePatterns: [
       {
