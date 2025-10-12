@@ -10,7 +10,6 @@ import ChildDashboard from '@/components/app/screens/ChildDashboard';
 import RecoverCodeScreen from '@/components/app/screens/RecoverCodeScreen';
 import QrScannerScreen from '@/components/app/screens/QrScannerScreen';
 import AdminLoginScreen from '@/components/app/screens/AdminLoginScreen';
-import AdminDashboard from '@/components/app/screens/AdminDashboard';
 import { Loader2 } from 'lucide-react';
 import type { Screen } from '@/lib/types';
 import nextDynamic from 'next/dynamic';
@@ -20,6 +19,15 @@ export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
 const ParentDashboard = nextDynamic(() => import('@/components/app/screens/ParentDashboard'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full flex items-center justify-center bg-slate-50">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+    </div>
+  ),
+});
+
+const AdminDashboard = nextDynamic(() => import('@/components/app/screens/AdminDashboard'), {
   ssr: false,
   loading: () => (
     <div className="h-full w-full flex items-center justify-center bg-slate-50">
