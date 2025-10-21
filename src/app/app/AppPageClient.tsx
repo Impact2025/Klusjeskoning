@@ -15,6 +15,7 @@ import AdminLoginScreen from '@/components/app/screens/AdminLoginScreen';
 import nextDynamic from 'next/dynamic';
 import type { Screen } from '@/lib/types';
 
+// Dynamically import components that might have Firebase issues
 const ParentDashboard = nextDynamic(() => import('@/components/app/screens/ParentDashboard'), {
   ssr: false,
   loading: () => (

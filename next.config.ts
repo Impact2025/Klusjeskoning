@@ -10,8 +10,7 @@ const nextConfig: NextConfig = {
   },
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
-  // Increase serverComponentsExternalPackages to prevent bundling
-  serverComponentsExternalPackages: ['firebase', 'firebase-admin'],
+  // Removed deprecated serverComponentsExternalPackages option
   images: {
     remotePatterns: [
       {

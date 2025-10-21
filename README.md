@@ -13,6 +13,7 @@ KlusjesKoning is een gamified klusjesapp die gezinnen helpt om huishouden taken 
 - **AI-ondersteuning**: Genereer klusjes- en beloningsideeën met Gemini AI
 - **Veilige authenticatie**: Parent-first authenticatie met kindvriendelijke login
 - **Admin dashboard**: Beheer blogposts, reviews, gezinnen en statistieken
+- **Financieel beheer**: Beheer premium abonnementen en financiële gegevens (admin only)
 - **Email notificaties**: Automatische emails bij registratie, klusjes en beloningen
 
 ## 🛠 Tech Stack

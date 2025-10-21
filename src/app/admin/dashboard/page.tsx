@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { LogOut, Users, FileText, Gift, BarChart3 } from 'lucide-react';
+import { LogOut, Users, FileText, Gift, BarChart3, CreditCard } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, onSnapshot, getDocs } from 'firebase/firestore';
@@ -162,6 +162,10 @@ export default function AdminDashboard() {
               <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/admin/statistics')}>
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Bekijk Statistieken
+              </Button>
+              <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/admin/financial')}>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Financieel Beheer
               </Button>
             </CardContent>
           </Card>

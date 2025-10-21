@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { LogIn, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { auth } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 // Hardcoded admin credentials
@@ -21,9 +21,19 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [auth, setAuth] = useState<ReturnType<typeof getFirebaseAuth> | null>(null);
+
+  // Initialize Firebase auth only on client-side
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAuth(getFirebaseAuth());
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) return;
+    
     setIsLoading(true);
 
     try {
@@ -73,7 +83,7 @@ export default function AdminLoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@klusjeskoning.nl"
                 required
-                disabled={isLoading}
+                disabled={isLoading || !auth}
               />
             </div>
             <div className="space-y-2">
@@ -85,12 +95,12 @@ export default function AdminLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                disabled={isLoading}
+                disabled={isLoading || !auth}
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col">
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || !auth}>
               <LogIn className="mr-2 h-4 w-4" />
               {isLoading ? 'Inloggen...' : 'Inloggen'}
             </Button>

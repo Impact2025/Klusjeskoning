@@ -28,6 +28,19 @@ import { Timestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 
+// Only import components that might cause SSR issues dynamically
+import dynamic from 'next/dynamic';
+const AddChildModalDynamic = dynamic(() => import('../models/AddChildModal'), { ssr: false });
+const AddChoreModalDynamic = dynamic(() => import('../models/AddChoreModal'), { ssr: false });
+const AddRewardModalDynamic = dynamic(() => import('../models/AddRewardModal'), { ssr: false });
+const EditChildModalDynamic = dynamic(() => import('../models/EditChildModal'), { ssr: false });
+const EditChoreModalDynamic = dynamic(() => import('../models/EditChoreModal'), { ssr: false });
+const EditRewardModalDynamic = dynamic(() => import('../models/EditRewardModal'), { ssr: false });
+const TopChoresModalDynamic = dynamic(() => import('../models/TopChoresModal'), { ssr: false });
+const TopRewardsModalDynamic = dynamic(() => import('../models/TopRewardsModal'), { ssr: false });
+const GeminiChoreIdeasModalDynamic = dynamic(() => import('../models/GeminiChoreIdeasModal'), { ssr: false });
+const QrCodeModalDynamic = dynamic(() => import('../models/QrCodeModal'), { ssr: false });
+
 export default function ParentDashboard() {
   const {
     family,
@@ -65,10 +78,17 @@ export default function ParentDashboard() {
   const [isTopRewardsModalOpen, setTopRewardsModalOpen] = useState(false);
   const [isGeminiModalOpen, setGeminiModalOpen] = useState(false);
   const [isQrCodeModalOpen, setQrCodeModalOpen] = useState(false);
-  const [recoveryEmail, setRecoveryEmail] = useState(family?.recoveryEmail || '');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
   const searchParams = useSearchParams();
   const router = useRouter();
   const [processingOrder, setProcessingOrder] = useState<string | null>(null);
+
+  // Initialize recovery email when family loads
+  useEffect(() => {
+    if (family?.recoveryEmail) {
+      setRecoveryEmail(family.recoveryEmail);
+    }
+  }, [family]);
 
   const handleUpgrade = useCallback(async (interval: BillingInterval) => {
     const paymentUrl = await startPremiumCheckout(interval);
@@ -210,6 +230,7 @@ Heel veel plezier! 🚀`;
             </CardContent>
           </Card>
 
+          {/* Simplified plan information card without upgrade buttons */}
           <Card className="border border-primary/20 bg-white">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -255,31 +276,24 @@ Heel veel plezier! 🚀`;
                       <li key={highlight}>✦ {highlight}</li>
                     ))}
                   </ul>
+                  <div className="mt-4">
+                    <Button size="sm" onClick={() => router.push('/app/upgrade')} className="w-full">
+                      Upgrade naar Gezin+ · {formatPrice(premiumPlan.priceMonthlyCents)}/mnd
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  {typeof maxChildren === 'number' ? (
-                    <span>{children.length}/{maxChildren} kinderen</span>
-                  ) : (
-                    <span>Onbeperkte kinderen</span>
-                  )}
-                  {typeof choreQuota === 'number' ? (
-                    <span>{monthlyChoreUsage}/{choreQuota} klusjes deze maand</span>
-                  ) : (
-                    <span>Onbeperkte klusjes</span>
-                  )}
-                </div>
-                {!isPremium && (
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleUpgrade('monthly')} disabled={isLoading}>
-                      Upgrade naar Gezin+ · {formatPrice(premiumPlan.priceMonthlyCents)}/mnd
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleUpgrade('yearly')} disabled={isLoading}>
-                      {formatPrice(premiumPlan.priceYearlyCents)}/jaar
-                    </Button>
-                  </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                {typeof maxChildren === 'number' ? (
+                  <span>{children.length}/{maxChildren} kinderen</span>
+                ) : (
+                  <span>Onbeperkte kinderen</span>
+                )}
+                {typeof choreQuota === 'number' ? (
+                  <span>{monthlyChoreUsage}/{choreQuota} klusjes deze maand</span>
+                ) : (
+                  <span>Onbeperkte klusjes</span>
                 )}
               </div>
             </CardContent>
@@ -573,18 +587,19 @@ Heel veel plezier! 🚀`;
         </main>
       </ScrollArea>
       
-      <AddChildModal isOpen={isAddChildModalOpen} setIsOpen={setAddChildModalOpen} />
-      <AddChoreModal isOpen={isAddChoreModalOpen} setIsOpen={setAddChoreModalOpen} />
-      <AddRewardModal isOpen={isAddRewardModalOpen} setIsOpen={setAddRewardModalOpen} />
+      {/* Use dynamic imports for modals to prevent SSR issues */}
+      <AddChildModalDynamic isOpen={isAddChildModalOpen} setIsOpen={setAddChildModalOpen} />
+      <AddChoreModalDynamic isOpen={isAddChoreModalOpen} setIsOpen={setAddChoreModalOpen} />
+      <AddRewardModalDynamic isOpen={isAddRewardModalOpen} setIsOpen={setAddRewardModalOpen} />
 
-      {editingChild && <EditChildModal isOpen={isEditChildModalOpen} setIsOpen={setEditChildModalOpen} child={editingChild} />}
-      {editingChore && <EditChoreModal isOpen={isEditChoreModalOpen} setIsOpen={setEditChoreModalOpen} chore={editingChore} />}
-      {editingReward && <EditRewardModal isOpen={isEditRewardModalOpen} setIsOpen={setEditRewardModalOpen} reward={editingReward} />}
+      {editingChild && <EditChildModalDynamic isOpen={isEditChildModalOpen} setIsOpen={setEditChildModalOpen} child={editingChild} />}
+      {editingChore && <EditChoreModalDynamic isOpen={isEditChoreModalOpen} setIsOpen={setEditChoreModalOpen} chore={editingChore} />}
+      {editingReward && <EditRewardModalDynamic isOpen={isEditRewardModalOpen} setIsOpen={setEditRewardModalOpen} reward={editingReward} />}
 
-      <TopChoresModal isOpen={isTopChoresModalOpen} setIsOpen={setTopChoresModalOpen} />
-      <TopRewardsModal isOpen={isTopRewardsModalOpen} setIsOpen={setTopRewardsModalOpen} />
-      <GeminiChoreIdeasModal isOpen={isGeminiModalOpen} setIsOpen={setGeminiModalOpen} />
-      <QrCodeModal isOpen={isQrCodeModalOpen} setIsOpen={setQrCodeModalOpen} />
+      <TopChoresModalDynamic isOpen={isTopChoresModalOpen} setIsOpen={setTopChoresModalOpen} />
+      <TopRewardsModalDynamic isOpen={isTopRewardsModalOpen} setIsOpen={setTopRewardsModalOpen} />
+      <GeminiChoreIdeasModalDynamic isOpen={isGeminiModalOpen} setIsOpen={setGeminiModalOpen} />
+      <QrCodeModalDynamic isOpen={isQrCodeModalOpen} setIsOpen={setQrCodeModalOpen} />
     </div>
   );
 }

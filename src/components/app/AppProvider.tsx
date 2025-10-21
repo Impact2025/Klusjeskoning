@@ -157,16 +157,20 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const generateFamilyCode = () => (Math.random().toString(36).substring(2, 8)).toUpperCase();
 
+// Initialize with a safe default that doesn't require Firebase
 const getInitialScreen = (): Screen => {
-  if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location.pathname === '/admin') {
-    return 'adminLogin';
+  // Only check window.location on client-side
+  if (typeof window !== 'undefined' && typeof window.location !== 'undefined') {
+    if (window.location.pathname === '/admin') {
+      return 'adminLogin';
+    }
   }
   return 'landing';
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentScreen, setScreen] = useState<Screen>(() => getInitialScreen());
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start with false to prevent SSR issues
   const [family, setFamily] = useState<Family | null>(null);
   const [user, setUser] = useState<Child | null>(null);
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
@@ -1024,6 +1028,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Geen betaal-URL ontvangen van MultiSafepay.');
       }
 
+      // Store pending checkout in sessionStorage
+      sessionStorage.setItem('pendingCheckout', 'premium');
+      
       return data.paymentUrl as string;
     } catch (error) {
       console.error('startPremiumCheckout error', error);
