@@ -7,8 +7,7 @@
  * - GenerateChoreIdeasOutput - The return type for the generateChoreIdeas function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const GenerateChoreIdeasInputSchema = z.object({
   keyword: z.string().describe('Keyword or theme to generate chore ideas.'),
@@ -23,35 +22,75 @@ const GenerateChoreIdeasOutputSchema = z.array(
 );
 export type GenerateChoreIdeasOutput = z.infer<typeof GenerateChoreIdeasOutputSchema>;
 
-export async function generateChoreIdeas(input: GenerateChoreIdeasInput): Promise<GenerateChoreIdeasOutput> {
-  return generateChoreIdeasFlow(input);
+// Function to generate chore ideas using OpenRouter API directly
+async function callOpenRouterAPI(keyword: string): Promise<GenerateChoreIdeasOutput> {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+  if (!openRouterKey) {
+    throw new Error('OPENROUTER_API_KEY is not configured');
+  }
+
+  const prompt = `Je bent een behulpzame assistent voor ouders die een klusjes-app gebruiken voor kinderen van 8-12 jaar. Genereer een lijst van 5 tot 7 leeftijdsspecifieke klusjes gebaseerd op het volgende thema/keyword. Geef voor elk klusje een geschatte puntwaarde, waarbij 5 punten een heel makkelijke taak is en 50 punten een moeilijke. Antwoord met een JSON array van objecten, waarbij elk object een 'name' (string) en 'points' (number) veld heeft.
+
+Keyword: ${keyword}
+
+Geef je antwoord als een JSON array met deze structuur:
+[
+  {
+    "name": "Naam van het klusje",
+    "points": 10
+  }
+]`;
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openRouterKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      'X-Title': 'KlusjesKoning Chore Ideas Generator',
+    },
+    body: JSON.stringify({
+      model: 'openai/gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Je bent een behulpzame assistent voor ouders die een klusjes-app gebruiken. Geef altijd je antwoorden in het Nederlands en in JSON formaat.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices[0]?.message?.content;
+
+  if (!content) {
+    throw new Error('No content returned from OpenRouter API');
+  }
+
+  try {
+    // Parse the JSON response
+    const parsedContent = JSON.parse(content);
+    // If the response is wrapped in an object, extract the array
+    const chores = Array.isArray(parsedContent) ? parsedContent : parsedContent.chores || parsedContent.ideas || [];
+    return chores;
+  } catch (error) {
+    console.error('Error parsing OpenRouter response:', content);
+    throw new Error('Failed to parse response from OpenRouter API');
+  }
 }
 
-const prompt = ai.definePrompt({
-  name: 'generateChoreIdeasPrompt',
-  input: {schema: GenerateChoreIdeasInputSchema},
-  output: {schema: GenerateChoreIdeasOutputSchema},
-  prompt: `You are a helpful assistant for parents using a chore app for kids aged 8-12. Generate a list of 5 to 7 age-specific chores based on the following theme/keyword. For each chore, provide an estimated point value, where 5 points is a very easy task and 50 points is a difficult one. Answer with a JSON array of objects, where each object has a 'name' (string) and 'points' (number) key.
-
-Keyword: {{{keyword}}}`,
-  config: {
-    safetySettings: [
-      {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_ONLY_HIGH',
-      },
-    ],
-  },
-});
-
-const generateChoreIdeasFlow = ai.defineFlow(
-  {
-    name: 'generateChoreIdeasFlow',
-    inputSchema: GenerateChoreIdeasInputSchema,
-    outputSchema: GenerateChoreIdeasOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
+export async function generateChoreIdeas(input: GenerateChoreIdeasInput): Promise<GenerateChoreIdeasOutput> {
+  return callOpenRouterAPI(input.keyword);
+}

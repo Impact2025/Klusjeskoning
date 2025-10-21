@@ -6,7 +6,7 @@ import { useApp } from '../AppProvider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { LogOut, Copy, QrCode, Plus, ListOrdered, Sparkles, Medal, Trash2, Check, X, Bell, Pencil, Gift } from 'lucide-react';
+import { LogOut, Copy, QrCode, Plus, ListOrdered, Sparkles, Medal, Trash2, Check, X, Bell, Pencil, Gift, CreditCard, Settings } from 'lucide-react';
 import { WhatsAppIcon } from '@/lib/icons';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ import TopRewardsModal from '../models/TopRewardsModal';
 import GeminiChoreIdeasModal from '../models/GeminiChoreIdeasModal';
 import QrCodeModal from '../models/QrCodeModal';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import type { Child, Chore, Reward, BillingInterval } from '@/lib/types';
 import { Timestamp } from 'firebase/firestore';
@@ -78,6 +79,9 @@ export default function ParentDashboard() {
   const [isTopRewardsModalOpen, setTopRewardsModalOpen] = useState(false);
   const [isGeminiModalOpen, setGeminiModalOpen] = useState(false);
   const [isQrCodeModalOpen, setQrCodeModalOpen] = useState(false);
+  const [isPremiumModalOpen, setPremiumModalOpen] = useState(false);
+  const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [showFullCauseDescription, setShowFullCauseDescription] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -205,9 +209,17 @@ Heel veel plezier! 🚀`;
     <div className="h-full flex flex-col bg-slate-50">
       <header className="bg-primary text-primary-foreground p-4 flex justify-between items-center shadow-md">
         <h2 className="font-brand text-2xl">Dashboard</h2>
-        <Button variant="ghost" size="icon" onClick={logout}>
-          <LogOut />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => setPremiumModalOpen(true)} title="Premium Abonnement">
+            <CreditCard />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setSettingsModalOpen(true)} title="Instellingen">
+            <Settings />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={logout} title="Uitloggen">
+            <LogOut />
+          </Button>
+        </div>
       </header>
       <ScrollArea className="flex-grow">
         <main className="p-4 space-y-6">
@@ -230,75 +242,6 @@ Heel veel plezier! 🚀`;
             </CardContent>
           </Card>
 
-          {/* Simplified plan information card without upgrade buttons */}
-          <Card className="border border-primary/20 bg-white">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">{planDefinition.label}</CardTitle>
-                  <CardDescription>{planDefinition.tagline}</CardDescription>
-                </div>
-                <Badge variant={isPremium ? 'default' : 'secondary'}>{isPremium ? 'Actief' : 'Gratis plan'}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Maandelijks</p>
-                  <p className="text-lg font-semibold">{formatPrice(planDefinition.priceMonthlyCents)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Jaarlijks</p>
-                  <p className="text-lg font-semibold">{formatPrice(planDefinition.priceYearlyCents)}</p>
-                </div>
-                <div className="space-y-1">
-                  {currentIntervalLabel && <p className="text-sm font-medium text-slate-700">{currentIntervalLabel}</p>}
-                  {renewalLabel && <p className="text-xs text-muted-foreground">Verlenging op {renewalLabel}</p>}
-                </div>
-              </div>
-
-              {planDefinition.includedHighlights.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Inclusief:</p>
-                  <ul className="grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
-                    {planDefinition.includedHighlights.map((highlight) => (
-                      <li key={highlight}>• {highlight}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {!isPremium && planDefinition.missingHighlights.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Mis je nu:</p>
-                  <ul className="grid gap-1 text-sm text-slate-500 sm:grid-cols-2">
-                    {planDefinition.missingHighlights.map((highlight) => (
-                      <li key={highlight}>✦ {highlight}</li>
-                    ))}
-                  </ul>
-                  <div className="mt-4">
-                    <Button size="sm" onClick={() => router.push('/app/upgrade')} className="w-full">
-                      Upgrade naar Gezin+ · {formatPrice(premiumPlan.priceMonthlyCents)}/mnd
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                {typeof maxChildren === 'number' ? (
-                  <span>{children.length}/{maxChildren} kinderen</span>
-                ) : (
-                  <span>Onbeperkte kinderen</span>
-                )}
-                {typeof choreQuota === 'number' ? (
-                  <span>{monthlyChoreUsage}/{choreQuota} klusjes deze maand</span>
-                ) : (
-                  <span>Onbeperkte klusjes</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          
           {activeCause && (
              <Card className="bg-rose-50 border-l-4 border-rose-500 shadow-sm">
                 <CardHeader className="pb-3">
@@ -309,38 +252,44 @@ Heel veel plezier! 🚀`;
                 <CardContent className="pt-0">
                     <div className="bg-white p-4 rounded-lg border border-rose-100">
                       <p className="font-bold text-lg text-rose-800">{activeCause.name}</p>
-                      <p className="text-sm text-gray-700 mb-3">{activeCause.description}</p>
+                      {showFullCauseDescription ? (
+                        <>
+                          <p className="text-sm text-gray-700 mb-3">{activeCause.description}</p>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => setShowFullCauseDescription(false)}
+                            className="text-rose-600 hover:text-rose-700 p-0 h-auto mb-3"
+                          >
+                            Minder tonen
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-gray-700 mb-2">
+                            {activeCause.description.length > 100
+                              ? `${activeCause.description.substring(0, 100)}...`
+                              : activeCause.description}
+                          </p>
+                          {activeCause.description.length > 100 && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() => setShowFullCauseDescription(true)}
+                              className="text-rose-600 hover:text-rose-700 p-0 h-auto mb-3"
+                            >
+                              Lees meer
+                            </Button>
+                          )}
+                        </>
+                      )}
                       <p className="text-xs text-rose-600 font-medium">
                           Actief tot: {format(activeCause.endDate.toDate(), 'dd MMMM yyyy', { locale: nl })}
                       </p>
                     </div>
-                    <CardDescription className="mt-3 text-sm">
-                        Deze periode steunen we dit goede doel. Het is een leuke, niet-verplichte manier om veel impact te maken. Kinderen kunnen hun gespaarde punten doneren in de beloningswinkel.
-                    </CardDescription>
                 </CardContent>
             </Card>
           )}
-
-          <Card className="bg-slate-50 shadow-sm">
-            <CardContent className="p-4">
-              <p className="font-bold mb-3 text-slate-800">Herstel-e-mailadres</p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Input 
-                  type="email" 
-                  placeholder="jouw@email.com" 
-                  value={recoveryEmail} 
-                  onChange={(e) => setRecoveryEmail(e.target.value)} 
-                  className="flex-grow"
-                />
-                <Button onClick={handleSaveRecoveryEmail} className="bg-slate-800 hover:bg-slate-700">
-                  Opslaan
-                </Button>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Ontvang een herstel-e-mail met je gezinscode als je wachtwoord kwijt bent.
-              </p>
-            </CardContent>
-          </Card>
 
           <Card className="bg-yellow-50 border-yellow-200 shadow-sm">
             <CardHeader className="pb-3">
@@ -600,6 +549,171 @@ Heel veel plezier! 🚀`;
       <TopRewardsModalDynamic isOpen={isTopRewardsModalOpen} setIsOpen={setTopRewardsModalOpen} />
       <GeminiChoreIdeasModalDynamic isOpen={isGeminiModalOpen} setIsOpen={setGeminiModalOpen} />
       <QrCodeModalDynamic isOpen={isQrCodeModalOpen} setIsOpen={setQrCodeModalOpen} />
+
+      {/* Settings Modal */}
+      <Dialog open={isSettingsModalOpen} onOpenChange={setSettingsModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <Settings className="h-6 w-6" />
+              Instellingen
+            </DialogTitle>
+            <DialogDescription>
+              Beheer je account instellingen
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Herstel-e-mailadres</CardTitle>
+                <CardDescription>
+                  Ontvang een herstel-e-mail met je gezinscode als je wachtwoord kwijt bent
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input
+                  type="email"
+                  placeholder="jouw@email.com"
+                  value={recoveryEmail}
+                  onChange={(e) => setRecoveryEmail(e.target.value)}
+                />
+                <Button
+                  onClick={handleSaveRecoveryEmail}
+                  className="w-full"
+                >
+                  Opslaan
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Premium Modal */}
+      <Dialog open={isPremiumModalOpen} onOpenChange={setPremiumModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <CreditCard className="h-6 w-6" />
+              Premium (Gezin+)
+            </DialogTitle>
+            <DialogDescription>
+              Alles voor actieve gezinnen
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 mt-4">
+            {/* Status Badge */}
+            <div className="flex items-center gap-2">
+              <Badge variant={isPremium ? 'default' : 'secondary'} className="text-lg px-4 py-1">
+                {isPremium ? 'Actief' : 'Niet actief'}
+              </Badge>
+            </div>
+
+            {/* Pricing */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Abonnement opties</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border rounded-lg p-4">
+                    <p className="text-sm text-muted-foreground mb-1">Maandelijks</p>
+                    <p className="text-2xl font-bold">{formatPrice(planDefinition.priceMonthlyCents)}</p>
+                  </div>
+                  <div className="border rounded-lg p-4">
+                    <p className="text-sm text-muted-foreground mb-1">Jaarlijks</p>
+                    <p className="text-2xl font-bold">{formatPrice(planDefinition.priceYearlyCents)}</p>
+                  </div>
+                </div>
+
+                {currentIntervalLabel && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm font-medium text-blue-900">{currentIntervalLabel}</p>
+                    {renewalLabel && <p className="text-xs text-blue-700 mt-1">Verlenging op {renewalLabel}</p>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Features */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Inclusief:</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2">
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>Onbeperkte klusjes & kinderen</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>AI-klusassistent (Gemini)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>Virtueel huisdier & badges</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>Gezinsdoelen & donaties</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>Aanpasbare thema's</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>E-mail support</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Usage limits */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Gebruik</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Kinderen</span>
+                  <span className="font-medium">
+                    {typeof maxChildren === 'number' ? `${children.length}/${maxChildren}` : 'Onbeperkt'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Klusjes deze maand</span>
+                  <span className="font-medium">
+                    {typeof choreQuota === 'number' ? `${monthlyChoreUsage}/${choreQuota}` : 'Onbeperkt'}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Upgrade button for free users */}
+            {!isPremium && (
+              <div className="space-y-3">
+                <Button
+                  onClick={() => {
+                    setPremiumModalOpen(false);
+                    router.push('/app/upgrade');
+                  }}
+                  className="w-full"
+                  size="lg"
+                >
+                  Upgrade naar Gezin+ · {formatPrice(PLAN_DEFINITIONS.premium.priceMonthlyCents)}/mnd
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  Je kunt op elk moment opzeggen
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

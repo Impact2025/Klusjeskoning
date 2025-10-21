@@ -256,7 +256,6 @@ export default function HomePage() {
           </div>
           <div className="hidden items-center space-x-4 md:flex">
             <Link href="/app" className="text-sm font-semibold text-slate-700 hover:text-slate-900">App omgeving</Link>
-            <Link href="/admin" className="text-sm font-semibold text-slate-700 hover:text-slate-900">Admin</Link>
             <Button asChild className="bg-primary text-primary-foreground shadow-md hover:bg-primary/90">
               <Link href="/app?register=true">Start gratis</Link>
             </Button>
@@ -462,9 +461,6 @@ export default function HomePage() {
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
-                  <Link href="/admin">Admin demo</Link>
-                </Button>
               </div>
             </div>
             <div className="relative mt-6 lg:mt-0">
@@ -603,7 +599,18 @@ export default function HomePage() {
       </main>
 
       <footer className="px-6 py-10 text-center text-sm text-slate-500">
-        © {new Date().getFullYear()} KlusjesKoning. Samen plezier in klusjes.
+        <p>© {new Date().getFullYear()} KlusjesKoning. Samen plezier in klusjes.</p>
+        <p className="mt-2">
+          KlusjesKoning.app is een concept van{' '}
+          <a
+            href="https://weareimpact.nl/ai-advies-tools-met-impact/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            WeAreImpact
+          </a>
+        </p>
       </footer>
     </div>
   );
