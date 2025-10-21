@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import { AppProvider, useApp } from '@/components/app/AppProvider';
+import { useApp } from '@/components/app/AppProvider';
 import LandingScreen from '@/components/app/screens/LandingScreen';
 import ParentLoginScreen from '@/components/app/screens/ParentLoginScreen';
 import ChildLoginScreen from '@/components/app/screens/ChildLoginScreen';
@@ -76,9 +76,7 @@ export function AppPageClient() {
         </div>
       }
     >
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
+      <AppContent />
     </Suspense>
   );
 }
