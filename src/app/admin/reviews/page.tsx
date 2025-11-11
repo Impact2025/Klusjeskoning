@@ -14,6 +14,8 @@ import type { Review } from '@/lib/types';
 
 const ADMIN_EMAIL = 'admin@klusjeskoning.nl';
 
+export const dynamic = 'force-dynamic';
+
 export default function ReviewsManagement() {
   const router = useRouter();
   const { family, reviews, getReviews, deleteReview, isLoading } = useApp();

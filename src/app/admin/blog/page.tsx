@@ -14,6 +14,8 @@ import type { BlogPost } from '@/lib/types';
 
 const ADMIN_EMAIL = 'admin@klusjeskoning.nl';
 
+export const dynamic = 'force-dynamic';
+
 export default function BlogManagement() {
   const router = useRouter();
   const { family, blogPosts, getBlogPosts, deleteBlogPost, isLoading } = useApp();

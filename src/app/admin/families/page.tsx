@@ -36,6 +36,8 @@ const initialForm: FormState = {
   password: '',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function FamiliesManagement() {
   const router = useRouter();
   const {

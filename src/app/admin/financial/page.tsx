@@ -13,6 +13,8 @@ import { formatPrice } from '@/lib/plans';
 
 const ADMIN_EMAIL = 'admin@klusjeskoning.nl';
 
+export const dynamic = 'force-dynamic';
+
 export default function FinancialManagement() {
   const router = useRouter();
   const { family, financialOverview, getFinancialOverview } = useApp();

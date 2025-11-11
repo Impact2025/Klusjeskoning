@@ -9,6 +9,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { LogIn, Shield } from 'lucide-react';
 import { useApp } from '@/components/app/AppProvider';
 
+export const dynamic = 'force-dynamic';
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const { loginAdmin, currentScreen, isLoading } = useApp();

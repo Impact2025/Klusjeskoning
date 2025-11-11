@@ -11,6 +11,8 @@ import { useApp } from '@/components/app/AppProvider';
 
 const ADMIN_EMAIL = 'admin@klusjeskoning.nl';
 
+export const dynamic = 'force-dynamic';
+
 export default function StatisticsPage() {
   const router = useRouter();
   const {

@@ -8,6 +8,8 @@ import { LogOut, Users, FileText, Gift, BarChart3, CreditCard } from 'lucide-rea
 import AdminLoading from '@/components/admin/AdminLoading';
 import { useApp } from '@/components/app/AppProvider';
 
+export const dynamic = 'force-dynamic';
+
 export default function AdminDashboard() {
   const router = useRouter();
   const {
