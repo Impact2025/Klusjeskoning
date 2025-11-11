@@ -2,12 +2,15 @@
 
 import { ReactNode } from 'react';
 import { Toaster } from '@/components/ui/toaster';
+import { AppProvider } from '@/components/app/AppProvider';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Toaster />
-      {children}
-    </div>
+    <AppProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Toaster />
+        {children}
+      </div>
+    </AppProvider>
   );
 }
