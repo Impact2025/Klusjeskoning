@@ -693,9 +693,19 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error('[api/app]', action, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('[api/app] Error details:', { action, errorMessage, errorStack });
+
     if (error instanceof z.ZodError) {
       return errorResponse('Ongeldige gegevens.', 400);
     }
+
+    // Return more detailed error in development
+    if (process.env.NODE_ENV === 'development') {
+      return errorResponse(`Er ging iets mis: ${errorMessage}`, 500);
+    }
+
     return errorResponse('Er ging iets mis.', 500);
   }
 }
