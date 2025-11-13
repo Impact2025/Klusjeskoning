@@ -164,6 +164,22 @@ export const getFamilyByCode = async (code: string) => {
     where: eq(families.familyCode, code.toUpperCase()),
     with: {
       children: true,
+      chores: {
+        with: {
+          assignments: true,
+        },
+      },
+      rewards: {
+        with: {
+          assignments: true,
+        },
+      },
+      pendingRewards: {
+        with: {
+          child: true,
+          reward: true,
+        },
+      },
     },
   });
 };
