@@ -383,24 +383,26 @@ export default function GuidesPage() {
   return (
     <div className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-sky-100 via-white to-amber-100" />
-      <main className="mx-auto flex max-w-6xl flex-col gap-8 sm:gap-16 px-4 py-8 sm:px-10 sm:py-16">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 sm:gap-12 md:gap-16 px-3 py-6 sm:px-6 md:px-10 sm:py-12 md:py-16">
         <div className="flex justify-start">
           <Button asChild variant="outline" size="sm">
             <Link href="/" className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
-              Terug naar home
+              <span className="hidden sm:inline">Terug naar home</span>
+              <span className="sm:hidden">Terug</span>
             </Link>
           </Button>
         </div>
-        <header className="space-y-4 sm:space-y-6 text-center">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/70 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-primary shadow">
+        <header className="space-y-3 sm:space-y-5 text-center">
+          <div className="mx-auto inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-white/70 px-2.5 sm:px-4 py-1 sm:py-2 text-[11px] sm:text-sm font-semibold text-primary shadow">
             <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
-            Super vette handleiding
+            <span className="hidden xs:inline">Super vette handleiding</span>
+            <span className="xs:hidden">Handleiding</span>
           </div>
-          <h1 className="font-brand text-2xl sm:text-4xl leading-tight text-slate-900 lg:text-5xl">
+          <h1 className="font-brand text-xl sm:text-3xl md:text-4xl leading-tight text-slate-900 lg:text-5xl px-2">
             👨‍👩‍👧 Handleiding voor Ouders & Kids
           </h1>
-          <p className="mx-auto max-w-3xl text-lg text-slate-600 sm:text-xl">
+          <p className="mx-auto max-w-3xl text-sm sm:text-lg text-slate-600 md:text-xl px-4">
             Alles wat je nodig hebt om samen te starten, klusjes te rocken en beloningen te vieren. Kies jouw route hieronder en ontdek stap voor stap hoe het werkt.
           </p>
           <div className="flex flex-wrap justify-center gap-4">

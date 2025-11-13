@@ -167,18 +167,17 @@ export default async function HomePage() {
       <OrganizationSchema />
       <WebApplicationSchema />
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-sky-100 via-white to-amber-50" />
-      <header className="px-4 sm:px-10 py-4 sm:py-8">
-        <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <Image src="https://weareimpact.nl/LogoKlusjeskoning3.png" alt="KlusjesKoning logo" width={40} height={40} className="h-10 w-10 sm:h-14 sm:w-14 rounded-full bg-white shadow-lg" />
+      <header className="px-3 sm:px-6 md:px-10 py-3 sm:py-6 md:py-8">
+        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2">
+          <Link href="/" className="flex items-center space-x-2 sm:space-x-3">
+            <Image src="https://weareimpact.nl/LogoKlusjeskoning3.png" alt="KlusjesKoning logo" width={32} height={32} className="h-8 w-8 sm:h-12 sm:w-12 md:h-14 md:w-14 rounded-full bg-white shadow-lg" />
             <div>
-              <p className="font-brand text-lg sm:text-2xl text-slate-800">KlusjesKoning</p>
-              <p className="text-[10px] sm:text-xs text-slate-500">Game on voor je huishouden</p>
+              <p className="font-brand text-base sm:text-xl md:text-2xl text-slate-800 leading-tight">KlusjesKoning</p>
+              <p className="hidden sm:block text-xs text-slate-500">Game on voor je huishouden</p>
             </div>
-          </div>
-          <div className="hidden items-center space-x-4 md:flex">
-            <Link href="/app" className="text-sm font-semibold text-slate-700 hover:text-slate-900">App omgeving</Link>
-            <Button asChild className="bg-primary text-primary-foreground shadow-md hover:bg-primary/90">
+          </Link>
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <Button asChild size="sm" className="bg-primary text-primary-foreground shadow-md hover:bg-primary/90 text-xs sm:text-sm">
               <Link href="/app?register=true">Start gratis</Link>
             </Button>
           </div>
