@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { MicrosoftClarity } from '@/components/analytics/MicrosoftClarity';
 import { CookieConsent } from '@/components/analytics/CookieConsent';
+import { GoogleReCaptcha } from '@/components/analytics/GoogleReCaptcha';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://klusjeskoningapp.nl'),
@@ -62,6 +63,7 @@ export default function RootLayout({
 }>) {
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
   const clarityId = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
 
   return (
     <html lang="nl">
@@ -77,6 +79,7 @@ export default function RootLayout({
         <CookieConsent />
         {gaId && <GoogleAnalytics measurementId={gaId} />}
         {clarityId && <MicrosoftClarity projectId={clarityId} />}
+        {recaptchaSiteKey && <GoogleReCaptcha siteKey={recaptchaSiteKey} />}
       </body>
     </html>
   );

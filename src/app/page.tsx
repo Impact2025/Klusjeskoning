@@ -167,18 +167,35 @@ export default async function HomePage() {
       <OrganizationSchema />
       <WebApplicationSchema />
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-sky-100 via-white to-amber-50" />
-      <header className="px-3 sm:px-6 md:px-10 py-3 sm:py-6 md:py-8">
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm px-3 sm:px-6 md:px-10 py-3 sm:py-4">
         <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2">
-          <Link href="/" className="flex items-center space-x-2 sm:space-x-3">
-            <Image src="https://weareimpact.nl/LogoKlusjeskoning3.png" alt="KlusjesKoning logo" width={32} height={32} className="h-8 w-8 sm:h-12 sm:w-12 md:h-14 md:w-14 rounded-full bg-white shadow-lg" />
-            <div>
-              <p className="font-brand text-base sm:text-xl md:text-2xl text-slate-800 leading-tight">KlusjesKoning</p>
-              <p className="hidden sm:block text-xs text-slate-500">Game on voor je huishouden</p>
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
+            <Image
+              src="https://weareimpact.nl/LogoKlusjeskoning3.png"
+              alt="KlusjesKoning logo"
+              width={48}
+              height={48}
+              className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 rounded-full bg-white shadow-md"
+            />
+            <div className="min-w-0">
+              <p className="font-brand text-lg sm:text-xl md:text-2xl text-slate-800 leading-tight truncate">
+                KlusjesKoning
+              </p>
+              <p className="hidden sm:block text-xs text-slate-500 truncate">
+                Game on voor je huishouden
+              </p>
             </div>
           </Link>
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <Button asChild size="sm" className="bg-primary text-primary-foreground shadow-md hover:bg-primary/90 text-xs sm:text-sm">
-              <Link href="/app?register=true">Start gratis</Link>
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <Button
+              asChild
+              size="sm"
+              className="bg-primary text-primary-foreground shadow-md hover:bg-primary/90 text-xs sm:text-sm whitespace-nowrap px-3 sm:px-4"
+            >
+              <Link href="/app?register=true">
+                <span className="hidden xs:inline">Start gratis</span>
+                <span className="xs:hidden">Start</span>
+              </Link>
             </Button>
           </div>
         </nav>
