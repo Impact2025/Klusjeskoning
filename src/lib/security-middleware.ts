@@ -74,6 +74,14 @@ export function validateRequestOrigin(
         ...allowedOrigins
       ];
 
+      // In development, allow all localhost origins
+      if (process.env.NODE_ENV !== 'production' && (
+        originUrl.hostname === 'localhost' ||
+        originUrl.hostname === '127.0.0.1'
+      )) {
+        return { valid: true };
+      }
+
       const isAllowed = allowedDomains.some(domain =>
         originUrl.hostname === domain ||
         originUrl.hostname.endsWith('.' + domain)
