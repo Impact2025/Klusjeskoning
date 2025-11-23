@@ -1816,7 +1816,7 @@ export const createVerificationCode = async (params: {
     // If table doesn't exist, create it and retry
     if (error.message?.includes('relation "verification_codes" does not exist')) {
       console.log('Creating verification_codes table...');
-      await db.execute(sql.unsafe(`
+      await db.execute(sql`
         CREATE TABLE IF NOT EXISTS verification_codes (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
           email varchar(255) NOT NULL,
@@ -1829,7 +1829,7 @@ export const createVerificationCode = async (params: {
 
         CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);
         CREATE INDEX IF NOT EXISTS idx_verification_codes_expires_at ON verification_codes(expires_at);
-      `));
+      `);
 
       // Retry the operation
       await db
