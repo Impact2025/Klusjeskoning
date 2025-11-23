@@ -165,7 +165,7 @@ export default function ParentDashboard() {
             {activeTab === 'children' && 'Kinderen'}
             {activeTab === 'chores' && 'Klusjes'}
             {activeTab === 'rewards' && 'Beloningen'}
-            {activeTab === 'actions' && 'Acties'}
+            {activeTab === 'actions' && 'Goedkeuren'}
             {activeTab === 'settings' && 'Instellingen'}
           </h1>
           <p className="text-sm text-gray-600">{family.familyName}</p>
@@ -217,7 +217,7 @@ export default function ParentDashboard() {
                 </TabsTrigger>
                 <TabsTrigger value="actions" className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
-                  Acties
+                  Goedkeuren
                   {totalPending > 0 && (
                     <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
                       {totalPending}
@@ -287,7 +287,7 @@ export default function ParentDashboard() {
                   }`}
                 >
                   <AlertTriangle className="h-5 w-5" />
-                  <span className="text-xs font-medium">Acties</span>
+                  <span className="text-xs font-medium">Goedkeuren</span>
                   {totalPending > 0 && (
                     <Badge
                       variant="destructive"
