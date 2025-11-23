@@ -247,6 +247,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const current = await fetchCurrentFamily();
       if (current) {
         applyFamily(current);
+
+        // Check if we have a child session by checking if user is set and we're in child flow
+        if (user && (currentScreen === 'childPin' || currentScreen === 'childDashboard')) {
+          // Keep the existing child user and screen
+          return;
+        }
+
+        // Default parent dashboard for parent sessions
         setScreen((prev) => (prev === 'landing' || prev === 'parentLogin' ? 'parentDashboard' : prev));
       }
       // If no session but we're in child login flow, don't reset anything
@@ -254,7 +262,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.error('refreshFamily error', error);
       // Don't reset family or screen during child login flow
     }
-  }, [applyFamily]);
+  }, [applyFamily, user, currentScreen]);
 
   useEffect(() => {
     void refreshFamily();

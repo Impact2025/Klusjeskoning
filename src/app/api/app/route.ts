@@ -631,7 +631,7 @@ export async function POST(request: Request) {
         if (!child || child.pin !== data.pin) {
           return errorResponse('Onjuiste pincode.', 401);
         }
-        await createSession(data.familyId);
+        await createSession(data.familyId, data.childId);
         return respondWithFamily(data.familyId);
       }
       case 'addChild': {
