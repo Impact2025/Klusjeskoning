@@ -21,7 +21,9 @@ import {
   Gift,
   BarChart3,
   Edit,
-  Trash2
+  Trash2,
+  Home,
+  Menu
 } from 'lucide-react';
 import type { Chore, Child, Reward } from '@/lib/types';
 import AddChildModal from '../models/AddChildModal';
@@ -113,8 +115,8 @@ export default function ParentDashboard() {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      {/* Header */}
-      <header className="p-4 flex justify-between items-center bg-white shadow-sm border-b">
+      {/* Desktop Header */}
+      <header className="hidden md:flex p-4 justify-between items-center bg-white shadow-sm border-b">
         <div>
           <h1 className="text-xl font-bold text-gray-800">KlusjesKoning</h1>
           <p className="text-sm text-gray-600">{family.familyName}</p>
@@ -139,40 +141,145 @@ export default function ParentDashboard() {
         </div>
       </header>
 
+      {/* Mobile Header */}
+      <header className="md:hidden p-4 flex justify-between items-center bg-white shadow-sm border-b">
+        <div>
+          <h1 className="text-lg font-bold text-gray-800">
+            {activeTab === 'overview' && 'Overzicht'}
+            {activeTab === 'children' && 'Kinderen'}
+            {activeTab === 'chores' && 'Klusjes'}
+            {activeTab === 'rewards' && 'Beloningen'}
+            {activeTab === 'actions' && 'Acties'}
+            {activeTab === 'settings' && 'Instellingen'}
+          </h1>
+          <p className="text-sm text-gray-600">{family.familyName}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {family.subscription?.plan === 'starter' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 text-xs px-2 py-1"
+              onClick={() => window.location.href = '/app/upgrade'}
+            >
+              ⭐ Premium
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setActiveTab('settings')}>
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={logout}>
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+
       <ScrollArea className="flex-grow">
-        <main className="p-4">
+        <main className="p-4 pb-20 md:pb-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="overview" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Overzicht
-              </TabsTrigger>
-              <TabsTrigger value="children" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Kinderen
-              </TabsTrigger>
-              <TabsTrigger value="chores" className="flex items-center gap-2">
-                <ListTodo className="h-4 w-4" />
-                Klusjes
-              </TabsTrigger>
-              <TabsTrigger value="rewards" className="flex items-center gap-2">
-                <Gift className="h-4 w-4" />
-                Beloningen
-              </TabsTrigger>
-              <TabsTrigger value="actions" className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Acties
-                {totalPending > 0 && (
-                  <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
-                    {totalPending}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Instellingen
-              </TabsTrigger>
-            </TabsList>
+            {/* Desktop Navigation */}
+            <div className="hidden md:block">
+              <TabsList className="grid w-full grid-cols-6">
+                <TabsTrigger value="overview" className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Overzicht
+                </TabsTrigger>
+                <TabsTrigger value="children" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Kinderen
+                </TabsTrigger>
+                <TabsTrigger value="chores" className="flex items-center gap-2">
+                  <ListTodo className="h-4 w-4" />
+                  Klusjes
+                </TabsTrigger>
+                <TabsTrigger value="rewards" className="flex items-center gap-2">
+                  <Gift className="h-4 w-4" />
+                  Beloningen
+                </TabsTrigger>
+                <TabsTrigger value="actions" className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Acties
+                  {totalPending > 0 && (
+                    <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                      {totalPending}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  Instellingen
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Mobile Bottom Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-50">
+              <div className="grid grid-cols-5 h-16">
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 transition-colors ${
+                    activeTab === 'overview'
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <Home className="h-5 w-5" />
+                  <span className="text-xs font-medium">Home</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('children')}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 transition-colors ${
+                    activeTab === 'children'
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <Users className="h-5 w-5" />
+                  <span className="text-xs font-medium">Kinderen</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('chores')}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 transition-colors ${
+                    activeTab === 'chores'
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <ListTodo className="h-5 w-5" />
+                  <span className="text-xs font-medium">Klusjes</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('rewards')}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 transition-colors ${
+                    activeTab === 'rewards'
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <Gift className="h-5 w-5" />
+                  <span className="text-xs font-medium">Beloningen</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('actions')}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 transition-colors relative ${
+                    activeTab === 'actions'
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="text-xs font-medium">Acties</span>
+                  {totalPending > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
+                    >
+                      {totalPending}
+                    </Badge>
+                  )}
+                </button>
+              </div>
+            </div>
 
             <TabsContent value="overview" className="space-y-6 mt-6">
               {/* Family Overview */}
