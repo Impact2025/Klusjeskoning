@@ -1,9 +1,15 @@
-import { sql } from 'drizzle-orm';
-import { db } from '../src/server/db/client';
+import { neon } from '@neondatabase/serverless';
 
 async function createTable() {
   try {
     console.log('Creating verification_codes table...');
+
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL not configured');
+    }
+
+    const sql = neon(connectionString);
 
     const createTableSQL = `
       CREATE TABLE IF NOT EXISTS verification_codes (
@@ -20,7 +26,7 @@ async function createTable() {
       CREATE INDEX IF NOT EXISTS idx_verification_codes_expires_at ON verification_codes(expires_at);
     `;
 
-    await db.execute(sql.unsafe(createTableSQL));
+    await sql`${createTableSQL}`;
     console.log('Verification codes table created successfully!');
   } catch (error) {
     console.error('Error creating verification codes table:', error);
