@@ -28,6 +28,13 @@ export default function ChildPinScreen() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setScreen('childLogin');
+      return;
+    }
+  }, [user, setScreen]);
+
+  useEffect(() => {
     if (pin.length === 4) {
       handleSubmit();
     }
@@ -35,7 +42,6 @@ export default function ChildPinScreen() {
   }, [pin]);
 
   if (!user) {
-    setScreen('childLogin');
     return null;
   }
 
