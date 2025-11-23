@@ -40,6 +40,7 @@ export default function ChildDashboard() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isAvatarCustomizerOpen, setAvatarCustomizerOpen] = useState(false);
   const [selectedChoreId, setSelectedChoreId] = useState<string | null>(null);
+  const [optimisticallySubmittedChores, setOptimisticallySubmittedChores] = useState<Set<string>>(new Set());
 
   // Check if child has completed onboarding
   useEffect(() => {
@@ -64,6 +65,34 @@ export default function ChildDashboard() {
 
   const currentLevel = LEVEL_BADGES.find(badge => badge.level <= getLevelFromXp(user.totalXpEver || 0)) || LEVEL_BADGES[0];
   
+  const handleSubmissionStart = (choreId: string) => {
+    setOptimisticallySubmittedChores(prev => new Set(prev).add(choreId));
+  };
+
+  const handleSubmissionSuccess = (choreId: string) => {
+    // Keep it in optimistic set until state updates
+  };
+
+  const handleSubmissionError = (choreId: string) => {
+    // Remove from optimistic set on error
+    setOptimisticallySubmittedChores(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(choreId);
+      return newSet;
+    });
+  };
+
+  const handleModalClose = (choreId: string | null) => {
+    if (choreId) {
+      // Remove from optimistic set if modal is closed without submission
+      setOptimisticallySubmittedChores(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(choreId);
+        return newSet;
+      });
+    }
+  };
+
   const openSubmitModal = (choreId: string) => {
     setSelectedChoreId(choreId);
     setSubmitChoreOpen(true);
@@ -90,7 +119,8 @@ export default function ChildDashboard() {
       familyChore.status === 'submitted' &&
       familyChore.submittedBy === user.id
     );
-    return isAvailable && isAssigned && !hasSubmitted;
+    const isOptimisticallySubmitted = optimisticallySubmittedChores.has(c.id);
+    return isAvailable && isAssigned && !hasSubmitted && !isOptimisticallySubmitted;
   });
   const submittedChores = family.chores.filter(c => c.status === 'submitted' && c.submittedBy === user.id);
 
@@ -193,7 +223,15 @@ export default function ChildDashboard() {
       </nav>
       
       <RewardShopModal isOpen={isRewardShopOpen} setIsOpen={setRewardShopOpen} />
-      <SubmitChoreModal isOpen={isSubmitChoreOpen} setIsOpen={setSubmitChoreOpen} choreId={selectedChoreId} />
+      <SubmitChoreModal
+        isOpen={isSubmitChoreOpen}
+        setIsOpen={setSubmitChoreOpen}
+        choreId={selectedChoreId}
+        onSubmissionStart={handleSubmissionStart}
+        onSubmissionSuccess={handleSubmissionSuccess}
+        onSubmissionError={handleSubmissionError}
+        onModalClose={handleModalClose}
+      />
       <LevelsModal isOpen={isLevelsModalOpen} setIsOpen={setLevelsModalOpen} />
       <ChildOnboardingModal isOpen={isOnboardingOpen} setIsOpen={setIsOnboardingOpen} />
       {/* <AvatarCustomizerModal isOpen={isAvatarCustomizerOpen} setIsOpen={setAvatarCustomizerOpen} /> */}

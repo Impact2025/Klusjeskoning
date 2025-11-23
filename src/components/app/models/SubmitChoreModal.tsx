@@ -12,11 +12,23 @@ type SubmitChoreModalProps = {
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
     choreId: string | null;
+    onSubmissionStart?: (choreId: string) => void;
+    onSubmissionSuccess?: (choreId: string) => void;
+    onSubmissionError?: (choreId: string) => void;
+    onModalClose?: (choreId: string | null) => void;
 };
 
 const emotions = ['😫', '😕', '🙂', '😁', '😎'];
 
-export default function SubmitChoreModal({ isOpen, setIsOpen, choreId }: SubmitChoreModalProps) {
+export default function SubmitChoreModal({
+  isOpen,
+  setIsOpen,
+  choreId,
+  onSubmissionStart,
+  onSubmissionSuccess,
+  onSubmissionError,
+  onModalClose
+}: SubmitChoreModalProps) {
   const { family, submitChoreForApproval } = useApp();
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -63,6 +75,7 @@ export default function SubmitChoreModal({ isOpen, setIsOpen, choreId }: SubmitC
     if(isSubmitting) return;
     setIsOpen(false);
     resetState();
+    onModalClose?.(choreId);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -71,19 +84,21 @@ export default function SubmitChoreModal({ isOpen, setIsOpen, choreId }: SubmitC
         toast({ variant: "destructive", title: "Oeps!", description: "Kies hoe je je voelde bij dit klusje." });
         return;
     }
-    
+
     setIsSubmitting(true);
-    submitChoreForApproval(choreId, selectedEmotion, photoFile)
-      .then(() => {
-        toast({ title: "Goed gedaan!", description: "Klusje ingediend voor goedkeuring." });
-        setIsOpen(false);
-        resetState();
-      })
-      .catch((err) => {
-        console.error("Submission failed", err);
-        toast({ variant: "destructive", title: "Fout bij indienen", description: err.message || "Kon het klusje niet indienen." });
-        setIsSubmitting(false);
-      });
+    onSubmissionStart?.(choreId);
+    try {
+      await submitChoreForApproval(choreId, selectedEmotion, photoFile);
+      toast({ title: "Goed gedaan!", description: "Klusje ingediend voor goedkeuring." });
+      setIsOpen(false);
+      resetState();
+      onSubmissionSuccess?.(choreId);
+    } catch (err) {
+      console.error("Submission failed", err);
+      toast({ variant: "destructive", title: "Fout bij indienen", description: err.message || "Kon het klusje niet indienen." });
+      setIsSubmitting(false);
+      onSubmissionError?.(choreId);
+    }
   };
 
   if (!chore) return null;
