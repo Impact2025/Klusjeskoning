@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://www.google-analytics.com https://clarity.microsoft.com https://api.qrserver.com https://weareimpact.nl",
+              "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://clarity.microsoft.com https://api.qrserver.com https://weareimpact.nl",
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",
