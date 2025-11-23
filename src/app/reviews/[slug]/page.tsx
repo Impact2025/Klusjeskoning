@@ -6,13 +6,14 @@ import { nl } from 'date-fns/locale';
 import type { Metadata } from 'next';
 
 type ReviewPageProps = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 export const revalidate = 300;
 
 export async function generateMetadata({ params }: ReviewPageProps): Promise<Metadata> {
-  const review = await fetchReviewBySlug(params.slug);
+  const { slug } = await params;
+  const review = await fetchReviewBySlug(slug);
   if (!review || review.status !== 'published') {
     return { title: 'Review niet gevonden | KlusjesKoning' };
   }
@@ -27,7 +28,8 @@ export async function generateMetadata({ params }: ReviewPageProps): Promise<Met
 }
 
 export default async function ReviewPage({ params }: ReviewPageProps) {
-  const review = await fetchReviewBySlug(params.slug);
+  const { slug } = await params;
+  const review = await fetchReviewBySlug(slug);
 
   if (!review || review.status !== 'published') {
     notFound();
