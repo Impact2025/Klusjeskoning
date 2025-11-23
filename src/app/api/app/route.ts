@@ -707,9 +707,9 @@ export async function POST(request: Request) {
           if (child && chore) {
             await sendNotification(request, {
               type: 'chore_submitted',
-              to: familyRecord.email,
+              to: (familyRecord as any).email,
               data: {
-                parentName: familyRecord.familyName,
+                parentName: (familyRecord as any).familyName,
                 childName: child.name,
                 choreName: chore.name,
                 points: chore.points,
