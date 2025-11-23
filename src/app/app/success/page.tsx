@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { CheckCircle, Crown, Star, Users, Zap, Heart, ArrowRight, Sparkles } fro
 import { useAppContext } from '@/components/app/AppProvider';
 import confetti from 'canvas-confetti';
 
-export default function SuccessPage() {
+function SuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { family } = useAppContext();
@@ -208,5 +208,13 @@ export default function SuccessPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <SuccessContent />
+    </Suspense>
   );
 }

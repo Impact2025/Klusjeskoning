@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { sql } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 import { db } from '@/server/db/client';
+import { children, avatarItems, avatarCustomizations } from '@/server/db/schema';
 
 import {
   authenticateFamily,
@@ -198,9 +199,14 @@ const couponSchema = z.object({
   validUntil: z.string().datetime().optional(),
   isActive: z.boolean().optional(),
 }).transform((data) => ({
-  ...data,
+  code: data.code,
+  description: data.description,
+  discountType: data.discountType,
+  discountValue: data.discountValue,
+  maxUses: data.maxUses,
   validFrom: data.validFrom ? new Date(data.validFrom) : undefined,
   validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+  isActive: data.isActive,
 }));
 
 const couponUpdateSchema = z.object({
@@ -213,9 +219,14 @@ const couponUpdateSchema = z.object({
   validUntil: z.string().datetime().nullable().optional(),
   isActive: z.boolean().optional(),
 }).transform((data) => ({
-  ...data,
+  couponId: data.couponId,
+  description: data.description,
+  discountType: data.discountType,
+  discountValue: data.discountValue,
+  maxUses: data.maxUses,
   validFrom: data.validFrom ? new Date(data.validFrom) : undefined,
   validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+  isActive: data.isActive,
 }));
 
 const couponDeleteSchema = z.object({ couponId: z.string() });
@@ -236,8 +247,12 @@ const subscriptionSetSchema = z.object({
   renewalDate: z.string().datetime().nullable().optional(),
   orderId: z.string().nullable().optional(),
 }).transform((data) => ({
-  ...data,
+  familyId: data.familyId,
+  plan: data.plan,
+  status: data.status,
+  interval: data.interval,
   renewalDate: data.renewalDate ? new Date(data.renewalDate) : null,
+  orderId: data.orderId,
 }));
 
 const subscriptionUpgradeSchema = z.object({
@@ -260,12 +275,14 @@ const subscriptionExtendSchema = z.object({
   orderId: z.string().optional(),
 });
 
+const subscriptionOperationSchema = z.object({
+  familyId: z.string().min(1),
+  action: z.enum(['upgrade', 'downgrade', 'extend', 'cancel']),
+  options: z.record(z.any()).optional(),
+});
+
 const bulkSubscriptionUpdateSchema = z.object({
-  operations: z.array(z.object({
-    familyId: z.string().min(1),
-    action: z.enum(['upgrade', 'downgrade', 'extend', 'cancel']),
-    options: z.record(z.any()).optional(),
-  })).min(1),
+  operations: z.array(subscriptionOperationSchema).min(1),
 });
 
 const unlockAvatarItemSchema = z.object({
@@ -1051,13 +1068,17 @@ export async function POST(request: Request) {
       case 'bulkUpdateSubscriptions': {
         await requireAdminSession();
         const data = bulkSubscriptionUpdateSchema.parse(payload);
-        const results = await bulkUpdateSubscriptions(data.operations);
+        const results = await bulkUpdateSubscriptions(data.operations as Array<{
+          familyId: string;
+          action: 'upgrade' | 'downgrade' | 'extend' | 'cancel';
+          options?: any;
+        }>);
         return NextResponse.json({ results });
       }
       case 'createVerificationTable': {
         try {
           // Create verification_codes table
-          const createTableSQL = `
+          await db.execute(sql`
             CREATE TABLE IF NOT EXISTS verification_codes (
               id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
               email varchar(255) NOT NULL,
@@ -1070,8 +1091,7 @@ export async function POST(request: Request) {
 
             CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);
             CREATE INDEX IF NOT EXISTS idx_verification_codes_expires_at ON verification_codes(expires_at);
-          `;
-          await db.execute(sql.unsafe(createTableSQL));
+          `);
           return NextResponse.json({ success: true, message: 'Verification codes table created' });
         } catch (error) {
           console.error('Error creating verification table:', error);
@@ -1083,7 +1103,7 @@ export async function POST(request: Request) {
         const data = unlockAvatarItemSchema.parse(payload);
 
         // Verify the child belongs to the family
-        const family = await loadFamilyWithRelations(session.familyId);
+        const family = await loadFamilyWithRelations(session.familyId) as { children: { id: string }[] } | null;
         if (!family?.children.some(child => child.id === data.childId)) {
           return errorResponse('Kind niet gevonden in gezin.', 404);
         }
@@ -1147,7 +1167,7 @@ export async function POST(request: Request) {
         const data = equipAvatarItemSchema.parse(payload);
 
         // Verify the child belongs to the family
-        const family = await loadFamilyWithRelations(session.familyId);
+        const family = await loadFamilyWithRelations(session.familyId) as { children: { id: string }[] } | null;
         if (!family?.children.some(child => child.id === data.childId)) {
           return errorResponse('Kind niet gevonden in gezin.', 404);
         }

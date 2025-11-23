@@ -41,6 +41,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: false,
       chainOrder: 1,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
     {
       id: 'make-bed',
@@ -53,6 +55,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: false,
       chainOrder: 2,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
     {
       id: 'get-dressed',
@@ -65,6 +69,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: true, // Main quest badge
       chainOrder: 3,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
   ],
   'bedroom-cleanup': [
@@ -79,6 +85,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: false,
       chainOrder: 1,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
     {
       id: 'fold-clothes',
@@ -91,6 +99,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: false,
       chainOrder: 2,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
     {
       id: 'vacuum-floor',
@@ -103,6 +113,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: true,
       chainOrder: 3,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
   ],
   'kitchen-helper': [
@@ -117,6 +129,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: false,
       chainOrder: 1,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
     {
       id: 'load-dishwasher',
@@ -129,6 +143,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: false,
       chainOrder: 2,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
     {
       id: 'wipe-counters',
@@ -141,6 +157,8 @@ export const QUEST_CHAIN_CHORES: Record<string, Chore[]> = {
       isMainQuest: true,
       chainOrder: 3,
       createdAt: Timestamp.now(),
+      recurrenceType: null,
+      isTemplate: false,
     },
   ],
 };

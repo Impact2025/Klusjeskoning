@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         if (customInfo?.family_id) {
           try {
             const { loadFamilyWithRelations } = await import('@/server/services/family-service');
-            const family = await loadFamilyWithRelations(customInfo.family_id);
+            const family = await loadFamilyWithRelations(customInfo.family_id) as { email: string; familyName: string; familyCode: string } | null;
 
             if (family) {
               const { sendEmail } = await import('@/lib/email/sendgrid');

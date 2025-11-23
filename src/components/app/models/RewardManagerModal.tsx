@@ -28,7 +28,7 @@ const iconMap: Record<RewardType, React.ReactNode> = {
 };
 
 export default function RewardManagerModal({ isOpen, setIsOpen }: RewardManagerModalProps) {
-  const { family, createReward, updateReward, deleteReward } = useApp();
+  const { family, addReward, updateReward, deleteItem } = useApp();
   const { toast } = useToast();
   const [isAddingReward, setIsAddingReward] = useState(false);
   const [editingReward, setEditingReward] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export default function RewardManagerModal({ isOpen, setIsOpen }: RewardManagerM
           description: `"${formData.name}" is succesvol bijgewerkt.`,
         });
       } else {
-        await createReward(formData);
+        await addReward(formData.name, formData.points, formData.type, []);
         toast({
           title: "Beloning toegevoegd",
           description: `"${formData.name}" is toegevoegd aan jullie beloningen.`,
@@ -101,7 +101,7 @@ export default function RewardManagerModal({ isOpen, setIsOpen }: RewardManagerM
 
     if (confirm(`Weet je zeker dat je "${reward.name}" wilt verwijderen?`)) {
       try {
-        await deleteReward(rewardId);
+        await deleteItem('rewards', rewardId);
         toast({
           title: "Beloning verwijderd",
           description: `"${reward.name}" is verwijderd.`,
@@ -116,7 +116,7 @@ export default function RewardManagerModal({ isOpen, setIsOpen }: RewardManagerM
     }
   };
 
-  const suggestedRewards = getRewardSuggestionsForFamily(family.children);
+  const suggestedRewards = getRewardSuggestionsForFamily(family.children.map(child => ({ name: child.name, age: 10 })));
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

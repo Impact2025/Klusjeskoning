@@ -15,6 +15,7 @@ import type {
   PlanTier,
   SubscriptionStatus,
   BillingInterval,
+  RecurrenceType,
 } from '@/lib/types';
 import { Timestamp, deserializeTimestamp } from '@/lib/timestamp';
 
@@ -85,6 +86,8 @@ const mapChore = (chore: SerializableChore): Chore => ({
   isMainQuest: chore.isMainQuest,
   chainOrder: chore.chainOrder ?? null,
   createdAt: toTimestamp(chore.createdAt),
+  recurrenceType: (chore.recurrenceType as RecurrenceType) ?? null,
+  isTemplate: chore.isTemplate ?? false,
 });
 
 const mapReward = (reward: SerializableReward): Reward => ({

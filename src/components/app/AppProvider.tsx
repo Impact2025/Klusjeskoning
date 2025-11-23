@@ -628,7 +628,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [handleAction]);
 
   const deleteCoupon = useCallback(async (couponId: string) => {
-    return await handleAction('deleteCoupon', { couponId });
+    await handleAction<{ success: boolean }>('deleteCoupon', { couponId });
   }, [handleAction]);
 
   const getCouponStats = useCallback(async () => {
@@ -637,7 +637,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [handleAction]);
 
   const generateCouponCode = useCallback(async () => {
-    return await handleAction<string>('generateCouponCode', undefined);
+    const result = await handleAction<{ code: string }>('generateCouponCode', undefined);
+    return result.code;
   }, [handleAction]);
 
   const upgradeFamilyToPro = useCallback(async (familyId: string, options?: any) => {

@@ -25,6 +25,8 @@ export type SerializableChore = {
   isMainQuest: boolean;
   chainOrder?: number | null;
   createdAt: string | null;
+  recurrenceType?: string | null;
+  isTemplate?: boolean;
 };
 
 export type SerializableReward = {
