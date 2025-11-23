@@ -11,13 +11,12 @@ import { sessions } from '../db/schema';
 const SESSION_COOKIE = 'kk_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 
-export const createSession = async (familyId: string, childId?: string) => {
+export const createSession = async (familyId: string) => {
   const token = randomUUID();
   const expiresAt = addMilliseconds(new Date(), SESSION_TTL_MS);
 
   await db.insert(sessions).values({
     familyId,
-    childId: childId || null,
     token,
     expiresAt,
   });
@@ -54,7 +53,6 @@ export const getSession = async () => {
     where: eq(sessions.token, sessionCookie.value),
     with: {
       family: true,
-      child: true,
     },
   });
 

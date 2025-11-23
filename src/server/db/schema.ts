@@ -227,7 +227,6 @@ export const sessions = pgTable('sessions', {
   familyId: uuid('family_id')
     .notNull()
     .references(() => families.id, { onDelete: 'cascade' }),
-  childId: uuid('child_id').references(() => children.id, { onDelete: 'cascade' }), // null for parent sessions
   token: text('token').notNull().unique(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
