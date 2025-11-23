@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PLAN_DEFINITIONS } from '@/lib/plans';
 import type { BillingInterval, PlanTier } from '@/lib/types';
+import { validateCoupon, applyCouponToOrder } from '@/server/services/family-service';
 
 const MULTISAFEPAY_API_KEY = process.env.MULTISAFEPAY_API_KEY;
 const MULTISAFEPAY_API_BASE = process.env.MULTISAFEPAY_API_BASE ?? 'https://testapi.multisafepay.com/v1/json';
@@ -11,6 +12,7 @@ type CreateOrderRequest = {
   email: string;
   interval: BillingInterval;
   plan: PlanTier;
+  couponCode?: string;
 };
 
 type MultiSafepayCreateResponse = {
@@ -31,12 +33,16 @@ export async function POST(request: NextRequest) {
 
   let payload: CreateOrderRequest;
   try {
-    payload = (await request.json()) as CreateOrderRequest;
+    const rawBody = await request.text();
+    console.log('Raw request body:', rawBody);
+    payload = JSON.parse(rawBody) as CreateOrderRequest;
+    console.log('Parsed payload:', payload);
   } catch (error) {
+    console.error('JSON parsing error:', error);
     return NextResponse.json({ error: 'Ongeldige JSON payload.' }, { status: 400 });
   }
 
-  const { familyId, familyName, email, interval, plan } = payload;
+  const { familyId, familyName, email, interval, plan, couponCode } = payload;
 
   if (!familyId || !email || !familyName) {
     return NextResponse.json({ error: 'familyId, familyName en email zijn verplicht.' }, { status: 400 });
@@ -51,18 +57,54 @@ export async function POST(request: NextRequest) {
   }
 
   const planDefinition = PLAN_DEFINITIONS[plan];
-  const amount = interval === 'yearly' ? planDefinition.priceYearlyCents : planDefinition.priceMonthlyCents;
+  let amount = interval === 'yearly' ? planDefinition.priceYearlyCents : planDefinition.priceMonthlyCents;
+  let discountAmount = 0;
+  let appliedCoupon = null;
 
-  if (amount <= 0) {
-    return NextResponse.json({ error: 'Je kunt geen betaalverzoek starten voor een gratis plan.' }, { status: 400 });
+  // Validate and apply coupon if provided
+  if (couponCode) {
+    console.log('Validating coupon:', couponCode, 'for family:', familyId);
+    try {
+      const coupon = await validateCoupon(couponCode, familyId);
+      console.log('Coupon validated:', coupon);
+
+      // Calculate discount
+      if (coupon.discountType === 'percentage') {
+        discountAmount = Math.round((amount * coupon.discountValue) / 100);
+      } else {
+        discountAmount = Math.min(coupon.discountValue, amount);
+      }
+
+      console.log('Original amount:', amount + discountAmount, 'Discount:', discountAmount, 'Final amount:', amount);
+
+      // Apply discount
+      amount = Math.max(0, amount - discountAmount);
+      appliedCoupon = coupon;
+    } catch (error) {
+      console.error('Coupon validation error:', error);
+      return NextResponse.json({
+        error: error instanceof Error ? error.message : 'Coupon code ongeldig.'
+      }, { status: 400 });
+    }
   }
 
   const origin = request.nextUrl.origin;
-  const orderId = `sub-${familyId}-${Date.now()}`;
+  const orderId = `sub-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+  // Handle free orders (100% discount) after coupon processing
+  if (amount <= 0) {
+    // For free orders, create a mock successful response
+    const freeOrderId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    return NextResponse.json({
+      orderId: freeOrderId,
+      paymentUrl: `${origin}/app/success?order_id=${freeOrderId}&interval=${interval}&free=true`,
+      free: true
+    }, { status: 200 });
+  }
 
   const paymentOptions = {
     notification_url: `${origin}/api/billing/webhook`,
-    redirect_url: `${origin}/app?checkout=success&order_id=${orderId}&interval=${interval}`,
+    redirect_url: `${origin}/app/success?order_id=${orderId}&interval=${interval}`,
     cancel_url: `${origin}/app?checkout=cancel`,
   };
 
@@ -71,18 +113,17 @@ export async function POST(request: NextRequest) {
     order_id: orderId,
     currency: 'EUR',
     amount,
-    description: `${planDefinition.label} (${interval})`,
-    customer: {
-      first_name: familyName,
-      last_name: 'Familie',
-      email,
-      locale: 'nl_NL',
-    },
+    description: `${planDefinition.label} (${interval})${appliedCoupon ? ` - ${appliedCoupon.discountValue}${appliedCoupon.discountType === 'percentage' ? '%' : '€'} korting` : ''}`,
     payment_options: paymentOptions,
     custom_info: {
       subscription_interval: interval,
       plan,
       family_id: familyId,
+      family_name: familyName,
+      email,
+      coupon_id: appliedCoupon?.id,
+      original_amount: interval === 'yearly' ? planDefinition.priceYearlyCents : planDefinition.priceMonthlyCents,
+      discount_amount: discountAmount,
     },
   };
 

@@ -40,7 +40,7 @@ export default function EditRewardModal({ isOpen, setIsOpen, reward }: EditRewar
     }
   }, [reward]);
 
-  if (!family) return null;
+  if (!family || !reward) return null;
 
   const handleUpdate = () => {
     const pointsNum = parseInt(points, 10);
@@ -62,7 +62,7 @@ export default function EditRewardModal({ isOpen, setIsOpen, reward }: EditRewar
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="font-brand text-2xl">Beloning Bewerken</DialogTitle>
-          <DialogDescription>Pas de gegevens van "{reward.name}" aan.</DialogDescription>
+          <DialogDescription>Pas de gegevens van "{reward?.name || 'deze beloning'}" aan.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">

@@ -37,7 +37,7 @@ export default function EditChoreModal({ isOpen, setIsOpen, chore }: EditChoreMo
     }
   }, [chore]);
 
-  if (!family) return null;
+  if (!family || !chore) return null;
 
   const handleUpdate = () => {
     const pointsNum = parseInt(points, 10);
@@ -59,7 +59,7 @@ export default function EditChoreModal({ isOpen, setIsOpen, chore }: EditChoreMo
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="font-brand text-2xl">Klusje Bewerken</DialogTitle>
-          <DialogDescription>Pas de gegevens van "{chore.name}" aan.</DialogDescription>
+          <DialogDescription>Pas de gegevens van "{chore?.name || 'dit klusje'}" aan.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">

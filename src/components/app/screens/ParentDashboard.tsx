@@ -1,723 +1,638 @@
 'use client';
-import Link from 'next/link';
-import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+
+import { useState, useEffect } from 'react';
 import { useApp } from '../AppProvider';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { LogOut, Copy, QrCode, Plus, ListOrdered, Sparkles, Medal, Trash2, Check, X, Bell, Pencil, Gift, CreditCard, Settings } from 'lucide-react';
-import { WhatsAppIcon } from '@/lib/icons';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
-import { formatPrice, PLAN_DEFINITIONS } from '@/lib/plans';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  Plus,
+  Image as ImageIcon,
+  DollarSign,
+  Users,
+  LogOut,
+  Settings,
+  ListTodo,
+  Gift,
+  BarChart3,
+  Edit,
+  Trash2
+} from 'lucide-react';
+import type { Chore, Child, Reward } from '@/lib/types';
 import AddChildModal from '../models/AddChildModal';
-import AddChoreModal from '../models/AddChoreModal';
-import AddRewardModal from '../models/AddRewardModal';
 import EditChildModal from '../models/EditChildModal';
+import AddChoreModal from '../models/AddChoreModal';
 import EditChoreModal from '../models/EditChoreModal';
+import AddRewardModal from '../models/AddRewardModal';
 import EditRewardModal from '../models/EditRewardModal';
-import TopChoresModal from '../models/TopChoresModal';
-import TopRewardsModal from '../models/TopRewardsModal';
-import GeminiChoreIdeasModal from '../models/GeminiChoreIdeasModal';
-import QrCodeModal from '../models/QrCodeModal';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import type { Child, Chore, Reward, BillingInterval } from '@/lib/types';
-import { Timestamp } from '@/lib/timestamp';
-import { format } from 'date-fns';
-import { nl } from 'date-fns/locale';
-
-// Only import components that might cause SSR issues dynamically
-import dynamic from 'next/dynamic';
-const AddChildModalDynamic = dynamic(() => import('../models/AddChildModal'), { ssr: false });
-const AddChoreModalDynamic = dynamic(() => import('../models/AddChoreModal'), { ssr: false });
-const AddRewardModalDynamic = dynamic(() => import('../models/AddRewardModal'), { ssr: false });
-const EditChildModalDynamic = dynamic(() => import('../models/EditChildModal'), { ssr: false });
-const EditChoreModalDynamic = dynamic(() => import('../models/EditChoreModal'), { ssr: false });
-const EditRewardModalDynamic = dynamic(() => import('../models/EditRewardModal'), { ssr: false });
-const TopChoresModalDynamic = dynamic(() => import('../models/TopChoresModal'), { ssr: false });
-const TopRewardsModalDynamic = dynamic(() => import('../models/TopRewardsModal'), { ssr: false });
-const GeminiChoreIdeasModalDynamic = dynamic(() => import('../models/GeminiChoreIdeasModal'), { ssr: false });
-const QrCodeModalDynamic = dynamic(() => import('../models/QrCodeModal'), { ssr: false });
 
 export default function ParentDashboard() {
-  const {
-    family,
-    logout,
-    approveChore,
-    rejectChore,
-    markRewardAsGiven,
-    deleteItem,
-    saveRecoveryEmail,
-    goodCauses,
-    activePlan,
-    planDefinition,
-    isPremium,
-    monthlyChoreUsage,
-    startPremiumCheckout,
-    confirmPremiumCheckout,
-    canAccessFeature,
-    isLoading,
-  } = useApp();
-  const { toast } = useToast();
-  
-  const [isAddChildModalOpen, setAddChildModalOpen] = useState(false);
-  const [isAddChoreModalOpen, setAddChoreModalOpen] = useState(false);
-  const [isAddRewardModalOpen, setAddRewardModalOpen] = useState(false);
+  const { family, logout, approveChore, deleteItem } = useApp();
+  const [pendingApprovals, setPendingApprovals] = useState<Chore[]>([]);
+  const [emptySavings, setEmptySavings] = useState<Child[]>([]);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [isAddChildOpen, setIsAddChildOpen] = useState(false);
+  const [isEditChildOpen, setIsEditChildOpen] = useState(false);
+  const [selectedChild, setSelectedChild] = useState<Child | null>(null);
+  const [isAddChoreOpen, setIsAddChoreOpen] = useState(false);
+  const [isEditChoreOpen, setIsEditChoreOpen] = useState(false);
+  const [selectedChore, setSelectedChore] = useState<Chore | null>(null);
+  const [isAddRewardOpen, setIsAddRewardOpen] = useState(false);
+  const [isEditRewardOpen, setIsEditRewardOpen] = useState(false);
+  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [automationSettings, setAutomationSettings] = useState<any>(null);
 
-  const [isEditChildModalOpen, setEditChildModalOpen] = useState(false);
-  const [isEditChoreModalOpen, setEditChoreModalOpen] = useState(false);
-  const [isEditRewardModalOpen, setEditRewardModalOpen] = useState(false);
-
-  const [editingChild, setEditingChild] = useState<Child | null>(null);
-  const [editingChore, setEditingChore] = useState<Chore | null>(null);
-  const [editingReward, setEditingReward] = useState<Reward | null>(null);
-
-  const [isTopChoresModalOpen, setTopChoresModalOpen] = useState(false);
-  const [isTopRewardsModalOpen, setTopRewardsModalOpen] = useState(false);
-  const [isGeminiModalOpen, setGeminiModalOpen] = useState(false);
-  const [isQrCodeModalOpen, setQrCodeModalOpen] = useState(false);
-  const [isPremiumModalOpen, setPremiumModalOpen] = useState(false);
-  const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [showFullCauseDescription, setShowFullCauseDescription] = useState(false);
-  const [recoveryEmail, setRecoveryEmail] = useState('');
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [processingOrder, setProcessingOrder] = useState<string | null>(null);
-
-  // Initialize recovery email when family loads
   useEffect(() => {
-    if (family?.recoveryEmail) {
-      setRecoveryEmail(family.recoveryEmail);
+    if (family) {
+      // Get pending chore approvals
+      const pending = family.chores.filter(chore => chore.status === 'submitted');
+      setPendingApprovals(pending);
+
+      // Get children with empty savings (mock data for now)
+      const empty = family.children.filter(child => child.points < 50);
+      setEmptySavings(empty);
     }
   }, [family]);
 
-  const handleUpgrade = useCallback(async (interval: BillingInterval) => {
-    const paymentUrl = await startPremiumCheckout(interval);
-    if (paymentUrl) {
-      window.location.href = paymentUrl;
+  const handleApproveChore = async (choreId: string) => {
+    try {
+      await approveChore(choreId);
+      setPendingApprovals(prev => prev.filter(chore => chore.id !== choreId));
+    } catch (error) {
+      console.error('Failed to approve chore:', error);
     }
-  }, [startPremiumCheckout]);
+  };
 
-  useEffect(() => {
-    const checkoutStatus = searchParams?.get('checkout');
-    const orderId = searchParams?.get('order_id');
-    const intervalParam = (searchParams?.get('interval') as BillingInterval | null) ?? 'monthly';
+  const handleQuickApprove = async (choreId: string) => {
+    // One-click approval without confirmation
+    await handleApproveChore(choreId);
+  };
 
-    // Check for pending checkout from sessionStorage
-    const pendingCheckout = sessionStorage.getItem('pendingCheckout');
+  const handleEditChild = (child: Child) => {
+    setSelectedChild(child);
+    setIsEditChildOpen(true);
+  };
 
-    if (pendingCheckout === 'premium') {
-      sessionStorage.removeItem('pendingCheckout');
-      handleUpgrade('monthly');
-      return;
+  const handleDeleteChild = async (childId: string, childName: string) => {
+    if (window.confirm(`Weet je zeker dat je ${childName} wilt verwijderen? Alle gegevens van dit kind gaan verloren.`)) {
+      await deleteItem('children', childId);
     }
+  };
 
-    if (!checkoutStatus) {
-      return;
-    }
+  const handleEditChore = (chore: Chore) => {
+    setSelectedChore(chore);
+    setIsEditChoreOpen(true);
+  };
 
-    if (checkoutStatus === 'premium') {
-      // User clicked "Word Gezin+" - start checkout flow
-      router.replace('/app');
-      handleUpgrade('monthly');
-    } else if (checkoutStatus === 'success' && orderId && processingOrder !== orderId) {
-      setProcessingOrder(orderId);
-      (async () => {
-        await confirmPremiumCheckout(orderId, intervalParam);
-        router.replace('/app');
-      })();
-    } else if (checkoutStatus === 'cancel') {
-      toast({ title: 'Upgrade geannuleerd', description: 'Je blijft op het gratis plan.' });
-      router.replace('/app');
+  const handleDeleteChore = async (choreId: string, choreName: string) => {
+    if (window.confirm(`Weet je zeker dat je "${choreName}" wilt verwijderen?`)) {
+      await deleteItem('chores', choreId);
     }
-  }, [searchParams, confirmPremiumCheckout, router, toast, processingOrder, handleUpgrade]);
+  };
+
+  const handleEditReward = (reward: Reward) => {
+    setSelectedReward(reward);
+    setIsEditRewardOpen(true);
+  };
+
+  const handleDeleteReward = async (rewardId: string, rewardName: string) => {
+    if (window.confirm(`Weet je zeker dat je "${rewardName}" wilt verwijderen?`)) {
+      await deleteItem('rewards', rewardId);
+    }
+  };
 
   if (!family) return null;
 
-  const { familyCode, children, chores, rewards, pendingRewards } = family;
-  const submittedChores = chores.filter(c => c.status === 'submitted');
-  const maxChildren = planDefinition.limits.maxChildren;
-  const canAddMoreChildren = typeof maxChildren !== 'number' || children.length < maxChildren;
-  const choreQuota = planDefinition.limits.monthlyChoreQuota;
-  const choreQuotaReached = typeof choreQuota === 'number' && monthlyChoreUsage >= choreQuota;
-  const renewalDate = family.subscription?.renewalDate;
-  const renewalLabel = renewalDate ? format(renewalDate.toDate(), 'dd MMMM yyyy', { locale: nl }) : null;
-  const currentIntervalLabel = family.subscription?.interval === 'yearly'
-    ? 'Jaarplan'
-    : family.subscription?.interval === 'monthly'
-      ? 'Maandplan'
-      : null;
-  const aiFeatureEnabled = canAccessFeature('aiHelper');
-  const donationsEnabled = canAccessFeature('donations');
-  const premiumPlan = PLAN_DEFINITIONS.premium;
-  
-  const now = Timestamp.now();
-  const nowMillis = now.toMillis();
-  const activeCause = goodCauses?.find((cause) => {
-    const start = cause.startDate?.toMillis?.() ?? 0;
-    const end = cause.endDate?.toMillis?.() ?? 0;
-    return start <= nowMillis && nowMillis <= end;
-  });
-
-  const copyFamilyCode = () => {
-    navigator.clipboard.writeText(familyCode);
-    toast({ title: 'Gekopieerd!', description: 'De gezinscode is gekopieerd.' });
-  };
-
-  const inviteChildViaWhatsApp = (child: Child) => {
-    const message = `Hoi ${child.name}! 🌟 Tijd om een echte KlusjesKoning te worden! Met deze app kun je klusjes doen, punten verdienen en superleuke beloningen vrijspelen. Doe je mee?
-
-Hier zijn je inloggegevens:
-Gezinscode: ${familyCode}
-Jouw pincode: ${child.pin}
-
-Klik op de link om de app te openen en direct te beginnen: [LINK NAAR APP]
-
-Heel veel plezier! 🚀`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-  };
-  
-  const handleSaveRecoveryEmail = () => {
-    if (recoveryEmail && /^\S+@\S+\.\S+$/.test(recoveryEmail)) {
-      saveRecoveryEmail(recoveryEmail);
-    } else {
-      toast({ variant: 'destructive', title: 'Fout', description: 'Voer een geldig e-mailadres in.' });
-    }
-  };
-
-  const getAssignedText = (item: { assignedTo: string[] }) => {
-    if (!item.assignedTo || item.assignedTo.length === 0) return 'Voor iedereen';
-    const names = item.assignedTo.map(id => children.find(c => c.id === id)?.name.split(' ')[0]).filter(Boolean);
-    return names.length > 0 ? `Voor: ${names.join(', ')}` : 'Niemand?';
-  };
-
-  const openEditChildModal = (child: Child) => {
-    setEditingChild(child);
-    setEditChildModalOpen(true);
-  };
-  const openEditChoreModal = (chore: Chore) => {
-    setEditingChore(chore);
-    setEditChoreModalOpen(true);
-  };
-  const openEditRewardModal = (reward: Reward) => {
-    setEditingReward(reward);
-    setEditRewardModalOpen(true);
-  };
-
+  const totalPending = pendingApprovals.length + emptySavings.length;
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      <header className="bg-primary text-primary-foreground p-4 flex justify-between items-center shadow-md">
-        <h2 className="font-brand text-2xl">Dashboard</h2>
+      {/* Header */}
+      <header className="p-4 flex justify-between items-center bg-white shadow-sm border-b">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">KlusjesKoning</h1>
+          <p className="text-sm text-gray-600">{family.familyName}</p>
+        </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setPremiumModalOpen(true)} title="Premium Abonnement">
-            <CreditCard />
+          {family.subscription?.plan === 'starter' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
+              onClick={() => window.location.href = '/app/upgrade'}
+            >
+              ⭐ Upgrade naar Premium
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setActiveTab('settings')}>
+            <Settings className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setSettingsModalOpen(true)} title="Instellingen">
-            <Settings />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={logout} title="Uitloggen">
-            <LogOut />
+          <Button variant="ghost" size="sm" onClick={logout}>
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>
-      <ScrollArea className="flex-grow">
-        <main className="p-4 space-y-6">
-          <Card className="bg-blue-50 border-l-4 border-primary shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <p className="font-bold text-blue-900">Gezinscode: <span className="font-mono bg-white px-3 py-1 rounded-md border text-lg">{familyCode}</span></p>
-                  <p className="text-sm text-blue-700 mt-2">Deel deze code met je kinderen om ze in te laten loggen.</p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={copyFamilyCode} className="bg-white border-blue-200 hover:bg-blue-100 text-blue-700">
-                    <Copy className="h-4 w-4 mr-1" /> Kopieer
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setQrCodeModalOpen(true)} className="bg-white border-blue-200 hover:bg-blue-100 text-blue-700">
-                    <QrCode className="h-4 w-4 mr-1" /> QR Code
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {activeCause && (
-             <Card className="bg-rose-50 border-l-4 border-rose-500 shadow-sm">
-                <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center text-rose-800">
-                      <Gift className="mr-2 h-5 w-5" /> Goede Doel van de Maand
+      <ScrollArea className="flex-grow">
+        <main className="p-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Overzicht
+              </TabsTrigger>
+              <TabsTrigger value="children" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Kinderen
+              </TabsTrigger>
+              <TabsTrigger value="chores" className="flex items-center gap-2">
+                <ListTodo className="h-4 w-4" />
+                Klusjes
+              </TabsTrigger>
+              <TabsTrigger value="rewards" className="flex items-center gap-2">
+                <Gift className="h-4 w-4" />
+                Beloningen
+              </TabsTrigger>
+              <TabsTrigger value="actions" className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Acties
+                {totalPending > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                    {totalPending}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Instellingen
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6 mt-6">
+              {/* Family Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      Familie Overzicht
                     </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {family.children.map((child) => (
+                        <div key={child.id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-medium text-blue-600">{child.name[0]}</span>
+                            </div>
+                            <div>
+                              <p className="font-medium">{child.name}</p>
+                              <p className="text-sm text-gray-600">Level {Math.floor(child.totalXpEver / 100) + 1}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-green-600">{child.points}</p>
+                            <p className="text-xs text-gray-500">punten</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Deze week
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm">Voltooide klusjes</span>
+                        <span className="font-bold">{family.chores.filter(c => c.status === 'approved').length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Totaal verdiend</span>
+                        <span className="font-bold text-green-600">
+                          €{family.children.reduce((sum, child) => sum + child.points, 0) / 100}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Actieve kinderen</span>
+                        <span className="font-bold">{family.children.length}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="children" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      Kinderen Beheren
+                    </span>
+                    <Button onClick={() => setIsAddChildOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Kind Toevoegen
+                    </Button>
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="bg-white p-4 rounded-lg border border-rose-100">
-                      <p className="font-bold text-lg text-rose-800">{activeCause.name}</p>
-                      {showFullCauseDescription ? (
-                        <>
-                          <p className="text-sm text-gray-700 mb-3">{activeCause.description}</p>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            onClick={() => setShowFullCauseDescription(false)}
-                            className="text-rose-600 hover:text-rose-700 p-0 h-auto mb-3"
-                          >
-                            Minder tonen
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm text-gray-700 mb-2">
-                            {activeCause.description.length > 100
-                              ? `${activeCause.description.substring(0, 100)}...`
-                              : activeCause.description}
-                          </p>
-                          {activeCause.description.length > 100 && (
+                <CardContent>
+                  <div className="space-y-4">
+                    {family.children.length > 0 ? (
+                      family.children.map((child) => (
+                        <div key={child.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-xl">
+                              {child.avatar}
+                            </div>
+                            <div>
+                              <p className="font-medium">{child.name}</p>
+                              <p className="text-sm text-gray-600">
+                                Level {Math.floor(child.totalXpEver / 100) + 1} • {child.points} punten
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right mr-4">
+                              <p className="text-sm text-gray-500">PIN: {child.pin}</p>
+                              <p className="text-sm text-gray-500">XP: {child.xp}</p>
+                            </div>
                             <Button
-                              variant="link"
+                              variant="outline"
                               size="sm"
-                              onClick={() => setShowFullCauseDescription(true)}
-                              className="text-rose-600 hover:text-rose-700 p-0 h-auto mb-3"
+                              onClick={() => handleEditChild(child)}
+                              className="mr-2"
                             >
-                              Lees meer
+                              <Edit className="h-4 w-4" />
                             </Button>
-                          )}
-                        </>
-                      )}
-                      <p className="text-xs text-rose-600 font-medium">
-                          Actief tot: {format(activeCause.endDate.toDate(), 'dd MMMM yyyy', { locale: nl })}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteChild(child.id, child.name)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">Nog geen kinderen toegevoegd</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="chores" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center">
+                      <ListTodo className="h-5 w-5 mr-2" />
+                      Klusjes Beheren
+                    </span>
+                    <Button onClick={() => setIsAddChoreOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Klusje Toevoegen
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {family.chores.length > 0 ? (
+                      family.chores.map((chore) => (
+                        <div key={chore.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <div className="flex-1" onClick={() => handleEditChore(chore)}>
+                            <p className="font-medium">{chore.name}</p>
+                            <p className="text-sm text-gray-600">{chore.points} punten</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={chore.status === 'available' ? 'default' : chore.status === 'submitted' ? 'secondary' : 'outline'}>
+                              {chore.status === 'available' ? 'Beschikbaar' : chore.status === 'submitted' ? 'Ingediend' : 'Goedgekeurd'}
+                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditChore(chore)}
+                              className="mr-2"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteChore(chore.id, chore.name)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">Nog geen klusjes toegevoegd</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="rewards" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center">
+                      <Gift className="h-5 w-5 mr-2" />
+                      Beloningen Beheren
+                    </span>
+                    <Button onClick={() => setIsAddRewardOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Beloning Toevoegen
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {family.rewards.length > 0 ? (
+                      family.rewards.map((reward) => (
+                        <div key={reward.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <div className="flex-1" onClick={() => handleEditReward(reward)}>
+                            <p className="font-medium">{reward.name}</p>
+                            <p className="text-sm text-gray-600">{reward.points} punten • {reward.type}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{reward.type}</Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditReward(reward)}
+                              className="mr-2"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteReward(reward.id, reward.name)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">Nog geen beloningen toegevoegd</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="actions" className="space-y-6 mt-6">
+              {/* Action Required Section */}
+              {totalPending > 0 ? (
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-orange-800">
+                      <AlertTriangle className="h-5 w-5 mr-2" />
+                      Actie Vereist ({totalPending})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Pending Approvals */}
+                    {pendingApprovals.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-orange-800 mb-3">
+                          ❌ {pendingApprovals.length} klusje{pendingApprovals.length !== 1 ? 's' : ''} wacht{pendingApprovals.length !== 1 ? 'en' : ''} op goedkeuring
+                        </h4>
+                        <div className="space-y-2">
+                          {pendingApprovals.slice(0, 5).map((chore) => (
+                            <div key={chore.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                              <div className="flex items-center gap-3">
+                                {chore.photoUrl ? (
+                                  <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+                                    <img
+                                      src={chore.photoUrl}
+                                      alt="Klusje foto"
+                                      className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                                      onClick={() => handleQuickApprove(chore.id)}
+                                    />
+                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                      <CheckCircle className="h-6 w-6 text-white" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <ImageIcon className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-medium">{chore.name}</p>
+                                  <p className="text-sm text-gray-600">
+                                    {family.children.find(c => c.id === chore.submittedBy)?.name}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => handleApproveChore(chore.id)}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Goedkeuren
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty Savings Alerts */}
+                    {emptySavings.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-orange-800 mb-3">
+                          💰 {emptySavings.length} kind{emptySavings.length !== 1 ? 'eren' : ''} {emptySavings.length !== 1 ? 'hebben' : 'heeft'} een lege spaarpot
+                        </h4>
+                        <div className="space-y-2">
+                          {emptySavings.map((child) => (
+                            <div key={child.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                                  <span className="text-sm font-medium">{child.name[0]}</span>
+                                </div>
+                                <div>
+                                  <p className="font-medium">{child.name}</p>
+                                  <p className="text-sm text-gray-600">{child.points} punten</p>
+                                </div>
+                              </div>
+                              <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                Leeg
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Alles is in orde!</h3>
+                    <p className="text-gray-600">Geen acties vereist op dit moment.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Instellingen</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Familie Naam
+                      </label>
+                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        {family.familyName}
                       </p>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Familie Code
+                      </label>
+                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded font-mono">
+                        {family.familyCode}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        E-mail
+                      </label>
+                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        {family.email}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Abonnement
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={family.subscription?.plan === 'premium' ? 'default' : 'secondary'}>
+                          {family.subscription?.plan === 'premium' ? 'Premium' : 'Starter'}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.location.href = '/app/upgrade'}
+                        >
+                          {family.subscription?.plan === 'premium' ? 'Beheren' : 'Upgrade'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
-            </Card>
-          )}
+              </Card>
 
-          <Card className="bg-yellow-50 border-yellow-200 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center text-yellow-800">
-                <Bell className="mr-2 h-5 w-5" /> Goedkeuren <span className="ml-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">{submittedChores.length}</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              {submittedChores.length > 0 ? submittedChores.map(chore => {
-                const child = children.find(c => c.id === chore.submittedBy);
-                return (
-                  <div key={chore.id} className="bg-white p-4 rounded-lg border border-yellow-100 shadow-sm">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <p className="font-bold text-slate-800">{chore.name} <span className="text-gray-600 font-normal">door {child?.name || 'onbekend'} {chore.emotion || ''}</span></p>
-                        <p className="text-sm text-yellow-600 font-bold mt-1">{chore.points} punten</p>
-                        {chore.photoUrl && (
-                           <div className="mt-2">
-                                <a href={chore.photoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center">
-                                  <span className="mr-1">📸</span> Bekijk foto
-                                </a>
-                           </div>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button onClick={() => approveChore(chore.id)} size="sm" className="bg-success hover:bg-success/90 text-white">
-                          <Check className="h-4 w-4 mr-1" /> Goedkeuren
-                        </Button>
-                        <Button onClick={() => rejectChore(chore.id)} size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50">
-                          <X className="h-4 w-4 mr-1" /> Afkeuren
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }) : <p className="text-muted-foreground italic bg-white p-4 rounded-lg border">Geen klusjes om goed te keuren.</p>}
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-teal-50 border-teal-200 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center text-teal-800">
-                Beloningen Afhandelen <span className="ml-2 bg-teal-500 text-white text-xs font-bold px-2 py-1 rounded-full">{pendingRewards.length}</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              {pendingRewards.length > 0 ? pendingRewards.map(reward => (
-                  <div key={reward.id} className="bg-white p-4 rounded-lg border border-teal-100 shadow-sm">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div>
-                              <p className="font-bold text-slate-800">{reward.rewardName}</p>
-                              <p className="text-sm text-gray-600">Gekocht door: {reward.childName}</p>
-                              <p className="text-sm text-teal-600 font-bold mt-1">{reward.points} punten</p>
-                          </div>
-                          <Button onClick={() => markRewardAsGiven(reward.id)} size="sm" className="bg-teal-500 hover:bg-teal-600 text-white">
-                            <Check className="mr-1 h-4 w-4" /> Gegeven
-                          </Button>
-                      </div>
-                  </div>
-              )) : <p className="text-muted-foreground italic bg-white p-4 rounded-lg border">Geen beloningen om af te handelen.</p>}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-slate-800">Kinderen</CardTitle>
-              <Button
-                size="sm"
-                onClick={() => setAddChildModalOpen(true)}
-                className="bg-yellow-400 hover:bg-yellow-500 text-gray-800"
-                disabled={!canAddMoreChildren}
-                title={!canAddMoreChildren ? 'Upgrade naar Gezin+ voor onbeperkte kinderen' : undefined}
-              >
-                <Plus className="h-4 w-4 mr-1" /> Toevoegen
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              {children.length > 0 ? children.map(child => (
-                <div key={child.id} className="bg-white p-4 rounded-lg border shadow-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center">
-                      <span className="text-3xl mr-3">{child.avatar}</span>
-                      <div>
-                        <p className="font-bold text-slate-800">{child.name}</p>
-                        <p className="text-sm text-yellow-600 font-bold">{child.points || 0} punten</p>
-                        <p className="text-xs text-slate-500">Totaal verdiend: {child.totalPointsEver || 0} punten</p>
-                      </div>
-                    </div>
-                    <div className='flex items-center space-x-1'>
-                      <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50" onClick={() => inviteChildViaWhatsApp(child)} title={`Nodig ${child.name} uit via WhatsApp`}>
-                        <WhatsAppIcon className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => openEditChildModal(child)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="text-destructive border-red-200 hover:bg-red-50">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                            <AlertDialogDescription>Wil je {child.name} verwijderen? Deze actie kan niet ongedaan worden gemaakt.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteItem('children', child.id)} className="bg-destructive hover:bg-destructive/90">Verwijderen</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                </div>
-              )) : <p className="text-muted-foreground italic bg-white p-4 rounded-lg border">Nog geen kinderen toegevoegd.</p>}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-3">
-              <CardTitle className="text-slate-800">Klusjes</CardTitle>
-              <div className="flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => setTopChoresModalOpen(true)} className="bg-blue-500 hover:bg-blue-600 text-white">
-                    <ListOrdered className="h-4 w-4 mr-1" /> Top Klusjes
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => setGeminiModalOpen(true)}
-                    className="bg-purple-500 hover:bg-purple-600 text-white"
-                    title={aiFeatureEnabled ? 'Klusjes Assistent' : 'Premium functie'}
-                    disabled={!aiFeatureEnabled}
-                  >
-                    <Sparkles className="h-4 w-4 mr-1" /> AI Hulp
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => setAddChoreModalOpen(true)}
-                    className="bg-yellow-400 hover:bg-yellow-500 text-gray-800"
-                    disabled={choreQuotaReached}
-                    title={choreQuotaReached ? 'Upgrade voor onbeperkte klusjes' : undefined}
-                  >
-                    <Plus className="h-4 w-4 mr-1" /> Toevoegen
-                  </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              {choreQuotaReached && (
-                <p className="text-sm text-amber-700 font-semibold bg-amber-100 px-4 py-3 rounded-lg border border-amber-200">
-                  ⚠️ Je hebt het maximum van {choreQuota} klusjes deze maand bereikt. Upgrade naar Gezin+ voor onbeperkte klusjes.
-                </p>
-              )}
-              {chores.length > 0 ? chores.map(chore => (
-                <div key={chore.id} className="bg-white p-4 rounded-lg border shadow-sm">
-                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Geavanceerde Instellingen</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-bold text-slate-800">{chore.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">{getAssignedText(chore)}</p>
-                      <p className="text-sm text-yellow-600 font-bold mt-1">{chore.points} punten</p>
+                      <h4 className="font-medium">Automatische Uitbetalingen</h4>
+                      <p className="text-sm text-gray-600">Elke vrijdagavond automatisch uitbetalen</p>
                     </div>
-                    <div className='flex items-center space-x-1'>
-                      <Button variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => openEditChoreModal(chore)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="text-destructive border-red-200 hover:bg-red-50">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                            <AlertDialogDescription>Wil je "{chore.name}" verwijderen? Deze actie kan niet ongedaan worden gemaakt.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteItem('chores', chore.id)} className="bg-destructive hover:bg-destructive/90">Verwijderen</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                   </div>
-                </div>
-              )) : <p className="text-muted-foreground italic bg-white p-4 rounded-lg border">Nog geen klusjes toegevoegd.</p>}
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Beloningen</CardTitle>
-              <div className="flex space-x-2">
-                  <Button size="icon" onClick={() => setTopRewardsModalOpen(true)} className="bg-teal-500 text-white" title="Top Beloningen"><Medal /></Button>
-                  <Button size="icon" onClick={() => setAddRewardModalOpen(true)} className="bg-yellow-400 hover:bg-yellow-500 text-gray-800"><Plus /></Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {!donationsEnabled && (
-                <p className="text-sm text-amber-700 bg-amber-100 px-4 py-3 rounded-lg border border-amber-200">
-                  ℹ️ Donatie-beloningen zijn onderdeel van Gezin+. Upgrade om goede doelen te activeren.
-                </p>
-              )}
-              {rewards.length > 0 ? rewards.map(reward => (
-                <div key={reward.id} className="bg-white p-4 rounded-lg border shadow-sm">
-                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                      Actief
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-bold text-slate-800">{reward.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">{getAssignedText(reward)}</p>
-                      <p className="text-sm text-yellow-600 font-bold mt-1">{reward.points} punten</p>
-                      <Badge variant="secondary" className="mt-2">
-                        {reward.type === 'money' && 'Geld'}
-                        {reward.type === 'experience' && 'Ervaring'}
-                        {reward.type === 'privilege' && 'Privilege'}
-                        {reward.type === 'donation' && 'Donatie'}
-                      </Badge>
+                      <h4 className="font-medium">Herinneringen</h4>
+                      <p className="text-sm text-gray-600">Dagelijkse notificaties voor pending approvals</p>
                     </div>
-                    <div className='flex items-center space-x-1'>
-                      <Button variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => openEditRewardModal(reward)}>
-                        <Pencil className="h-4 w-4" />
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                      Actief
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Foto Goedkeuringen</h4>
+                      <p className="text-sm text-gray-600">One-click goedkeuringen voor klusjes met foto</p>
+                    </div>
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                      Actief
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Gevarenzone</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg bg-red-50">
+                      <div>
+                        <h4 className="font-medium text-red-800">Account Verwijderen</h4>
+                        <p className="text-sm text-red-600">Dit verwijdert permanent alle gegevens</p>
+                      </div>
+                      <Button variant="destructive" size="sm">
+                        Verwijder Account
                       </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="text-destructive border-red-200 hover:bg-red-50">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                            <AlertDialogDescription>Wil je "{reward.name}" verwijderen? Deze actie kan niet ongedaan worden gemaakt.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteItem('rewards', reward.id)} className="bg-destructive hover:bg-destructive/90">Verwijderen</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                     </div>
-                   </div>
-                </div>
-              )) : <p className="text-muted-foreground italic bg-white p-4 rounded-lg border">Nog geen beloningen toegevoegd.</p>}
-            </CardContent>
-          </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </main>
       </ScrollArea>
-      
-      {/* Use dynamic imports for modals to prevent SSR issues */}
-      <AddChildModalDynamic isOpen={isAddChildModalOpen} setIsOpen={setAddChildModalOpen} />
-      <AddChoreModalDynamic isOpen={isAddChoreModalOpen} setIsOpen={setAddChoreModalOpen} />
-      <AddRewardModalDynamic isOpen={isAddRewardModalOpen} setIsOpen={setAddRewardModalOpen} />
 
-      {editingChild && <EditChildModalDynamic isOpen={isEditChildModalOpen} setIsOpen={setEditChildModalOpen} child={editingChild} />}
-      {editingChore && <EditChoreModalDynamic isOpen={isEditChoreModalOpen} setIsOpen={setEditChoreModalOpen} chore={editingChore} />}
-      {editingReward && <EditRewardModalDynamic isOpen={isEditRewardModalOpen} setIsOpen={setEditRewardModalOpen} reward={editingReward} />}
-
-      <TopChoresModalDynamic isOpen={isTopChoresModalOpen} setIsOpen={setTopChoresModalOpen} />
-      <TopRewardsModalDynamic isOpen={isTopRewardsModalOpen} setIsOpen={setTopRewardsModalOpen} />
-      <GeminiChoreIdeasModalDynamic isOpen={isGeminiModalOpen} setIsOpen={setGeminiModalOpen} />
-      <QrCodeModalDynamic isOpen={isQrCodeModalOpen} setIsOpen={setQrCodeModalOpen} />
-
-      {/* Settings Modal */}
-      <Dialog open={isSettingsModalOpen} onOpenChange={setSettingsModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl flex items-center gap-2">
-              <Settings className="h-6 w-6" />
-              Instellingen
-            </DialogTitle>
-            <DialogDescription>
-              Beheer je account instellingen
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Herstel-e-mailadres</CardTitle>
-                <CardDescription>
-                  Ontvang een herstel-e-mail met je gezinscode als je wachtwoord kwijt bent
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input
-                  type="email"
-                  placeholder="jouw@email.com"
-                  value={recoveryEmail}
-                  onChange={(e) => setRecoveryEmail(e.target.value)}
-                />
-                <Button
-                  onClick={handleSaveRecoveryEmail}
-                  className="w-full"
-                >
-                  Opslaan
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Premium Modal */}
-      <Dialog open={isPremiumModalOpen} onOpenChange={setPremiumModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl flex items-center gap-2">
-              <CreditCard className="h-6 w-6" />
-              Premium (Gezin+)
-            </DialogTitle>
-            <DialogDescription>
-              Alles voor actieve gezinnen
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 mt-4">
-            {/* Status Badge */}
-            <div className="flex items-center gap-2">
-              <Badge variant={isPremium ? 'default' : 'secondary'} className="text-lg px-4 py-1">
-                {isPremium ? 'Actief' : 'Niet actief'}
-              </Badge>
-            </div>
-
-            {/* Pricing */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Abonnement opties</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="border rounded-lg p-4">
-                    <p className="text-sm text-muted-foreground mb-1">Maandelijks</p>
-                    <p className="text-2xl font-bold">{formatPrice(planDefinition.priceMonthlyCents)}</p>
-                  </div>
-                  <div className="border rounded-lg p-4">
-                    <p className="text-sm text-muted-foreground mb-1">Jaarlijks</p>
-                    <p className="text-2xl font-bold">{formatPrice(planDefinition.priceYearlyCents)}</p>
-                  </div>
-                </div>
-
-                {currentIntervalLabel && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm font-medium text-blue-900">{currentIntervalLabel}</p>
-                    {renewalLabel && <p className="text-xs text-blue-700 mt-1">Verlenging op {renewalLabel}</p>}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Features */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Inclusief:</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Onbeperkte klusjes & kinderen</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>AI-klusassistent (Gemini)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Virtueel huisdier & badges</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Gezinsdoelen & donaties</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Aanpasbare thema's</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>E-mail support</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Usage limits */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Gebruik</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Kinderen</span>
-                  <span className="font-medium">
-                    {typeof maxChildren === 'number' ? `${children.length}/${maxChildren}` : 'Onbeperkt'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Klusjes deze maand</span>
-                  <span className="font-medium">
-                    {typeof choreQuota === 'number' ? `${monthlyChoreUsage}/${choreQuota}` : 'Onbeperkt'}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Upgrade button for free users */}
-            {!isPremium && (
-              <div className="space-y-3">
-                <Button
-                  onClick={() => {
-                    setPremiumModalOpen(false);
-                    router.push('/app/upgrade');
-                  }}
-                  className="w-full"
-                  size="lg"
-                >
-                  Upgrade naar Gezin+ · {formatPrice(PLAN_DEFINITIONS.premium.priceMonthlyCents)}/mnd
-                </Button>
-                <p className="text-xs text-center text-muted-foreground">
-                  Je kunt op elk moment opzeggen
-                </p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Modals */}
+      <AddChildModal isOpen={isAddChildOpen} setIsOpen={setIsAddChildOpen} />
+      <EditChildModal
+        isOpen={isEditChildOpen}
+        setIsOpen={setIsEditChildOpen}
+        child={selectedChild!}
+      />
+      <AddChoreModal isOpen={isAddChoreOpen} setIsOpen={setIsAddChoreOpen} />
+      <EditChoreModal
+        isOpen={isEditChoreOpen}
+        setIsOpen={setIsEditChoreOpen}
+        chore={selectedChore!}
+      />
+      <AddRewardModal isOpen={isAddRewardOpen} setIsOpen={setIsAddRewardOpen} />
+      <EditRewardModal
+        isOpen={isEditRewardOpen}
+        setIsOpen={setIsEditRewardOpen}
+        reward={selectedReward!}
+      />
     </div>
   );
 }

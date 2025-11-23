@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PLAN_DEFINITIONS, formatPrice } from '@/lib/plans';
 import { fetchPublishedBlogPosts } from '@/lib/content';
-import { OrganizationSchema, WebApplicationSchema } from '@/components/seo/StructuredData';
+import { OrganizationSchema, WebApplicationSchema, ProductSchema, FAQSchema } from '@/components/seo/StructuredData';
 import { HowItWorksCarousel, FounderStoryCarousel } from '@/components/home/HomePageClient';
+import { Header } from '@/components/header/Header';
 
 const isValidUrl = (value: string) => {
   try {
@@ -166,89 +167,106 @@ export default async function HomePage() {
     <div className="relative overflow-hidden">
       <OrganizationSchema />
       <WebApplicationSchema />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-sky-100 via-white to-amber-50" />
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm px-3 sm:px-6 md:px-10 py-3 sm:py-4">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2">
-          <Link href="/" className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
-            <Image
-              src="https://weareimpact.nl/LogoKlusjeskoning3.png"
-              alt="KlusjesKoning logo"
-              width={48}
-              height={48}
-              className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 rounded-full bg-white shadow-md"
-            />
-            <div className="min-w-0">
-              <p className="font-brand text-lg sm:text-xl md:text-2xl text-slate-800 leading-tight truncate">
+
+      {/* Header */}
+      <Header />
+
+      {/* Professional Hero Header with Background Image */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16" role="banner" aria-label="Hoofdsectie met introductie">
+        {/* Background Image */}
+        <div className="absolute inset-0 -z-10">
+          <Image
+            src="/images/app voor klusjes, zakgeld en gezinsdoelen.png"
+            alt="KlusjesKoning app voor klusjes, zakgeld en gezinsdoelen - Dashboard met klusjes, punten en beloningen"
+            fill
+            className="object-cover object-center transition-transform duration-700 ease-out hover:scale-105"
+            priority
+            quality={85}
+            placeholder="blur"
+            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z"
+          />
+          {/* Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
+        </div>
+
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            {/* Left Column - Main Content */}
+            <div className="space-y-6 text-center lg:text-left">
+              {/* Badge */}
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm px-4 py-2 text-sm font-medium mx-auto lg:mx-0 w-fit">
+                🚀 Professionele gezinsapp voor moderne ouders
+              </Badge>
+
+              {/* Main Heading */}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight animate-fade-in-up">
                 KlusjesKoning
-              </p>
-              <p className="hidden sm:block text-xs text-slate-500 truncate">
-                Game on voor je huishouden
-              </p>
-            </div>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <Button
-              asChild
-              size="sm"
-              className="bg-primary text-primary-foreground shadow-md hover:bg-primary/90 text-xs sm:text-sm whitespace-nowrap px-3 sm:px-4"
-            >
-              <Link href="/app?register=true">
-                <span className="hidden xs:inline">Start gratis</span>
-                <span className="xs:hidden">Start</span>
-              </Link>
-            </Button>
-          </div>
-        </nav>
-      </header>
+                <span className="block text-2xl sm:text-3xl lg:text-4xl font-light text-white/90 mt-2 animate-fade-in-up animation-delay-200">
+                  Waar verantwoordelijkheid beloond wordt
+                </span>
+              </h1>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-16 px-4 pb-24 sm:px-10">
-        <section className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div className="space-y-6 text-center lg:text-left">
-            <Badge className="bg-amber-200 text-amber-800 shadow-sm">Nieuw: marketing homepage</Badge>
-            <h1 className="font-brand text-4xl leading-tight text-slate-900 sm:text-5xl">
-              De leukste manier om klusjes te doen, verdienen én vieren
-            </h1>
-            <p className="text-lg text-slate-600 sm:text-xl">
-              Een mobiele ervaring voor gezinnen die samenwerken, sparen voor beloningen en zelfs goede doelen ondersteunen. Alles in een kleurrijke, intuïtieve app.
-            </p>
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start">
-              <Button asChild size="lg" className="w-full max-w-xs bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">
-                <Link href="/app?register=true" className="flex items-center gap-2">
-                  Start gratis
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="w-full max-w-xs border-primary text-primary hover:bg-primary/10 sm:w-auto">
-                <Link href="/handleidingen" className="flex items-center gap-2">
-                  Bekijk hoe het werkt
-                  <Rocket className="h-4 w-4" />
-                </Link>
-              </Button>
+              {/* Subheading */}
+              <p className="text-base sm:text-lg lg:text-xl text-white/90 leading-relaxed font-light animate-fade-in-up animation-delay-400">
+                Transformeer dagelijkse klusjes in waardevolle leermomenten. Laat je kinderen ervaren hoe hun inzet wordt beloond - thuis én in de samenleving.
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center pt-4 animate-fade-in-up animation-delay-200">
+                <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-white px-6 py-3 text-base font-semibold shadow-2xl">
+                  <Link href="/app?register=true" className="flex items-center gap-2">
+                    <Crown className="h-4 w-4" />
+                    Start jullie koninkrijk
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+
+                <Button asChild size="lg" variant="outline" className="border-white/80 bg-white/10 text-white hover:bg-white/30 hover:border-white backdrop-blur-md px-6 py-3 text-base font-medium shadow-xl">
+                  <Link href="#hoe-het-werkt" className="flex items-center gap-2">
+                    <Rocket className="h-4 w-4" />
+                    Ontdek de magie
+                  </Link>
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-wrap justify-center gap-6 pt-4 lg:justify-start">
-              {stats.map((stat) => (
-                <div key={stat.label} className="min-w-[120px]">
-                  <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
-                  <p className="text-sm text-slate-500">{stat.label}</p>
-                </div>
-              ))}
+
+            {/* Right Column - Trust Indicators */}
+            <div className="space-y-6">
+              <div className="grid grid-cols-3 lg:grid-cols-1 gap-6 text-white/80">
+                {stats.map((stat) => (
+                  <div key={stat.label} className="text-center lg:text-left lg:flex lg:items-center lg:gap-4 p-4 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20">
+                    <p className="text-3xl lg:text-4xl font-bold text-white">{stat.value}</p>
+                    <p className="text-sm font-medium mt-1 lg:mt-0">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+        </div>
 
-          <HowItWorksCarousel />
-        </section>
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <div className="w-6 h-10 border-2 border-white/50 rounded-full flex justify-center">
+            <div className="w-1 h-3 bg-white/70 rounded-full mt-2 animate-pulse"></div>
+          </div>
+        </div>
+      </section>
+
+      <main className="mx-auto flex max-w-6xl flex-col gap-12 sm:gap-16 px-3 sm:px-4 md:px-6 lg:px-10 pb-16 sm:pb-24">
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" id="hoe-werkt-het">
-          {highlights.map(({ icon: Icon, title, description }) => (
-            <Card key={title} className="border-none bg-white/85 text-center shadow-lg backdrop-blur">
+          {highlights.map(({ icon: Icon, title, description }, index) => (
+            <Card key={title} className={`border-none bg-white/85 text-center shadow-lg backdrop-blur hover-lift transition-all duration-300 animate-fade-in-up`} style={{ animationDelay: `${index * 0.1}s` }}>
               <CardHeader className="space-y-2">
-                <div className="mx-auto inline-flex items-center rounded-full bg-primary/10 p-2 text-primary">
-                  <Icon className="h-5 w-5" />
+                <div className="mx-auto inline-flex items-center rounded-full bg-primary/10 p-3 text-primary transition-transform duration-300 hover:scale-110">
+                  <Icon className="h-6 w-6" />
                 </div>
                 <CardTitle className="text-xl text-slate-900">{title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-slate-600">{description}</CardDescription>
+                <CardDescription className="text-slate-600 break-words hyphens-auto">{description}</CardDescription>
               </CardContent>
             </Card>
           ))}
@@ -270,13 +288,13 @@ export default async function HomePage() {
           ))}
         </section>
 
-        <section className="space-y-8" id="prijzen">
-          <div className="text-center space-y-3">
-            <Badge className="bg-amber-200 text-amber-800">👑 2️⃣ Aanbevolen prijsstructuur (2025–2026)</Badge>
-            <h2 className="text-3xl font-semibold text-slate-900">Kies het plan dat bij jullie gezin past</h2>
-            <p className="text-lg text-slate-600">Start gratis en groei door naar Premium wanneer jullie klaar zijn voor onbeperkte fun en AI-power.</p>
+        <section className="space-y-6 sm:space-y-8" id="prijzen">
+          <div className="text-center space-y-3 px-4 sm:px-0">
+            <Badge className="bg-amber-200 text-amber-800 mx-auto">👑 2️⃣ Aanbevolen prijsstructuur (2025–2026)</Badge>
+            <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900">Kies het plan dat bij jullie gezin past</h2>
+            <p className="text-base sm:text-lg text-slate-600 break-words hyphens-auto">Start gratis en groei door naar Premium wanneer jullie klaar zijn voor onbeperkte fun en AI-power.</p>
           </div>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2 px-4 sm:px-0">
             {pricingPlans.map((plan) => (
               <Card key={plan.id} className={`relative border-2 bg-white/80 backdrop-blur ${plan.accent}`}>
                 {plan.id === 'premium' && (
@@ -308,25 +326,39 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* Snelle Blik Section - Moved from hero */}
+        <section className="space-y-8" id="hoe-het-werkt">
+          <div className="text-center space-y-4">
+            <Badge className="bg-primary/10 text-primary mx-auto">👀 Snelle blik</Badge>
+            <h2 className="text-3xl sm:text-4xl font-semibold text-slate-900">Zo werkt KlusjesKoning in 3 stappen</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              Van registratie tot eerste beloning - ontdek hoe eenvoudig het is om jullie gezin te motiveren.
+            </p>
+          </div>
+          <div className="max-w-4xl mx-auto">
+            <HowItWorksCarousel />
+          </div>
+        </section>
+
         <section className="grid gap-4 md:grid-cols-3">
           {testimonials.map((testimonial) => (
             <Card key={testimonial.author} className="border-none bg-white shadow-lg">
               <CardContent className="space-y-4 p-6 text-center">
                 <Star className="h-6 w-6 text-amber-400" />
-                <p className="text-base text-slate-600">“{testimonial.quote}”</p>
+                <p className="text-base text-slate-600 break-words hyphens-auto">"{testimonial.quote}"</p>
                 <p className="text-sm font-semibold text-slate-900">{testimonial.author}</p>
               </CardContent>
             </Card>
           ))}
         </section>
 
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-sky-700 p-10 text-primary-foreground shadow-2xl">
+        <section className="overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-sky-700 p-6 sm:p-8 lg:p-10 text-primary-foreground shadow-2xl mx-3 sm:mx-0">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-            <div className="space-y-4">
-              <Badge className="bg-white/20 text-white">Klaar om te starten?</Badge>
-              <h2 className="text-3xl font-semibold sm:text-4xl">Bouw vandaag nog jullie eigen KlusjesKoninkrijk</h2>
-              <p className="text-lg text-white/80">Maak een gezin aan, nodig je kids uit en laat ze punten sparen voor toffe beloningen of donaties.</p>
-              <div className="flex flex-wrap gap-4">
+            <div className="space-y-4 text-center lg:text-left">
+              <Badge className="bg-white/20 text-white mx-auto lg:mx-0 w-fit">Klaar om te starten?</Badge>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold break-words hyphens-auto">Bouw vandaag nog jullie eigen KlusjesKoninkrijk</h2>
+              <p className="text-base sm:text-lg text-white/80 break-words hyphens-auto">Maak een gezin aan, nodig je kids uit en laat ze punten sparen voor toffe beloningen of donaties.</p>
+              <div className="flex flex-wrap gap-4 justify-center lg:justify-start pt-2">
                 <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90">
                   <Link href="/app?register=true" className="flex items-center gap-2">
                     Start gratis
@@ -336,7 +368,7 @@ export default async function HomePage() {
               </div>
             </div>
             <div className="relative mt-6 lg:mt-0">
-              <div className="absolute -left-8 -top-8 h-32 w-32 rounded-full bg-white/20 blur-3xl" />
+              <div className="absolute -left-4 sm:-left-8 -top-4 sm:-top-8 h-24 w-24 sm:h-32 sm:w-32 rounded-full bg-white/20 blur-3xl" />
               <FounderStoryCarousel />
             </div>
           </div>
@@ -365,13 +397,15 @@ export default async function HomePage() {
                       {hasValidCover ? (
                         <Image
                           src={post.coverImageUrl as string}
-                          alt={post.title}
+                          alt={`Cover afbeelding voor: ${post.title}`}
                           fill
                           className="object-cover transition duration-300 group-hover:scale-105"
                           sizes="(min-width: 1024px) 50vw, 100vw"
+                          loading="lazy"
+                          quality={80}
                         />
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-4xl text-primary/60">✍️</div>
+                        <div className="absolute inset-0 flex items-center justify-center text-4xl text-primary/60" role="img" aria-label="Blog post zonder afbeelding">✍️</div>
                       )}
                     </div>
                     <div className="flex flex-1 flex-col gap-3 p-6">
@@ -401,15 +435,15 @@ export default async function HomePage() {
         )}
       </main>
 
-      <footer className="px-6 py-10 text-center text-sm text-slate-500">
+      <footer className="px-4 sm:px-6 py-8 sm:py-10 text-center text-xs sm:text-sm text-slate-500">
         <p>© {new Date().getFullYear()} KlusjesKoning. Samen plezier in klusjes.</p>
-        <p className="mt-2">
+        <p className="mt-2 px-4 sm:px-0">
           KlusjesKoning.app is een concept van{' '}
           <a
             href="https://weareimpact.nl/ai-advies-tools-met-impact/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary hover:underline"
+            className="text-primary hover:underline break-words"
           >
             WeAreImpact
           </a>

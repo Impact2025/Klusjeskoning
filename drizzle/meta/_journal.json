@@ -8,6 +8,20 @@
       "when": 1761070819858,
       "tag": "0000_thick_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1732362989501,
+      "tag": "0001_gamification_features",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1732363230381,
+      "tag": "0002_automation_features",
+      "breakpoints": true
     }
   ]
 }

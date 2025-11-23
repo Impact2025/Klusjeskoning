@@ -1,19 +1,5 @@
 import { NextResponse } from 'next/server';
-import sgMail from '@sendgrid/mail';
-
-import {
-  renderChoreSubmissionEmail,
-  renderRewardRedemptionEmail,
-  renderWelcomeEmail,
-  renderAdminRegistrationNotification,
-} from '@/lib/email/templates';
-
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL ?? 'hello@klusjeskoning.nl';
-
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-}
+import { sendEmail } from '@/lib/email/sendgrid';
 
 type NotificationPayload =
   | {
@@ -34,23 +20,21 @@ type NotificationPayload =
   | {
       type: 'admin_new_registration';
       to: string;
-      data: { 
+      data: {
         familyName: string;
         email: string;
         city: string;
         familyCode: string;
         timestamp: string;
       };
+    }
+  | {
+      type: 'verification_code';
+      to: string;
+      data: { verificationCode: string; familyName: string };
     };
 
 export async function POST(request: Request) {
-  if (!SENDGRID_API_KEY) {
-    return NextResponse.json(
-      { success: false, error: 'SendGrid API key is not configured.' },
-      { status: 500 }
-    );
-  }
-
   try {
     const payload = (await request.json()) as NotificationPayload;
 
@@ -58,48 +42,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Invalid payload.' }, { status: 400 });
     }
 
-    let subject: string;
-    let html: string;
-
-    switch (payload.type) {
-      case 'welcome_parent': {
-        const email = renderWelcomeEmail(payload.data);
-        subject = email.subject;
-        html = email.html;
-        break;
-      }
-      case 'chore_submitted': {
-        const email = renderChoreSubmissionEmail(payload.data);
-        subject = email.subject;
-        html = email.html;
-        break;
-      }
-      case 'reward_redeemed': {
-        const email = renderRewardRedemptionEmail(payload.data);
-        subject = email.subject;
-        html = email.html;
-        break;
-      }
-      case 'admin_new_registration': {
-        const email = renderAdminRegistrationNotification(payload.data);
-        subject = email.subject;
-        html = email.html;
-        break;
-      }
-      default:
-        return NextResponse.json({ success: false, error: 'Unknown notification type.' }, { status: 400 });
-    }
-
-    await sgMail.send({
+    // Send email directly via SendGrid
+    const result = await sendEmail({
       to: payload.to,
-      from: SENDGRID_FROM_EMAIL,
-      subject,
-      html,
+      type: payload.type,
+      data: payload.data,
     });
 
-    return NextResponse.json({ success: true });
+    if (!result.success) {
+      return NextResponse.json({
+        success: false,
+        error: result.error || 'Failed to send email.'
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Email sent successfully'
+    });
   } catch (error) {
     console.error('[notifications/send] error', error);
-    return NextResponse.json({ success: false, error: 'Failed to send email.' }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to send email.'
+    }, { status: 500 });
+  }
+}
+
+// GET endpoint for email service status
+export async function GET() {
+  try {
+    // Check if SendGrid is configured
+    const isConfigured = !!(process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL);
+
+    return NextResponse.json({
+      success: true,
+      status: 'operational',
+      service: 'SendGrid Direct',
+      configured: isConfigured
+    });
+  } catch (error) {
+    console.error('[notifications/status] error', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to get service status.'
+    }, { status: 500 });
   }
 }

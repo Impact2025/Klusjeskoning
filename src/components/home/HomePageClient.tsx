@@ -109,7 +109,7 @@ export function HowItWorksCarousel() {
               ))}
             </div>
           </div>
-          <div className="flex justify-center gap-3 px-6 pb-6 sm:hidden">
+          <div className="flex justify-center gap-3 px-8 pb-8 sm:hidden">
             <Button variant="outline" size="sm" onClick={() => carouselApi?.scrollPrev()} disabled={currentSlide === 0}>
               Vorige
             </Button>
@@ -188,12 +188,12 @@ export function FounderStoryCarousel() {
         >
           <CarouselContent>
             {founderStorySlides.map((slide) => (
-              <CarouselItem key={slide.title} className="px-6 pt-6">
-                <div className="space-y-4 text-left">
+              <CarouselItem key={slide.title} className="px-8 pt-8">
+                <div className="space-y-6 text-left max-w-none">
                   <h3 className="text-xl font-semibold text-white">{slide.title}</h3>
-                  <div className="space-y-3 text-white/85">
+                  <div className="space-y-4 text-white/85">
                     {slide.paragraphs.map((paragraph) => (
-                      <p key={paragraph} className="text-sm leading-relaxed">
+                      <p key={paragraph} className="text-base leading-relaxed">
                         {paragraph}
                       </p>
                     ))}
@@ -206,7 +206,7 @@ export function FounderStoryCarousel() {
           <CarouselNext className="-right-3 top-1/2 hidden sm:flex border-white/30 text-white hover:bg-white/10" />
         </Carousel>
 
-        <div className="flex flex-col gap-3 px-6 pb-6 sm:flex-row sm:items-center sm:justify-between" aria-live="polite">
+        <div className="flex flex-col gap-3 px-8 pb-8 sm:flex-row sm:items-center sm:justify-between" aria-live="polite">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <Badge className="w-fit bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
               Slide {currentFounderSlide + 1} / {totalFounderSlides}

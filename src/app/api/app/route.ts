@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { sql } from 'drizzle-orm';
+import { db } from '@/server/db/client';
 
 import {
   authenticateFamily,
   createFamily,
+  startFamilyRegistration,
+  completeFamilyRegistration,
   loadFamilyWithRelations,
   serializeFamily,
   getFamilyByCode,
@@ -39,8 +43,26 @@ import {
   deleteFamilyAdmin,
   getFinancialOverview,
   setFamilyPassword,
+  createCoupon,
+  getAllCoupons,
+  getCouponById,
+  updateCoupon,
+  deleteCoupon,
+  validateCoupon,
+  applyCouponToOrder,
+  getCouponStats,
+  generateCouponCode,
+  setFamilySubscription,
+  upgradeFamilyToPro,
+  downgradeFamilyAccount,
+  extendFamilySubscription,
+  getSubscriptionStats,
+  getExpiringSubscriptions,
+  bulkUpdateSubscriptions,
 } from '@/server/services/family-service';
 import { createSession, clearSession, getSession, requireSession } from '@/server/auth/session';
+import { checkAuthRateLimit, checkApiRateLimit } from '@/lib/rate-limit';
+import { securityMiddleware, sanitizeInput } from '@/lib/security-middleware';
 
 const actionSchema = z.object({
   action: z.string(),
@@ -166,6 +188,97 @@ const adminFamilyUpdateSchema = z.object({
 
 const adminFamilyDeleteSchema = z.object({ familyId: z.string() });
 
+const couponSchema = z.object({
+  code: z.string().min(1).max(50),
+  description: z.string().optional(),
+  discountType: z.enum(['percentage', 'fixed']),
+  discountValue: z.number().int().positive(),
+  maxUses: z.number().int().nonnegative().optional(),
+  validFrom: z.string().datetime().optional(),
+  validUntil: z.string().datetime().optional(),
+  isActive: z.boolean().optional(),
+}).transform((data) => ({
+  ...data,
+  validFrom: data.validFrom ? new Date(data.validFrom) : undefined,
+  validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+}));
+
+const couponUpdateSchema = z.object({
+  couponId: z.string(),
+  description: z.string().optional(),
+  discountType: z.enum(['percentage', 'fixed']).optional(),
+  discountValue: z.number().int().positive().optional(),
+  maxUses: z.number().int().nonnegative().optional(),
+  validFrom: z.string().datetime().nullable().optional(),
+  validUntil: z.string().datetime().nullable().optional(),
+  isActive: z.boolean().optional(),
+}).transform((data) => ({
+  ...data,
+  validFrom: data.validFrom ? new Date(data.validFrom) : undefined,
+  validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+}));
+
+const couponDeleteSchema = z.object({ couponId: z.string() });
+
+const couponValidateSchema = z.object({ code: z.string().min(1) });
+
+const couponApplySchema = z.object({
+  couponId: z.string(),
+  orderId: z.string(),
+  originalAmount: z.number().int().nonnegative(),
+});
+
+const subscriptionSetSchema = z.object({
+  familyId: z.string(),
+  plan: z.enum(['starter', 'premium']).nullable(),
+  status: z.enum(['inactive', 'active', 'past_due', 'canceled']),
+  interval: z.enum(['monthly', 'yearly']).nullable().optional(),
+  renewalDate: z.string().datetime().nullable().optional(),
+  orderId: z.string().nullable().optional(),
+}).transform((data) => ({
+  ...data,
+  renewalDate: data.renewalDate ? new Date(data.renewalDate) : null,
+}));
+
+const subscriptionUpgradeSchema = z.object({
+  familyId: z.string(),
+  plan: z.enum(['premium']).optional(),
+  interval: z.enum(['monthly', 'yearly']).optional(),
+  durationMonths: z.number().int().positive().optional(),
+  orderId: z.string().optional(),
+});
+
+const subscriptionDowngradeSchema = z.object({
+  familyId: z.string(),
+  immediate: z.boolean().optional(),
+  orderId: z.string().optional(),
+});
+
+const subscriptionExtendSchema = z.object({
+  familyId: z.string(),
+  additionalMonths: z.number().int().positive(),
+  orderId: z.string().optional(),
+});
+
+const bulkSubscriptionUpdateSchema = z.object({
+  operations: z.array(z.object({
+    familyId: z.string().min(1),
+    action: z.enum(['upgrade', 'downgrade', 'extend', 'cancel']),
+    options: z.record(z.any()).optional(),
+  })).min(1),
+});
+
+const unlockAvatarItemSchema = z.object({
+  childId: z.string(),
+  itemId: z.string(),
+});
+
+const equipAvatarItemSchema = z.object({
+  childId: z.string(),
+  itemId: z.string(),
+  equip: z.boolean(),
+});
+
 const goodCauseSchema = z.object({
   causeId: z.string().optional(),
   name: z.string().min(1),
@@ -269,6 +382,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // Security middleware check
+  const securityCheck = await securityMiddleware(request, {
+    maxPayloadSize: 1024 * 1024, // 1MB limit
+    allowedOrigins: ['klusjeskoning.nl', 'klusjeskoningapp.nl']
+  });
+
+  if (!securityCheck.valid) {
+    return securityCheck.response!;
+  }
+
   let body: z.infer<typeof actionSchema>;
   try {
     const json = await request.json();
@@ -279,11 +402,130 @@ export async function POST(request: Request) {
 
   const { action, payload } = body;
 
+  // Rate limiting for authentication actions
+  const authActions = ['registerFamily', 'loginParent', 'adminLogin', 'loginChild', 'recoverFamilyCode'];
+  if (authActions.includes(action)) {
+    const rateLimitResult = await checkAuthRateLimit(request);
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Te veel pogingen. Probeer het later opnieuw.',
+        retryAfter: rateLimitResult.reset,
+      }, {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil((rateLimitResult.reset?.getTime() || Date.now() + 600000) / 1000).toString(),
+        }
+      });
+    }
+  }
+
+  // General API rate limiting for other actions
+  if (!authActions.includes(action)) {
+    const rateLimitResult = await checkApiRateLimit(request);
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Te veel API verzoeken. Probeer het later opnieuw.',
+        retryAfter: rateLimitResult.reset,
+      }, {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil((rateLimitResult.reset?.getTime() || Date.now() + 3600000) / 1000).toString(),
+        }
+      });
+    }
+  }
+
   try {
     switch (action) {
-      case 'registerFamily': {
+      case 'startRegistration': {
         const data = registerSchema.parse(payload);
-        const { id: familyId, familyCode } = await createFamily(data);
+        const result = await startFamilyRegistration({
+          familyName: data.familyName,
+          city: data.city,
+          email: data.email,
+          password: data.password,
+        });
+
+        // Send verification code via email
+        await sendNotification(request, {
+          type: 'verification_code',
+          to: data.email,
+          data: {
+            verificationCode: result.verificationCode,
+            familyName: data.familyName,
+          },
+        });
+
+        // Send admin notification for new registration attempt
+        await sendNotification(request, {
+          type: 'admin_new_registration',
+          to: ADMIN_NOTIFICATION_EMAIL,
+          data: {
+            familyName: data.familyName,
+            email: data.email,
+            city: data.city,
+            familyCode: 'pending_verification',
+            timestamp: new Date().toISOString(),
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Verificatiecode verzonden naar je email',
+          email: data.email,
+        });
+      }
+      case 'verifyRegistration': {
+        const data = z.object({
+          email: z.string().email(),
+          code: z.string().length(6),
+          familyName: z.string(),
+          city: z.string(),
+          password: z.string().min(6),
+        }).parse(payload);
+
+        const { id: familyId, familyCode } = await completeFamilyRegistration({
+          email: data.email,
+          code: data.code,
+          familyName: data.familyName,
+          city: data.city,
+          password: data.password,
+        });
+
+        await createSession(familyId);
+
+        // Send welcome email with family code
+        await sendNotification(request, {
+          type: 'welcome_parent',
+          to: data.email,
+          data: { familyName: data.familyName, familyCode },
+        });
+
+        // Notify admin
+        await sendNotification(request, {
+          type: 'admin_new_registration',
+          to: ADMIN_NOTIFICATION_EMAIL,
+          data: {
+            familyName: data.familyName,
+            email: data.email,
+            city: data.city,
+            familyCode,
+            timestamp: new Date().toISOString(),
+          },
+        });
+
+        return respondWithFamily(familyId);
+      }
+      case 'registerFamily': {
+        // Keep backward compatibility for admin use
+        const data = registerSchema.parse(payload);
+        const { id: familyId, familyCode } = await createFamily({
+          familyName: data.familyName,
+          city: data.city,
+          email: data.email,
+          password: data.password,
+          skipVerification: true,
+        });
         await createSession(familyId);
         await sendNotification(request, {
           type: 'welcome_parent',
@@ -498,7 +740,13 @@ export async function POST(request: Request) {
       case 'adminCreateFamily': {
         await requireAdminSession();
         const data = adminFamilySchema.parse(payload);
-        await createFamilyAdmin(data);
+        await createFamilyAdmin({
+          familyName: data.familyName,
+          city: data.city,
+          email: data.email,
+          password: data.password,
+          familyCode: data.familyCode,
+        });
         const families = await listFamiliesForAdmin();
         return NextResponse.json({ families: families.map(serializeAdminFamily) });
       }
@@ -701,6 +949,234 @@ export async function POST(request: Request) {
         const stats = await getAdminStatsSummary();
         return NextResponse.json({ adminStats: stats });
       }
+      case 'createCoupon': {
+        await requireAdminSession();
+        const data = couponSchema.parse(payload);
+        const coupon = await createCoupon(data);
+        return NextResponse.json({ coupon });
+      }
+      case 'getCoupons': {
+        await requireAdminSession();
+        const coupons = await getAllCoupons();
+        return NextResponse.json({ coupons });
+      }
+      case 'updateCoupon': {
+        await requireAdminSession();
+        const data = couponUpdateSchema.parse(payload);
+        const { couponId, ...updates } = data;
+        const coupon = await updateCoupon(couponId, updates);
+        return NextResponse.json({ coupon });
+      }
+      case 'deleteCoupon': {
+        await requireAdminSession();
+        const data = couponDeleteSchema.parse(payload);
+        await deleteCoupon(data.couponId);
+        return NextResponse.json({ success: true });
+      }
+      case 'validateCoupon': {
+        const session = await requireSession();
+        const data = couponValidateSchema.parse(payload);
+        const coupon = await validateCoupon(data.code, session.familyId);
+        return NextResponse.json({ coupon });
+      }
+      case 'applyCoupon': {
+        const session = await requireSession();
+        const data = couponApplySchema.parse(payload);
+        const result = await applyCouponToOrder(
+          data.couponId,
+          session.familyId,
+          data.orderId,
+          data.originalAmount
+        );
+        return NextResponse.json(result);
+      }
+      case 'getCouponStats': {
+        await requireAdminSession();
+        const stats = await getCouponStats();
+        return NextResponse.json({ couponStats: stats });
+      }
+      case 'generateCouponCode': {
+        await requireAdminSession();
+        const code = generateCouponCode();
+        return NextResponse.json({ code });
+      }
+      case 'setFamilySubscription': {
+        await requireAdminSession();
+        const data = subscriptionSetSchema.parse(payload);
+        const family = await setFamilySubscription(data.familyId, {
+          plan: data.plan,
+          status: data.status,
+          interval: data.interval,
+          renewalDate: data.renewalDate,
+          orderId: data.orderId,
+        });
+        return NextResponse.json({ family });
+      }
+      case 'upgradeFamilyToPro': {
+        await requireAdminSession();
+        const data = subscriptionUpgradeSchema.parse(payload);
+        const family = await upgradeFamilyToPro(data.familyId, {
+          plan: data.plan,
+          interval: data.interval,
+          durationMonths: data.durationMonths,
+          orderId: data.orderId,
+        });
+        return NextResponse.json({ family });
+      }
+      case 'downgradeFamilyAccount': {
+        await requireAdminSession();
+        const data = subscriptionDowngradeSchema.parse(payload);
+        const family = await downgradeFamilyAccount(data.familyId, {
+          immediate: data.immediate,
+          orderId: data.orderId,
+        });
+        return NextResponse.json({ family });
+      }
+      case 'extendFamilySubscription': {
+        await requireAdminSession();
+        const data = subscriptionExtendSchema.parse(payload);
+        const family = await extendFamilySubscription(data.familyId, data.additionalMonths, data.orderId);
+        return NextResponse.json({ family });
+      }
+      case 'getSubscriptionStats': {
+        await requireAdminSession();
+        const stats = await getSubscriptionStats();
+        return NextResponse.json({ subscriptionStats: stats });
+      }
+      case 'getExpiringSubscriptions': {
+        await requireAdminSession();
+        const families = await getExpiringSubscriptions();
+        return NextResponse.json({ expiringSubscriptions: families });
+      }
+      case 'bulkUpdateSubscriptions': {
+        await requireAdminSession();
+        const data = bulkSubscriptionUpdateSchema.parse(payload);
+        const results = await bulkUpdateSubscriptions(data.operations);
+        return NextResponse.json({ results });
+      }
+      case 'createVerificationTable': {
+        try {
+          // Create verification_codes table
+          const createTableSQL = `
+            CREATE TABLE IF NOT EXISTS verification_codes (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              email varchar(255) NOT NULL,
+              code varchar(6) NOT NULL,
+              purpose varchar(50) NOT NULL,
+              expires_at timestamp with time zone NOT NULL,
+              used_at timestamp with time zone,
+              created_at timestamp with time zone DEFAULT now() NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);
+            CREATE INDEX IF NOT EXISTS idx_verification_codes_expires_at ON verification_codes(expires_at);
+          `;
+          await db.execute(sql.unsafe(createTableSQL));
+          return NextResponse.json({ success: true, message: 'Verification codes table created' });
+        } catch (error) {
+          console.error('Error creating verification table:', error);
+          return NextResponse.json({ error: 'Failed to create table' }, { status: 500 });
+        }
+      }
+      case 'unlockAvatarItem': {
+        const session = await requireSession();
+        const data = unlockAvatarItemSchema.parse(payload);
+
+        // Verify the child belongs to the family
+        const family = await loadFamilyWithRelations(session.familyId);
+        if (!family?.children.some(child => child.id === data.childId)) {
+          return errorResponse('Kind niet gevonden in gezin.', 404);
+        }
+
+        // Get the child and item details
+        const [child] = await db
+          .select()
+          .from(children)
+          .where(eq(children.id, data.childId))
+          .limit(1);
+
+        if (!child) {
+          return errorResponse('Kind niet gevonden.', 404);
+        }
+
+        const [item] = await db
+          .select()
+          .from(avatarItems)
+          .where(eq(avatarItems.id, data.itemId))
+          .limit(1);
+
+        if (!item) {
+          return errorResponse('Item niet gevonden.', 404);
+        }
+
+        // Check if child has enough XP
+        if (child.xp < item.xpRequired) {
+          return errorResponse('Niet genoeg XP.', 400);
+        }
+
+        // Check if already unlocked
+        const [existing] = await db
+          .select()
+          .from(avatarCustomizations)
+          .where(and(
+            eq(avatarCustomizations.childId, data.childId),
+            eq(avatarCustomizations.itemId, data.itemId)
+          ))
+          .limit(1);
+
+        if (existing) {
+          return errorResponse('Item is al ontgrendeld.', 400);
+        }
+
+        // Unlock the item
+        await db.insert(avatarCustomizations).values({
+          childId: data.childId,
+          itemId: data.itemId,
+        });
+
+        // Deduct XP from child
+        await db
+          .update(children)
+          .set({ xp: child.xp - item.xpRequired })
+          .where(eq(children.id, data.childId));
+
+        return respondWithFamily(session.familyId);
+      }
+      case 'equipAvatarItem': {
+        const session = await requireSession();
+        const data = equipAvatarItemSchema.parse(payload);
+
+        // Verify the child belongs to the family
+        const family = await loadFamilyWithRelations(session.familyId);
+        if (!family?.children.some(child => child.id === data.childId)) {
+          return errorResponse('Kind niet gevonden in gezin.', 404);
+        }
+
+        // Check if the child owns this item
+        const [existing] = await db
+          .select()
+          .from(avatarCustomizations)
+          .where(and(
+            eq(avatarCustomizations.childId, data.childId),
+            eq(avatarCustomizations.itemId, data.itemId)
+          ))
+          .limit(1);
+
+        if (!existing) {
+          return errorResponse('Item niet in bezit.', 400);
+        }
+
+        // Update the equipped status
+        await db
+          .update(avatarCustomizations)
+          .set({ isEquipped: data.equip ? 1 : 0 })
+          .where(and(
+            eq(avatarCustomizations.childId, data.childId),
+            eq(avatarCustomizations.itemId, data.itemId)
+          ));
+
+        return respondWithFamily(session.familyId);
+      }
       default:
         return errorResponse('Onbekende actie.', 400);
     }
@@ -709,6 +1185,15 @@ export async function POST(request: Request) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : '';
     console.error('[api/app] Error details:', { action, errorMessage, errorStack });
+
+    // Handle authentication errors
+    if (errorMessage === 'Unauthenticated') {
+      return errorResponse('Niet geauthenticeerd. Log opnieuw in.', 401);
+    }
+
+    if (errorMessage === 'UNAUTHORIZED_ADMIN') {
+      return errorResponse('Onvoldoende rechten voor deze actie.', 403);
+    }
 
     if (error instanceof z.ZodError) {
       return errorResponse('Ongeldige gegevens.', 400);

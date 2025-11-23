@@ -65,6 +65,8 @@ const mapChild = (child: SerializableChild): Child => ({
   pin: child.pin,
   points: child.points,
   totalPointsEver: child.totalPointsEver,
+  xp: child.xp,
+  totalXpEver: child.totalXpEver,
   avatar: child.avatar,
 });
 
@@ -72,12 +74,16 @@ const mapChore = (chore: SerializableChore): Chore => ({
   id: chore.id,
   name: chore.name,
   points: chore.points,
+  xpReward: chore.xpReward,
   assignedTo: chore.assignedTo,
   status: chore.status as ChoreStatus,
   submittedBy: chore.submittedBy ?? null,
   submittedAt: toTimestamp(chore.submittedAt),
   emotion: chore.emotion ?? null,
   photoUrl: chore.photoUrl ?? null,
+  questChainId: chore.questChainId ?? null,
+  isMainQuest: chore.isMainQuest,
+  chainOrder: chore.chainOrder ?? null,
   createdAt: toTimestamp(chore.createdAt),
 });
 

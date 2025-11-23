@@ -4,6 +4,8 @@ export type SerializableChild = {
   pin: string;
   points: number;
   totalPointsEver: number;
+  xp: number;
+  totalXpEver: number;
   avatar: string;
   createdAt: string | null;
 };
@@ -12,12 +14,16 @@ export type SerializableChore = {
   id: string;
   name: string;
   points: number;
+  xpReward: number;
   assignedTo: string[];
   status: string;
   submittedBy?: string | null;
   submittedAt: string | null;
   emotion?: string | null;
   photoUrl?: string | null;
+  questChainId?: string | null;
+  isMainQuest: boolean;
+  chainOrder?: number | null;
   createdAt: string | null;
 };
 

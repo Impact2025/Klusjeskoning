@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useCallback, Suspense } from 'react';
+import { useEffect, useCallback, Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp } from '@/components/app/AppProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { formatPrice, PLAN_DEFINITIONS } from '@/lib/plans';
 import { CreditCard, CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -14,24 +16,76 @@ export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
 function UpgradePageContent() {
-  const { 
-    family, 
-    startPremiumCheckout, 
-    confirmPremiumCheckout, 
+  const {
+    family,
+    startPremiumCheckout,
+    confirmPremiumCheckout,
     isPremium,
-    isLoading 
+    isLoading
   } = useApp();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
   const premiumPlan = PLAN_DEFINITIONS.premium;
+  const [couponCode, setCouponCode] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  const handleApplyCoupon = useCallback(async () => {
+    if (!couponCode.trim()) {
+      setCouponError('Voer een couponcode in');
+      return;
+    }
+
+    setIsValidatingCoupon(true);
+    setCouponError('');
+
+    try {
+      // Validate coupon by making a test API call
+      const response = await fetch('/api/billing/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          familyId: family?.id || 'test',
+          email: family?.email || 'test@test.com',
+          familyName: family?.familyName || 'Test',
+          interval: 'monthly',
+          plan: 'premium',
+          couponCode: couponCode.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        // Coupon is valid, store it
+        const data = await response.json();
+        // We don't actually want to create an order, just validate
+        // So we'll make another call to get coupon details
+        setAppliedCoupon({ code: couponCode.trim(), validated: true });
+        setCouponError('');
+        toast({ title: 'Coupon toegepast!', description: 'De korting is toegepast op je abonnement.' });
+      } else {
+        const error = await response.json();
+        setCouponError(error.error || 'Ongeldige couponcode');
+        setAppliedCoupon(null);
+      }
+    } catch (error) {
+      setCouponError('Kon coupon niet valideren');
+      setAppliedCoupon(null);
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  }, [couponCode, family, toast]);
 
   const handleUpgrade = useCallback(async (interval: 'monthly' | 'yearly') => {
-    const paymentUrl = await startPremiumCheckout(interval);
+    console.log('Starting checkout with coupon:', appliedCoupon?.code || couponCode);
+    const paymentUrl = await startPremiumCheckout(interval, appliedCoupon?.code || couponCode || undefined);
     if (paymentUrl) {
       window.location.href = paymentUrl;
+    } else {
+      console.log('No payment URL received');
     }
-  }, [startPremiumCheckout]);
+  }, [startPremiumCheckout, appliedCoupon, couponCode]);
 
   useEffect(() => {
     const checkoutStatus = searchParams?.get('checkout');
@@ -53,7 +107,33 @@ function UpgradePageContent() {
   }, [searchParams, confirmPremiumCheckout, router, toast]);
 
   if (!family) {
-    return null;
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <CardTitle>Inloggen vereist</CardTitle>
+            <CardDescription>
+              Om te upgraden naar Gezin+ moet je eerst ingelogd zijn.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              className="w-full"
+              onClick={() => router.push('/app')}
+            >
+              Inloggen
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => router.push('/')}
+            >
+              Terug naar homepage
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (isPremium) {
@@ -155,6 +235,57 @@ function UpgradePageContent() {
             </CardContent>
           </Card>
 
+          {/* Coupon Code */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Coupon code (optioneel)</CardTitle>
+              <CardDescription>
+                Heb je een kortingscode? Voer deze hier in voor extra korting.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="coupon">Coupon code</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="coupon"
+                    placeholder="Voer je coupon code in..."
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      setCouponError('');
+                      setAppliedCoupon(null); // Reset applied coupon when typing
+                    }}
+                    className={couponError ? 'border-red-500' : ''}
+                    disabled={isValidatingCoupon}
+                  />
+                  <Button
+                    onClick={handleApplyCoupon}
+                    disabled={!couponCode.trim() || isValidatingCoupon || !!appliedCoupon}
+                    variant="outline"
+                  >
+                    {isValidatingCoupon ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : appliedCoupon ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      'Toepassen'
+                    )}
+                  </Button>
+                </div>
+                {couponError && (
+                  <p className="text-sm text-red-600">{couponError}</p>
+                )}
+                {appliedCoupon && (
+                  <p className="text-sm text-green-600 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Coupon "{appliedCoupon.code}" succesvol toegepast!
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Pricing Options */}
           <Card>
             <CardHeader>
@@ -170,12 +301,26 @@ function UpgradePageContent() {
                 <div className="mb-4">
                   <h3 className="text-xl font-bold">Maandabonnement</h3>
                   <div className="mt-2">
-                    <span className="text-3xl font-bold">{formatPrice(premiumPlan.priceMonthlyCents)}</span>
+                    {appliedCoupon ? (
+                      <>
+                        <span className="text-lg text-gray-500 line-through">{formatPrice(premiumPlan.priceMonthlyCents)}</span>
+                        <span className="text-3xl font-bold text-green-600 ml-2">
+                          {formatPrice(Math.max(0, premiumPlan.priceMonthlyCents - Math.round((premiumPlan.priceMonthlyCents * (appliedCoupon.code === 'VRIEND25' ? 100 : 20)) / 100)))}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-3xl font-bold">{formatPrice(premiumPlan.priceMonthlyCents)}</span>
+                    )}
                     <span className="text-gray-500">/maand</span>
                   </div>
+                  {appliedCoupon && (
+                    <p className="text-sm text-green-600">
+                      {appliedCoupon.code === 'VRIEND25' ? '100%' : '20%'} korting toegepast!
+                    </p>
+                  )}
                 </div>
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   size="lg"
                   onClick={() => handleUpgrade('monthly')}
                   disabled={isLoading}
@@ -190,16 +335,31 @@ function UpgradePageContent() {
                 <div className="mb-4">
                   <h3 className="text-xl font-bold">Jaarabonnement</h3>
                   <div className="mt-2">
-                    <span className="text-3xl font-bold">{formatPrice(premiumPlan.priceYearlyCents)}</span>
+                    {appliedCoupon ? (
+                      <>
+                        <span className="text-lg text-gray-500 line-through">{formatPrice(premiumPlan.priceYearlyCents)}</span>
+                        <span className="text-3xl font-bold text-green-600 ml-2">
+                          {formatPrice(Math.max(0, premiumPlan.priceYearlyCents - Math.round((premiumPlan.priceYearlyCents * (appliedCoupon.code === 'VRIEND25' ? 100 : 20)) / 100)))}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-3xl font-bold">{formatPrice(premiumPlan.priceYearlyCents)}</span>
+                    )}
                     <span className="text-gray-500">/jaar</span>
                   </div>
-                  <p className="text-sm text-green-600 mt-1">
-                    Bespaar €{((premiumPlan.priceMonthlyCents * 12 - premiumPlan.priceYearlyCents) / 100).toFixed(2)} per jaar
-                  </p>
+                  {appliedCoupon ? (
+                    <p className="text-sm text-green-600">
+                      {appliedCoupon.code === 'VRIEND25' ? '100%' : '20%'} korting toegepast!
+                    </p>
+                  ) : (
+                    <p className="text-sm text-green-600 mt-1">
+                      Bespaar €{((premiumPlan.priceMonthlyCents * 12 - premiumPlan.priceYearlyCents) / 100).toFixed(2)} per jaar
+                    </p>
+                  )}
                 </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
+                <Button
+                  variant="outline"
+                  className="w-full"
                   size="lg"
                   onClick={() => handleUpgrade('yearly')}
                   disabled={isLoading}

@@ -130,13 +130,15 @@ interface AppContextType {
   loginParent: (email: string, password: string) => Promise<void>;
   loginAdmin: (email: string, password: string) => Promise<void>;
   registerFamily: (familyName: string, city: string, email: string, password: string) => Promise<void>;
+  startRegistration: (familyName: string, city: string, email: string, password: string) => Promise<{ email: string }>;
+  verifyRegistration: (email: string, code: string, familyName: string, city: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loginChildStep1: (familyCode: string) => Promise<void>;
   selectChildProfile: (childId: string) => void;
   submitPin: (pin: string) => void;
   addChild: (name: string, pin: string, avatar: string) => Promise<void>;
   updateChild: (childId: string, updates: Partial<Child>) => Promise<void>;
-  addChore: (name: string, points: number, assignedTo: string[]) => Promise<void>;
+  addChore: (name: string, points: number, assignedTo: string[], options?: { recurrenceType?: string; recurrenceDays?: string | null }) => Promise<void>;
   updateChore: (choreId: string, updates: Partial<Chore>) => Promise<void>;
   addReward: (name: string, points: number, type: RewardType, assignedTo: string[]) => Promise<void>;
   updateReward: (rewardId: string, updates: Partial<Reward>) => Promise<void>;
@@ -161,13 +163,25 @@ interface AppContextType {
   createReview: (data: ReviewInput) => Promise<void>;
   updateReview: (reviewId: string, data: ReviewInput) => Promise<void>;
   deleteReview: (reviewId: string) => Promise<void>;
-  startPremiumCheckout: (interval: BillingInterval) => Promise<string | null>;
+  startPremiumCheckout: (interval: BillingInterval, couponCode?: string) => Promise<string | null>;
   confirmPremiumCheckout: (orderId: string, interval: BillingInterval) => Promise<boolean>;
   getAdminFamilies: () => Promise<void>;
   createAdminFamily: (data: AdminFamilyInput) => Promise<void>;
   updateAdminFamily: (data: AdminFamilyUpdateInput) => Promise<void>;
   deleteAdminFamily: (familyId: string) => Promise<void>;
   getFinancialOverview: () => Promise<void>;
+  getCoupons: () => Promise<any[]>;
+  createCoupon: (data: any) => Promise<any>;
+  updateCoupon: (couponId: string, data: any) => Promise<any>;
+  deleteCoupon: (couponId: string) => Promise<void>;
+  getCouponStats: () => Promise<any>;
+  generateCouponCode: () => Promise<string>;
+  upgradeFamilyToPro: (familyId: string, options?: any) => Promise<any>;
+  downgradeFamilyAccount: (familyId: string, options?: any) => Promise<any>;
+  setFamilySubscription: (familyId: string, subscriptionData: any) => Promise<any>;
+  extendFamilySubscription: (familyId: string, additionalMonths: number, orderId?: string) => Promise<any>;
+  unlockAvatarItem: (itemId: string) => Promise<void>;
+  equipAvatarItem: (itemId: string, equip: boolean) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -273,10 +287,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loginParent = useCallback(async (email: string, password: string) => {
     await handleAction<{ family: SerializableFamily }>('loginParent', { email, password }, ({ family }) => {
       applyFamily(family ?? null);
-      setScreen('parentDashboard');
+      // Check if family needs setup wizard (no children yet)
+      if (!family?.children || family.children.length === 0) {
+        setScreen('familySetup');
+      } else {
+        setScreen('parentDashboard');
+      }
       notify('success', 'Welkom terug!', 'Je bent succesvol ingelogd.');
     });
   }, [applyFamily, handleAction, notify]);
+
+  // Handle post-login redirects - only for actual checkout flows
+  useEffect(() => {
+    if (family && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const checkout = urlParams.get('checkout');
+      if (checkout === 'premium') {
+        // Remove the checkout parameter and redirect to upgrade
+        urlParams.delete('checkout');
+        const newUrl = urlParams.toString()
+          ? `${window.location.pathname}?${urlParams.toString()}`
+          : window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          if (typeof window !== 'undefined' && window.location) {
+            window.location.href = '/app/upgrade';
+          }
+        }, 100);
+      } else {
+        // Clear any stale pendingCheckout that's not from an actual checkout flow
+        const pendingCheckout = sessionStorage.getItem('pendingCheckout');
+        if (pendingCheckout === 'premium' && !checkout) {
+          sessionStorage.removeItem('pendingCheckout');
+        }
+      }
+    }
+  }, [family]);
 
   const loginAdmin = useCallback(async (email: string, password: string) => {
     await handleAction<{ family: SerializableFamily }>('adminLogin', { email, password }, ({ family }) => {
@@ -289,8 +336,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const registerFamily = useCallback(async (familyName: string, city: string, email: string, password: string) => {
     await handleAction<{ family: SerializableFamily }>('registerFamily', { familyName, city, email, password }, ({ family }) => {
       applyFamily(family ?? null);
-      setScreen('parentDashboard');
+      // Check if family needs setup wizard (no children yet)
+      if (!family?.children || family.children.length === 0) {
+        setScreen('familySetup');
+      } else {
+        setScreen('parentDashboard');
+      }
       notify('success', 'Welkom!', 'Je gezin is aangemaakt. Controleer je e-mail voor de gezinscode.');
+    });
+  }, [applyFamily, handleAction, notify]);
+
+  const startRegistration = useCallback(async (familyName: string, city: string, email: string, password: string) => {
+    const result = await handleAction<{ success: boolean; message: string; email: string }>('startRegistration', { familyName, city, email, password });
+    notify('success', 'Code verzonden', 'Controleer je email voor de verificatiecode.');
+    return { email: result.email };
+  }, [handleAction, notify]);
+
+  const verifyRegistration = useCallback(async (email: string, code: string, familyName: string, city: string, password: string) => {
+    await handleAction<{ family: SerializableFamily }>('verifyRegistration', { email, code, familyName, city, password }, ({ family }) => {
+      applyFamily(family ?? null);
+      // Check if family needs setup wizard (no children yet)
+      if (!family?.children || family.children.length === 0) {
+        setScreen('familySetup');
+      } else {
+        setScreen('parentDashboard');
+      }
+      notify('success', 'Welkom!', 'Je account is succesvol aangemaakt.');
     });
   }, [applyFamily, handleAction, notify]);
 
@@ -353,14 +424,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [applyFamily, handleAction, notify]);
 
-  const addChore = useCallback(async (name: string, points: number, assignedTo: string[]) => {
+  const addChore = useCallback(async (name: string, points: number, assignedTo: string[], options?: { recurrenceType?: string; recurrenceDays?: string | null }) => {
     if (!family) return;
     const gate = canAddChore(family);
     if (!gate.allowed) {
       notify('destructive', 'Upgrade nodig', gate.reason || 'Je hebt de limiet voor deze maand bereikt.');
       return;
     }
-    await handleAction<{ family: SerializableFamily }>('addChore', { name, points, assignedTo }, ({ family: payload }) => {
+    const xpReward = Math.floor(points / 10) + 1; // Simple XP calculation
+    await handleAction<{ family: SerializableFamily }>('addChore', {
+      name,
+      points,
+      assignedTo,
+      xpReward,
+      recurrenceType: options?.recurrenceType || 'none',
+      recurrenceDays: options?.recurrenceDays || null
+    }, ({ family: payload }) => {
       applyFamily(payload ?? null);
       notify('success', 'Succes', 'Klusje toegevoegd.');
     });
@@ -424,21 +503,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       let photoUrl: string | null = null;
       if (photoFile) {
-        const formData = new FormData();
-        formData.append('file', photoFile);
-        formData.append('folder', 'chore-proof');
+        try {
+          const formData = new FormData();
+          formData.append('file', photoFile);
+          formData.append('folder', 'chore-proof');
 
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
 
-        if (!uploadResponse.ok) {
-          throw new Error('Upload failed');
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            photoUrl = uploadData.url;
+          } else {
+            console.warn('Photo upload failed, continuing without photo');
+          }
+        } catch (uploadError) {
+          console.warn('Photo upload error:', uploadError);
+          // Continue without photo
         }
-
-        const uploadData = await uploadResponse.json();
-        photoUrl = uploadData.url;
       }
       const result = await callAppApi<{ family: SerializableFamily }>('submitChoreForApproval', {
         choreId,
@@ -529,6 +613,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     });
   }, [handleAction]);
+
+  const getCoupons = useCallback(async () => {
+    const result = await handleAction<{ coupons: any[] }>('getCoupons', undefined);
+    return result.coupons;
+  }, [handleAction]);
+
+  const createCoupon = useCallback(async (data: any) => {
+    return await handleAction<any>('createCoupon', data);
+  }, [handleAction]);
+
+  const updateCoupon = useCallback(async (couponId: string, data: any) => {
+    return await handleAction<any>('updateCoupon', { couponId, ...data });
+  }, [handleAction]);
+
+  const deleteCoupon = useCallback(async (couponId: string) => {
+    return await handleAction('deleteCoupon', { couponId });
+  }, [handleAction]);
+
+  const getCouponStats = useCallback(async () => {
+    const result = await handleAction<{ couponStats: any }>('getCouponStats', undefined);
+    return result.couponStats;
+  }, [handleAction]);
+
+  const generateCouponCode = useCallback(async () => {
+    return await handleAction<string>('generateCouponCode', undefined);
+  }, [handleAction]);
+
+  const upgradeFamilyToPro = useCallback(async (familyId: string, options?: any) => {
+    return await handleAction<any>('upgradeFamilyToPro', { familyId, ...options });
+  }, [handleAction]);
+
+  const downgradeFamilyAccount = useCallback(async (familyId: string, options?: any) => {
+    return await handleAction<any>('downgradeFamilyAccount', { familyId, ...options });
+  }, [handleAction]);
+
+  const setFamilySubscription = useCallback(async (familyId: string, subscriptionData: any) => {
+    return await handleAction<any>('setFamilySubscription', { familyId, ...subscriptionData });
+  }, [handleAction]);
+
+  const extendFamilySubscription = useCallback(async (familyId: string, additionalMonths: number, orderId?: string) => {
+    return await handleAction<any>('extendFamilySubscription', { familyId, additionalMonths, orderId });
+  }, [handleAction]);
+
+  const unlockAvatarItem = useCallback(async (itemId: string) => {
+    if (!user) return;
+    await handleAction<{ family: SerializableFamily }>('unlockAvatarItem', { childId: user.id, itemId }, ({ family: payload }) => {
+      applyFamily(payload ?? null);
+      notify('success', 'Item ontgrendeld!', 'Je kunt dit item nu gebruiken.');
+    });
+  }, [applyFamily, handleAction, notify, user]);
+
+  const equipAvatarItem = useCallback(async (itemId: string, equip: boolean) => {
+    if (!user) return;
+    await handleAction<{ family: SerializableFamily }>('equipAvatarItem', { childId: user.id, itemId, equip }, ({ family: payload }) => {
+      applyFamily(payload ?? null);
+      notify('success', equip ? 'Item aangehad!' : 'Item uitgedaan!', 'Je avatar is bijgewerkt.');
+    });
+  }, [applyFamily, handleAction, notify, user]);
 
   const getGoodCauses = useCallback(async () => {
     await handleAction<{ goodCauses: SerializableGoodCause[] }>('getGoodCauses', undefined, ({ goodCauses: payload }) => {
@@ -682,7 +824,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [handleAction, notify]);
 
-  const startPremiumCheckout = useCallback(async (interval: BillingInterval) => {
+  const startPremiumCheckout = useCallback(async (interval: BillingInterval, couponCode?: string) => {
     if (!family) {
       notify('destructive', 'Geen gezin gevonden', 'Log opnieuw in en probeer het nog eens.');
       return null;
@@ -698,6 +840,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           familyName: family.familyName,
           interval,
           plan: 'premium',
+          couponCode,
         }),
       });
       const data = await response.json();
@@ -773,6 +916,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     loginParent,
     loginAdmin,
     registerFamily,
+    startRegistration,
+    verifyRegistration,
     logout,
     loginChildStep1,
     selectChildProfile,
@@ -811,6 +956,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateAdminFamily,
     deleteAdminFamily,
     getFinancialOverview,
+    getCoupons,
+    createCoupon,
+    updateCoupon,
+    deleteCoupon,
+    getCouponStats,
+    generateCouponCode,
+    upgradeFamilyToPro,
+    downgradeFamilyAccount,
+    setFamilySubscription,
+    extendFamilySubscription,
+    unlockAvatarItem,
+    equipAvatarItem,
   }), [
     activePlan,
     addChild,
@@ -868,6 +1025,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     user,
     adminStats,
     planDefinition,
+    unlockAvatarItem,
+    equipAvatarItem,
   ]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;

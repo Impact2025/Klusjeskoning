@@ -1,10 +1,13 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useApp } from '@/components/app/AppProvider';
 import LandingScreen from '@/components/app/screens/LandingScreen';
 import ParentLoginScreen from '@/components/app/screens/ParentLoginScreen';
+import EmailVerificationScreen from '@/components/app/screens/EmailVerificationScreen';
+import FamilySetupWizard from '@/components/app/setup/FamilySetupWizard';
 import ChildLoginScreen from '@/components/app/screens/ChildLoginScreen';
 import ChildProfileSelectScreen from '@/components/app/screens/ChildProfileSelectScreen';
 import ChildPinScreen from '@/components/app/screens/ChildPinScreen';
@@ -35,11 +38,72 @@ const AdminDashboard = nextDynamic(() => import('@/components/app/screens/AdminD
 });
 
 function AppContent() {
-  const { currentScreen, isLoading } = useApp();
+  const { currentScreen, isLoading, family, addChild, addChore, addReward, setScreen } = useApp();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const handleFamilySetupComplete = async (data: {
+    children: { name: string; age: number }[];
+    model: 'linked' | 'separate';
+    chores: any[];
+    allowances: { [childName: string]: number };
+  }) => {
+    try {
+      // Create all children first
+      for (const child of data.children) {
+        await addChild(child.name, '1234', '🐼'); // Default PIN and avatar
+      }
+
+      // Small delay to ensure family state is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Now get the created children from the updated family state
+      const createdChildren = family?.children.filter(c =>
+        data.children.some(childData => childData.name === c.name)
+      ) || [];
+
+      // Create chores
+      for (const chore of data.chores) {
+        const childIds = createdChildren
+          .filter(c => chore.assignedTo.includes(c.name))
+          .map(c => c.id);
+        await addChore(chore.name, chore.points, childIds);
+      }
+
+      // Create rewards (allowances as money rewards)
+      for (const [childName, allowance] of Object.entries(data.allowances)) {
+        const child = createdChildren.find(c => c.name === childName);
+        if (child) {
+          await addReward(`${childName}'s zakgeld`, allowance, 'money', [child.id]);
+        }
+      }
+
+      // Navigate to parent dashboard
+      setScreen('parentDashboard');
+    } catch (error) {
+      console.error('Failed to complete family setup:', error);
+    }
+  };
+
+  // Handle checkout parameter
+  useEffect(() => {
+    const checkout = searchParams?.get('checkout');
+    if (checkout === 'premium') {
+      if (family) {
+        // User is logged in, redirect to upgrade page
+        router.replace('/app/upgrade');
+      } else {
+        // User is not logged in, stay on current page (login screen)
+        // The checkout parameter will be preserved for after login
+      }
+    }
+  }, [searchParams, router, family]);
 
   const screens: Record<Screen, React.ReactNode> = {
     landing: <LandingScreen />,
     parentLogin: <ParentLoginScreen />,
+    emailVerification: <EmailVerificationScreen />,
+    familySetup: <FamilySetupWizard onComplete={handleFamilySetupComplete} />,
     parentDashboard: <ParentDashboard />,
     childLogin: <ChildLoginScreen />,
     childProfileSelect: <ChildProfileSelectScreen />,

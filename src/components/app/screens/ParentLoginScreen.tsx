@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../AppProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Users, LogIn } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Users, LogIn, AlertCircle } from 'lucide-react';
 import ScreenWrapper from '../ScreenWrapper';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 
 export default function ParentLoginScreen() {
-  const { setScreen, registerFamily, loginParent, isLoading } = useApp();
+  const { setScreen, startRegistration, loginParent, isLoading } = useApp();
   const { toast } = useToast();
 
   // Check if there's a pending checkout or register flag to default to registration mode
@@ -27,11 +28,13 @@ export default function ParentLoginScreen() {
     return false;
   });
 
+
   // Form state
   const [familyName, setFamilyName] = useState('');
   const [city, setCity] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [formError, setFormError] = useState('');
 
   const handleLogin = () => {
     if (email && password) {
@@ -41,15 +44,30 @@ export default function ParentLoginScreen() {
     }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
+    setFormError(''); // Clear any previous errors
+
     if (familyName && city && email && password) {
         if(password.length < 6) {
-            toast({ variant: 'destructive', title: 'Fout', description: 'Wachtwoord moet minimaal 6 tekens lang zijn.' });
+            setFormError('Wachtwoord moet minimaal 6 tekens lang zijn.');
             return;
         }
-        registerFamily(familyName, city, email, password);
+        try {
+          await startRegistration(familyName, city, email, password);
+          // Store registration data for verification screen
+          sessionStorage.setItem('pendingRegistration', JSON.stringify({ email, familyName, city, password }));
+          setScreen('emailVerification');
+        } catch (error: any) {
+          // Handle specific errors gracefully
+          if (error.message?.includes('EMAIL_IN_USE')) {
+            setFormError('Dit emailadres is al in gebruik. Probeer in te loggen of gebruik een ander emailadres.');
+          } else {
+            // For other errors, still show toast as fallback
+            toast({ variant: 'destructive', title: 'Fout', description: error.message || 'Er ging iets mis bij het registreren.' });
+          }
+        }
     } else {
-      toast({ variant: 'destructive', title: 'Fout', description: 'Vul alle velden in om te registreren.' });
+      setFormError('Vul alle velden in om te registreren.');
     }
   };
   
@@ -65,11 +83,20 @@ export default function ParentLoginScreen() {
 
   const toggleMode = () => {
     setIsRegistering(!isRegistering);
-    // Clear fields on mode switch
+    // Clear fields and errors on mode switch
     setFamilyName('');
     setCity('');
     setEmail('');
     setPassword('');
+    setFormError('');
+  }
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    // Clear form error when user starts typing in email field
+    if (formError) {
+      setFormError('');
+    }
   }
 
   return (
@@ -79,7 +106,14 @@ export default function ParentLoginScreen() {
           <ArrowLeft className="h-6 w-6 text-primary" />
         </Button>
         <h2 className="font-brand text-3xl text-center flex-grow text-primary">Ouder Portaal</h2>
-        <div className="w-10"></div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => window.location.href = '/'}
+          className="text-primary hover:text-primary/80"
+        >
+          🏠 Home
+        </Button>
       </header>
       <main className="flex-grow flex flex-col justify-center">
         <h3 className="text-xl font-bold text-center mb-4">{isRegistering ? 'Nieuw Gezin Aanmaken' : 'Inloggen'}</h3>
@@ -98,15 +132,22 @@ export default function ParentLoginScreen() {
           )}
           <div>
             <Label htmlFor="email">E-mailadres</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ouder@email.com" required />
+            <Input id="email" type="email" value={email} onChange={(e) => handleEmailChange(e.target.value)} placeholder="ouder@email.com" required />
           </div>
           <div>
             <Label htmlFor="password">Wachtwoord</Label>
             <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimaal 6 tekens" required />
           </div>
 
+          {formError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{formError}</AlertDescription>
+            </Alert>
+          )}
+
           <Button type="submit" size="lg" className="w-full text-lg shadow-md bg-success hover:bg-success/90 text-white" disabled={isLoading}>
-             {isRegistering ? <><Users className="mr-2 h-6 w-6" /> Registreren</> : <><LogIn className="mr-2 h-6 w-6" /> Inloggen</>}
+            {isRegistering ? <><Users className="mr-2 h-6 w-6" /> Registreren</> : <><LogIn className="mr-2 h-6 w-6" /> Inloggen</>}
           </Button>
         </form>
         

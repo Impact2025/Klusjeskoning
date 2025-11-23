@@ -55,18 +55,18 @@ function renderBaseEmail({ previewText, heading, intro, contentBlocks, cta, foot
   const sections = contentBlocks
     .map((block) => {
       const title = block.title
-        ? `<h2 style="margin:0 0 12px;font-size:20px;color:${brand.text};font-weight:700;">${block.title}</h2>`
+        ? `<h2 style="margin:0 0 16px;font-size:20px;color:${brand.text};font-weight:700;text-align:left;">${block.title}</h2>`
         : '';
       const paragraphs = block.body
         .map(
           (paragraph) =>
-            `<p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:${brand.muted};">${paragraph}</p>`
+            `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:${brand.muted};text-align:left;">${paragraph}</p>`
         )
         .join('');
 
       return `
         <tr>
-          <td style="padding:18px 0;border-bottom:1px solid #e2e8f0;">
+          <td style="padding:20px 0;border-bottom:1px solid #e2e8f0;text-align:left;">
             ${title}
             ${paragraphs}
           </td>
@@ -78,8 +78,8 @@ function renderBaseEmail({ previewText, heading, intro, contentBlocks, cta, foot
   const ctaButton = cta
     ? `
         <tr>
-          <td style="padding:24px 0;">
-            <a href="${cta.href}" style="display:inline-block;padding:14px 28px;background:${brand.primary};color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;">
+          <td style="padding:28px 0;text-align:left;">
+            <a href="${cta.href}" style="display:inline-block;padding:14px 28px;background:${brand.primary};color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;text-align:center;">
               ${cta.label}
             </a>
           </td>
@@ -88,57 +88,63 @@ function renderBaseEmail({ previewText, heading, intro, contentBlocks, cta, foot
     : '';
 
   const footer = footerNote
-    ? `<p style="margin:16px 0 0;font-size:13px;color:${brand.muted};line-height:1.6;">${footerNote}</p>`
+    ? `<p style="margin:16px 0 0;font-size:13px;color:${brand.muted};line-height:1.6;text-align:left;">${footerNote}</p>`
+    : '';
+
+  // Add debug info in a small header
+  const debugInfo = process.env.NODE_ENV === 'development'
+    ? `<div style="background:#f1f5f9;padding:8px 16px;margin-bottom:20px;border-radius:8px;font-size:11px;color:#64748b;text-align:left;">Email verzonden op: ${new Date().toLocaleString('nl-NL')} | Type: ${heading}</div>`
     : '';
 
   return `<!DOCTYPE html>
-  <html lang="nl">
-    <head>
-      <meta charSet="utf-8" />
-      <title>${heading}</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-    </head>
-    <body style="margin:0;padding:0;background:${brand.background};font-family:'Inter','Segoe UI',sans-serif;">
-      <span style="display:none !important;color:${brand.background};">${previewText}</span>
-      <table role="presentation" width="100%" cellPadding="0" cellSpacing="0" style="background:${brand.background};padding:40px 16px;">
-        <tr>
-          <td>
-            <table role="presentation" width="100%" cellPadding="0" cellSpacing="0" style="max-width:640px;margin:0 auto;background:${brand.cardBg};border-radius:32px;padding:40px 36px;box-shadow:0 20px 45px rgba(14,165,233,0.15);">
-              <tr>
-                <td style="text-align:center;padding-bottom:28px;">
-                  <a href="${APP_BASE_URL}" style="text-decoration:none;color:${brand.text};display:inline-flex;align-items:center;gap:12px;">
-                    <span style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg, ${brand.primary}, ${brand.accent});color:#ffffff;font-size:26px;font-weight:700;">KK</span>
-                    <span style="font-size:22px;font-weight:700;">KlusjesKoning</span>
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <h1 style="margin:0 0 16px;font-size:28px;font-weight:700;color:${brand.text};">${heading}</h1>
-                  <p style="margin:0 0 22px;font-size:17px;line-height:1.7;color:${brand.muted};">${intro}</p>
-                </td>
-              </tr>
-              ${sections}
-              ${ctaButton}
-              <tr>
-                <td style="padding-top:20px;border-top:1px solid #e2e8f0;">
-                  <p style="margin:10px 0;font-size:14px;color:${brand.muted};">Samen maken we van klusjes doen een feestje 🎉</p>
-                  ${footer}
-                </td>
-              </tr>
-            </table>
-            <table role="presentation" width="100%" style="max-width:640px;margin:20px auto 0;text-align:center;">
-              <tr>
-                <td>
-                  <p style="margin:0;font-size:12px;color:${brand.muted};">Beheer je voorkeuren of log in via <a href="${APP_BASE_URL}/app" style="color:${brand.primary};text-decoration:none;">de KlusjesKoning app</a>.</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </body>
-  </html>`;
+   <html lang="nl">
+     <head>
+       <meta charSet="utf-8" />
+       <title>${heading}</title>
+       <meta name="viewport" content="width=device-width, initial-scale=1" />
+     </head>
+     <body style="margin:0;padding:0;background:${brand.background};font-family:'Inter','Segoe UI',sans-serif;text-align:left;">
+       <span style="display:none !important;color:${brand.background};">${previewText}</span>
+       <table role="presentation" width="100%" cellPadding="0" cellSpacing="0" style="background:${brand.background};padding:40px 16px;text-align:left;">
+         <tr>
+           <td>
+             <table role="presentation" width="100%" cellPadding="0" cellSpacing="0" style="max-width:640px;margin:0 auto;background:${brand.cardBg};border-radius:32px;padding:40px 36px;box-shadow:0 20px 45px rgba(14,165,233,0.15);text-align:left;">
+               ${debugInfo ? `<tr><td>${debugInfo}</td></tr>` : ''}
+               <tr>
+                 <td style="text-align:center;padding-bottom:28px;">
+                   <a href="${APP_BASE_URL}" style="text-decoration:none;color:${brand.text};display:inline-flex;align-items:center;gap:12px;">
+                     <span style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg, ${brand.primary}, ${brand.accent});color:#ffffff;font-size:26px;font-weight:700;">KK</span>
+                     <span style="font-size:22px;font-weight:700;">KlusjesKoning</span>
+                   </a>
+                 </td>
+               </tr>
+               <tr>
+                 <td style="text-align:left;">
+                   <h1 style="margin:0 0 16px;font-size:28px;font-weight:700;color:${brand.text};text-align:left;">${heading}</h1>
+                   <p style="margin:0 0 22px;font-size:17px;line-height:1.7;color:${brand.muted};text-align:left;">${intro}</p>
+                 </td>
+               </tr>
+               ${sections}
+               ${ctaButton}
+               <tr>
+                 <td style="padding-top:20px;border-top:1px solid #e2e8f0;text-align:left;">
+                   <p style="margin:10px 0;font-size:14px;color:${brand.muted};text-align:left;">Samen maken we van klusjes doen een feestje 🎉</p>
+                   ${footer}
+                 </td>
+               </tr>
+             </table>
+             <table role="presentation" width="100%" style="max-width:640px;margin:20px auto 0;text-align:center;">
+               <tr>
+                 <td>
+                   <p style="margin:0;font-size:12px;color:${brand.muted};text-align:center;">Beheer je voorkeuren of log in via <a href="${APP_BASE_URL}/app" style="color:${brand.primary};text-decoration:none;">de KlusjesKoning app</a>.</p>
+                 </td>
+               </tr>
+             </table>
+           </td>
+         </tr>
+       </table>
+     </body>
+   </html>`;
 }
 
 export function renderWelcomeEmail({
@@ -158,17 +164,17 @@ export function renderWelcomeEmail({
       {
         title: 'Jullie gezinscode',
         body: [
-          `Gebruik deze code om je kinderen toegang te geven:`,
-          `<strong style="color:${brand.primary};font-size:24px;letter-spacing:2px;">${familyCode}</strong>`,
-          `Hang hem op een zichtbare plek zodat iedereen mee kan doen!`,
+          'Gebruik deze code om je kinderen toegang te geven:',
+          `<div style="text-align:center;margin:20px 0;"><strong style="color:${brand.primary};font-size:24px;letter-spacing:2px;background:#f8fafc;padding:12px 24px;border-radius:8px;display:inline-block;">${familyCode}</strong></div>`,
+          'Hang hem op een zichtbare plek zodat iedereen mee kan doen!',
         ],
       },
       {
         title: 'Zo starten jullie vandaag nog',
         body: [
-          '✔ Voeg kinderen toe en geef ze een pincode',
-          '✔ Selecteer klusjes of genereer ideeën met de AI-assistent',
-          '✔ Vul de beloningsshop met gezinsmomenten of een goed doel',
+          '• Voeg kinderen toe en geef ze een pincode',
+          '• Selecteer klusjes of genereer ideeën met de AI-assistent',
+          '• Vul de beloningsshop met gezinsmomenten of een goed doel',
         ],
       },
     ],
@@ -207,11 +213,14 @@ export function renderAdminRegistrationNotification({
   familyCode: string;
   timestamp: string;
 }): EmailPayload {
-  const subject = `Nieuwe registratie: ${familyName}`;
+  const isPending = familyCode === 'pending_verification';
+  const subject = isPending ? `Nieuwe registratie poging: ${familyName}` : `Nieuwe registratie voltooid: ${familyName}`;
+  const statusText = isPending ? 'registratiepoging' : 'voltooide registratie';
+
   const html = renderBaseEmail({
-    previewText: `Nieuwe familie geregistreerd: ${familyName} (${email})`,
-    heading: 'Nieuwe registratie',
-    intro: `Er heeft zich een nieuwe familie geregistreerd op KlusjesKoning.`,
+    previewText: `Nieuwe familie ${statusText}: ${familyName} (${email})`,
+    heading: `Nieuwe ${statusText}`,
+    intro: `Er heeft zich een nieuwe familie ${isPending ? 'aangemeld' : 'geregistreerd'} op KlusjesKoning.`,
     contentBlocks: [
       {
         title: 'Registratie details',
@@ -221,6 +230,7 @@ export function renderAdminRegistrationNotification({
           `• Stad: <strong>${city}</strong>`,
           `• Gezinscode: <strong>${familyCode}</strong>`,
           `• Tijdstip: <strong>${timestamp}</strong>`,
+          `• Status: <strong>${isPending ? 'Wacht op verificatie' : 'Voltooid'}</strong>`,
         ],
       },
     ],
@@ -286,11 +296,11 @@ export function renderRewardRedemptionEmail({
   rewardName: string;
   points: number;
 }): EmailPayload {
-  const subject = `${childName} kocht “${rewardName}” 🛒`;
+  const subject = `${childName} kocht "${rewardName}" 🛒`;
   const html = renderBaseEmail({
     previewText: `${childName} wisselde ${points} punten in voor ${rewardName}.`,
     heading: `${childName} verzilverde een beloning!`,
-    intro: `${childName} gebruikte ${points} punten om “${rewardName}” te bemachtigen. Tijd om het moment samen te plannen!`,
+    intro: `${childName} gebruikte ${points} punten om "${rewardName}" te bemachtigen. Tijd om het moment samen te plannen!`,
     contentBlocks: [
       {
         body: [
@@ -310,6 +320,45 @@ export function renderRewardRedemptionEmail({
       href: `${APP_BASE_URL}/app`,
     },
     footerNote: `Veel plezier, ${parentName}!`,
+  });
+
+  return { subject, html };
+}
+
+export function renderVerificationEmail({
+  code,
+}: {
+  code: string;
+}): EmailPayload {
+  const subject = 'Verificeer je emailadres - KlusjesKoning';
+  const html = renderBaseEmail({
+    previewText: `Je verificatiecode is: ${code}`,
+    heading: 'Verificeer je emailadres',
+    intro: 'Welkom bij KlusjesKoning! Gebruik de onderstaande code om je emailadres te verifiëren.',
+    contentBlocks: [
+      {
+        title: 'Jouw verificatiecode',
+        body: [
+          `Gebruik deze code om je account te activeren:`,
+          `<strong style="color:${brand.primary};font-size:32px;letter-spacing:4px;display:block;text-align:center;margin:20px 0;">${code}</strong>`,
+          `Deze code verloopt over 24 uur.`,
+        ],
+      },
+      {
+        title: 'Waarom verifiëren?',
+        body: [
+          'Email verificatie helpt ons om:',
+          '• Je account veilig te houden',
+          '• Belangrijke updates te sturen',
+          '• Je wachtwoord te herstellen indien nodig',
+        ],
+      },
+    ],
+    cta: {
+      label: 'Ga naar KlusjesKoning',
+      href: `${APP_BASE_URL}/app`,
+    },
+    footerNote: 'Heb je deze email niet verwacht? Neem dan contact met ons op.',
   });
 
   return { subject, html };

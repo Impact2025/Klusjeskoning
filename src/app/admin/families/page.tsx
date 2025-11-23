@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Users, Plus, Edit, Trash2 } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Crown, CreditCard } from 'lucide-react';
 import AdminLoading from '@/components/admin/AdminLoading';
 import { useApp } from '@/components/app/AppProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -48,12 +48,18 @@ export default function FamiliesManagement() {
     createAdminFamily,
     updateAdminFamily,
     deleteAdminFamily,
+    upgradeFamilyToPro,
+    downgradeFamilyAccount,
+    setFamilySubscription,
+    extendFamilySubscription,
   } = useApp();
   const { toast } = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentFamilyId, setCurrentFamilyId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [isSubscriptionDialogOpen, setIsSubscriptionDialogOpen] = useState(false);
+  const [currentSubscriptionFamily, setCurrentSubscriptionFamily] = useState<any>(null);
 
   useEffect(() => {
     if (!family || family.email !== ADMIN_EMAIL) {
@@ -140,6 +146,46 @@ export default function FamiliesManagement() {
       return;
     }
     await deleteAdminFamily(id);
+  };
+
+  const handleManageSubscription = (family: any) => {
+    setCurrentSubscriptionFamily(family);
+    setIsSubscriptionDialogOpen(true);
+  };
+
+  const handleUpgradeToPro = async () => {
+    if (!currentSubscriptionFamily) return;
+
+    try {
+      await upgradeFamilyToPro(currentSubscriptionFamily.id, {
+        plan: 'premium',
+        interval: 'monthly',
+      });
+      toast({
+        title: 'Succes',
+        description: `${currentSubscriptionFamily.familyName} is opgewaardeerd naar Premium.`,
+      });
+      setIsSubscriptionDialogOpen(false);
+      await getAdminFamilies();
+    } catch (error) {
+      console.error('Error upgrading family:', error);
+    }
+  };
+
+  const handleDowngradeAccount = async () => {
+    if (!currentSubscriptionFamily) return;
+
+    try {
+      await downgradeFamilyAccount(currentSubscriptionFamily.id, { immediate: true });
+      toast({
+        title: 'Succes',
+        description: `${currentSubscriptionFamily.familyName} is teruggezet naar Starter.`,
+      });
+      setIsSubscriptionDialogOpen(false);
+      await getAdminFamilies();
+    } catch (error) {
+      console.error('Error downgrading family:', error);
+    }
   };
 
   const formatDate = (date: Date | undefined | null) => {
@@ -253,6 +299,7 @@ export default function FamiliesManagement() {
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kinderen</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aangemaakt</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Abonnement</th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acties</th>
                   </tr>
                 </thead>
@@ -269,6 +316,25 @@ export default function FamiliesManagement() {
                         <td className="px-4 py-2 text-sm font-mono">{fam.familyCode}</td>
                         <td className="px-4 py-2 text-sm">{fam.childrenCount}</td>
                         <td className="px-4 py-2 text-sm">{formatDate(createdAt)}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              fam.subscriptionPlan === 'premium'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {fam.subscriptionPlan === 'premium' ? 'Premium' : 'Starter'}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleManageSubscription(fam)}
+                              className="h-6 w-6"
+                            >
+                              <Crown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
                         <td className="px-4 py-2 text-right">
                           <div className="flex justify-end space-x-2">
                             <Button variant="ghost" size="icon" onClick={() => handleEditFamily(fam.id)}>
@@ -284,7 +350,7 @@ export default function FamiliesManagement() {
                   })}
                   {families.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
                         Geen gezinnen gevonden.
                       </td>
                     </tr>
@@ -294,6 +360,64 @@ export default function FamiliesManagement() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Subscription Management Dialog */}
+        <Dialog open={isSubscriptionDialogOpen} onOpenChange={setIsSubscriptionDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Abonnement Beheren</DialogTitle>
+            </DialogHeader>
+            {currentSubscriptionFamily && (
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-semibold">{currentSubscriptionFamily.familyName}</h3>
+                  <p className="text-sm text-muted-foreground">{currentSubscriptionFamily.email}</p>
+                  <div className="mt-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      currentSubscriptionFamily.subscriptionPlan === 'premium'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      Huidig: {currentSubscriptionFamily.subscriptionPlan === 'premium' ? 'Premium' : 'Starter'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium">Acties:</h4>
+                  <div className="space-y-2">
+                    {currentSubscriptionFamily.subscriptionPlan !== 'premium' && (
+                      <Button
+                        onClick={handleUpgradeToPro}
+                        className="w-full"
+                        disabled={isLoading}
+                      >
+                        <Crown className="mr-2 h-4 w-4" />
+                        Opwaarderen naar Premium
+                      </Button>
+                    )}
+                    {currentSubscriptionFamily.subscriptionPlan === 'premium' && (
+                      <Button
+                        onClick={handleDowngradeAccount}
+                        variant="destructive"
+                        className="w-full"
+                        disabled={isLoading}
+                      >
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Terugzetten naar Starter
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setIsSubscriptionDialogOpen(false)}>
+                Sluiten
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

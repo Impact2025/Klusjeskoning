@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { LogOut, Users, FileText, Gift, BarChart3, CreditCard } from 'lucide-react';
+import { LogOut, Users, FileText, Gift, BarChart3, CreditCard, Ticket } from 'lucide-react';
 import AdminLoading from '@/components/admin/AdminLoading';
 import { useApp } from '@/components/app/AppProvider';
 
@@ -134,6 +134,10 @@ export default function AdminDashboard() {
               <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/admin/financial')}>
                 <CreditCard className="mr-2 h-4 w-4" />
                 Financieel Beheer
+              </Button>
+              <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/admin/coupons')}>
+                <Ticket className="mr-2 h-4 w-4" />
+                Coupon Beheer
               </Button>
             </CardContent>
           </Card>

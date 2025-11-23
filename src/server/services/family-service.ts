@@ -1,8 +1,10 @@
 import 'server-only';
 
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, gte, lte, or, isNull } from 'drizzle-orm';
 
 import { db } from '../db/client';
+import { coupons, couponUsages } from '../db/schema';
+import { FamilyCache, CacheInvalidation } from '@/lib/cache';
 import {
   families,
   children,
@@ -14,6 +16,7 @@ import {
   goodCauses,
   blogPosts,
   reviews,
+  verificationCodes,
   billingIntervalEnum,
   planTierEnum,
   subscriptionStatusEnum,
@@ -96,8 +99,8 @@ const DEFAULT_CODE_ATTEMPTS = 10;
 const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
 const PLAN_PRICING = {
-  monthly: PLAN_DEFINITIONS.premium.priceMonthlyCents / 100,
-  yearly: PLAN_DEFINITIONS.premium.priceYearlyCents / 100,
+  monthly: PLAN_DEFINITIONS.premium.priceMonthlyCents,
+  yearly: PLAN_DEFINITIONS.premium.priceYearlyCents,
 };
 
 export const generateUniqueFamilyCode = async (): Promise<string> => {
@@ -116,6 +119,7 @@ export const createFamily = async (params: {
   city: string;
   email: string;
   password: string;
+  skipVerification?: boolean; // For admin use
 }) => {
   const existing = await db.query.families.findFirst({ where: eq(families.email, params.email) });
   if (existing) {
@@ -137,6 +141,68 @@ export const createFamily = async (params: {
     .returning({ id: families.id, familyCode: families.familyCode });
 
   return family;
+};
+
+/**
+ * Start family registration process (creates verification code)
+ */
+export const startFamilyRegistration = async (params: {
+  familyName: string;
+  city: string;
+  email: string;
+  password: string;
+}) => {
+  const existing = await db.query.families.findFirst({ where: eq(families.email, params.email) });
+  if (existing) {
+    throw new Error('EMAIL_IN_USE');
+  }
+
+  // Generate verification code
+  const verificationCode = await createVerificationCode({
+    email: params.email,
+    purpose: 'registration',
+  });
+
+  // Store registration data temporarily (we'll use the verification code to link it)
+  // For now, we'll just return the code - in a production system you'd want to store
+  // the registration data temporarily until verification is complete
+
+  return {
+    verificationCode,
+    email: params.email,
+    familyName: params.familyName,
+    city: params.city,
+  };
+};
+
+/**
+ * Complete family registration after verification
+ */
+export const completeFamilyRegistration = async (params: {
+  email: string;
+  code: string;
+  familyName: string;
+  city: string;
+  password: string;
+}) => {
+  // Verify the code
+  const isValid = await verifyCode({
+    email: params.email,
+    code: params.code,
+    purpose: 'registration',
+  });
+
+  if (!isValid) {
+    throw new Error('INVALID_VERIFICATION_CODE');
+  }
+
+  // Create the family
+  return await createFamily({
+    familyName: params.familyName,
+    city: params.city,
+    email: params.email,
+    password: params.password,
+  });
 };
 
 export const authenticateFamily = async (email: string, password: string) => {
@@ -163,8 +229,39 @@ export const getFamilyByCode = async (code: string) => {
   return db.query.families.findFirst({
     where: eq(families.familyCode, code.toUpperCase()),
     with: {
-      children: true,
+      children: {
+        columns: {
+          id: true,
+          familyId: true,
+          name: true,
+          pin: true,
+          points: true,
+          totalPointsEver: true,
+          avatar: true,
+          createdAt: true,
+          // Exclude gamification columns for now
+          // xp: true,
+          // totalXpEver: true,
+        },
+      },
       chores: {
+        columns: {
+          id: true,
+          familyId: true,
+          name: true,
+          points: true,
+          status: true,
+          submittedByChildId: true,
+          submittedAt: true,
+          emotion: true,
+          photoUrl: true,
+          createdAt: true,
+          // Exclude gamification columns for now
+          // xpReward: true,
+          // questChainId: true,
+          // isMainQuest: true,
+          // chainOrder: true,
+        },
         with: {
           assignments: true,
         },
@@ -176,7 +273,21 @@ export const getFamilyByCode = async (code: string) => {
       },
       pendingRewards: {
         with: {
-          child: true,
+          child: {
+            columns: {
+              id: true,
+              familyId: true,
+              name: true,
+              pin: true,
+              points: true,
+              totalPointsEver: true,
+              avatar: true,
+              createdAt: true,
+              // Exclude gamification columns for now
+              // xp: true,
+              // totalXpEver: true,
+            },
+          },
           reward: true,
         },
       },
@@ -185,13 +296,37 @@ export const getFamilyByCode = async (code: string) => {
 };
 
 export const loadFamilyWithRelations = async (familyId: string) => {
-  return db.query.families.findFirst({
+  // Try to get from cache first
+  const cachedFamily = await FamilyCache.get(familyId);
+  if (cachedFamily) {
+    return cachedFamily;
+  }
+
+  // Fetch from database
+  const family = await db.query.families.findFirst({
     where: eq(families.id, familyId),
     with: {
       children: true,
       chores: {
         with: {
           assignments: true,
+        },
+        columns: {
+          id: true,
+          familyId: true,
+          name: true,
+          points: true,
+          status: true,
+          submittedByChildId: true,
+          submittedAt: true,
+          emotion: true,
+          photoUrl: true,
+          createdAt: true,
+          // Exclude new gamification columns for now - database migration needed
+          // xpReward: true,
+          // questChainId: true,
+          // isMainQuest: true,
+          // chainOrder: true,
         },
       },
       rewards: {
@@ -207,6 +342,473 @@ export const loadFamilyWithRelations = async (familyId: string) => {
       },
     },
   });
+
+  // Cache the result if found
+  if (family) {
+    await FamilyCache.set(familyId, family);
+  }
+
+  return family;
+};
+
+// ===== COUPON MANAGEMENT FUNCTIONS =====
+
+/**
+ * Create a new coupon
+ */
+export const createCoupon = async (couponData: {
+  code: string;
+  description?: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  maxUses?: number;
+  validFrom?: Date;
+  validUntil?: Date;
+  isActive?: boolean;
+}) => {
+  const [coupon] = await db
+    .insert(coupons)
+    .values({
+      code: couponData.code.toUpperCase(),
+      description: couponData.description,
+      discountType: couponData.discountType,
+      discountValue: couponData.discountValue,
+      maxUses: couponData.maxUses,
+      validFrom: couponData.validFrom,
+      validUntil: couponData.validUntil,
+      isActive: couponData.isActive !== false ? 1 : 0,
+    })
+    .returning();
+
+  return coupon;
+};
+
+/**
+ * Get all coupons for admin
+ */
+export const getAllCoupons = async () => {
+  return db.query.coupons.findMany({
+    with: {
+      usages: {
+        with: {
+          family: {
+            columns: {
+              familyName: true,
+              email: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: desc(coupons.createdAt),
+  });
+};
+
+/**
+ * Get coupon by ID
+ */
+export const getCouponById = async (couponId: string) => {
+  return db.query.coupons.findFirst({
+    where: eq(coupons.id, couponId),
+    with: {
+      usages: {
+        with: {
+          family: {
+            columns: {
+              familyName: true,
+              email: true,
+            },
+          },
+        },
+      },
+    },
+  });
+};
+
+/**
+ * Update coupon
+ */
+export const updateCoupon = async (
+  couponId: string,
+  updates: Partial<{
+    description: string;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    maxUses: number;
+    validFrom: Date;
+    validUntil: Date;
+    isActive: boolean;
+  }>
+) => {
+  const updateData: any = { ...updates };
+  if (updates.isActive !== undefined) {
+    updateData.isActive = updates.isActive ? 1 : 0;
+  }
+  updateData.updatedAt = new Date();
+
+  const [coupon] = await db
+    .update(coupons)
+    .set(updateData)
+    .where(eq(coupons.id, couponId))
+    .returning();
+
+  return coupon;
+};
+
+/**
+ * Delete coupon
+ */
+export const deleteCoupon = async (couponId: string) => {
+  await db.delete(coupons).where(eq(coupons.id, couponId));
+};
+
+/**
+ * Validate and apply coupon
+ */
+export const validateCoupon = async (code: string, familyId: string) => {
+  const coupon = await db.query.coupons.findFirst({
+    where: and(
+      eq(coupons.code, code.toUpperCase()),
+      eq(coupons.isActive, 1)
+    ),
+  });
+
+  if (!coupon) {
+    throw new Error('Coupon code niet gevonden of niet actief');
+  }
+
+  // Check validity period
+  const now = new Date();
+  if (coupon.validFrom && coupon.validFrom > now) {
+    throw new Error('Coupon is nog niet geldig');
+  }
+  if (coupon.validUntil && coupon.validUntil < now) {
+    throw new Error('Coupon is verlopen');
+  }
+
+  // Check usage limits
+  if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
+    throw new Error('Coupon is niet meer beschikbaar');
+  }
+
+  // Check if family already used this coupon
+  const existingUsage = await db.query.couponUsages.findFirst({
+    where: and(
+      eq(couponUsages.couponId, coupon.id),
+      eq(couponUsages.familyId, familyId)
+    ),
+  });
+
+  if (existingUsage) {
+    throw new Error('Deze coupon is al gebruikt door je gezin');
+  }
+
+  return coupon;
+};
+
+/**
+ * Apply coupon to order
+ */
+export const applyCouponToOrder = async (
+  couponId: string,
+  familyId: string,
+  orderId: string,
+  originalAmount: number
+) => {
+  const coupon = await db.query.coupons.findFirst({
+    where: eq(coupons.id, couponId),
+  });
+
+  if (!coupon) {
+    throw new Error('Coupon niet gevonden');
+  }
+
+  // Calculate discount
+  let discountAmount = 0;
+  if (coupon.discountType === 'percentage') {
+    discountAmount = Math.round((originalAmount * coupon.discountValue) / 100);
+  } else {
+    discountAmount = Math.min(coupon.discountValue, originalAmount);
+  }
+
+  // Apply discount (don't exceed original amount)
+  discountAmount = Math.min(discountAmount, originalAmount);
+
+  // Record usage
+  await db.insert(couponUsages).values({
+    couponId,
+    familyId,
+    orderId,
+    discountApplied: discountAmount,
+  });
+
+  // Update coupon usage count
+  await db
+    .update(coupons)
+    .set({
+      usedCount: sql`${coupons.usedCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(coupons.id, couponId));
+
+  return {
+    discountAmount,
+    finalAmount: originalAmount - discountAmount,
+    coupon,
+  };
+};
+
+/**
+ * Get coupon usage statistics
+ */
+export const getCouponStats = async () => {
+  const [stats] = await db
+    .select({
+      totalCoupons: sql<number>`count(distinct ${coupons.id})`,
+      activeCoupons: sql<number>`count(distinct case when ${coupons.isActive} = 1 then ${coupons.id} end)`,
+      totalUsages: sql<number>`count(${couponUsages.id})`,
+      totalDiscountGiven: sql<number>`coalesce(sum(${couponUsages.discountApplied}), 0)`,
+    })
+    .from(coupons)
+    .leftJoin(couponUsages, eq(coupons.id, couponUsages.couponId));
+
+  return stats;
+};
+
+/**
+ * Generate unique coupon code
+ */
+export const generateCouponCode = (prefix = 'KK', length = 8): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = prefix;
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+// ===== ADMIN SUBSCRIPTION MANAGEMENT =====
+
+/**
+ * Manually set subscription for a family (admin only)
+ */
+export const setFamilySubscription = async (familyId: string, subscriptionData: {
+  plan?: 'starter' | 'premium' | null;
+  status?: 'inactive' | 'active' | 'past_due' | 'canceled';
+  interval?: 'monthly' | 'yearly' | null;
+  renewalDate?: Date | null;
+  orderId?: string | null;
+}) => {
+  // Update subscription data
+  const [updatedFamily] = await db
+    .update(families)
+    .set({
+      subscriptionPlan: subscriptionData.plan,
+      subscriptionStatus: subscriptionData.status,
+      subscriptionInterval: subscriptionData.interval,
+      subscriptionRenewalDate: subscriptionData.renewalDate,
+      subscriptionOrderId: subscriptionData.orderId,
+      subscriptionLastPaymentAt: subscriptionData.status === 'active' ? new Date() : undefined,
+    })
+    .where(eq(families.id, familyId))
+    .returning();
+
+  if (!updatedFamily) {
+    throw new Error('Family not found');
+  }
+
+  // Invalidate cache
+  await CacheInvalidation.invalidateFamilyData(familyId);
+
+  return updatedFamily;
+};
+
+/**
+ * Upgrade family to pro account with custom duration
+ */
+export const upgradeFamilyToPro = async (
+  familyId: string,
+  options: {
+    plan?: 'premium';
+    interval?: 'monthly' | 'yearly';
+    durationMonths?: number; // Custom duration in months
+    orderId?: string;
+  } = {}
+) => {
+  const {
+    plan = 'premium',
+    interval = 'monthly',
+    durationMonths = interval === 'yearly' ? 12 : 1,
+    orderId
+  } = options;
+
+  // Calculate renewal date
+  const renewalDate = new Date();
+  renewalDate.setMonth(renewalDate.getMonth() + durationMonths);
+
+  return setFamilySubscription(familyId, {
+    plan,
+    status: 'active',
+    interval,
+    renewalDate,
+    orderId,
+  });
+};
+
+/**
+ * Downgrade family account
+ */
+export const downgradeFamilyAccount = async (familyId: string, options: {
+  immediate?: boolean; // Cancel immediately vs end of period
+  orderId?: string;
+} = {}) => {
+  const { immediate = false, orderId } = options;
+
+  if (immediate) {
+    // Immediate cancellation
+    return setFamilySubscription(familyId, {
+      plan: null,
+      status: 'canceled',
+      interval: null,
+      renewalDate: null,
+      orderId,
+    });
+  } else {
+    // Cancel at end of billing period
+    return setFamilySubscription(familyId, {
+      status: 'canceled',
+      orderId,
+    });
+  }
+};
+
+/**
+ * Extend pro subscription
+ */
+export const extendFamilySubscription = async (
+  familyId: string,
+  additionalMonths: number,
+  orderId?: string
+) => {
+  // Get current subscription
+  const family = await db.query.families.findFirst({
+    where: eq(families.id, familyId),
+    columns: {
+      subscriptionRenewalDate: true,
+      subscriptionStatus: true,
+    },
+  });
+
+  if (!family) {
+    throw new Error('Family not found');
+  }
+
+  if (family.subscriptionStatus !== 'active') {
+    throw new Error('Family does not have an active subscription');
+  }
+
+  // Calculate new renewal date
+  const currentRenewal = family.subscriptionRenewalDate || new Date();
+  const newRenewalDate = new Date(currentRenewal);
+  newRenewalDate.setMonth(newRenewalDate.getMonth() + additionalMonths);
+
+  return setFamilySubscription(familyId, {
+    renewalDate: newRenewalDate,
+    orderId,
+  });
+};
+
+/**
+ * Get subscription management statistics
+ */
+export const getSubscriptionStats = async () => {
+  const [stats] = await db
+    .select({
+      totalFamilies: sql<number>`count(*)`,
+      activeSubscriptions: sql<number>`count(case when subscription_status = 'active' then 1 end)`,
+      premiumSubscriptions: sql<number>`count(case when subscription_plan = 'premium' and subscription_status = 'active' then 1 end)`,
+      starterSubscriptions: sql<number>`count(case when subscription_plan = 'starter' and subscription_status = 'active' then 1 end)`,
+      canceledSubscriptions: sql<number>`count(case when subscription_status = 'canceled' then 1 end)`,
+      expiringSoon: sql<number>`count(case when subscription_status = 'active' and subscription_renewal_date <= ${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)} then 1 end)`, // Next 30 days
+    })
+    .from(families);
+
+  return stats;
+};
+
+/**
+ * Get families with expiring subscriptions
+ */
+export const getExpiringSubscriptions = async (daysAhead = 30) => {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() + daysAhead);
+
+  return db.query.families.findMany({
+    where: and(
+      eq(families.subscriptionStatus, 'active'),
+      lte(families.subscriptionRenewalDate, cutoffDate)
+    ),
+    columns: {
+      id: true,
+      familyName: true,
+      email: true,
+      subscriptionPlan: true,
+      subscriptionRenewalDate: true,
+    },
+    orderBy: families.subscriptionRenewalDate,
+  });
+};
+
+/**
+ * Bulk subscription operations
+ */
+export const bulkUpdateSubscriptions = async (operations: Array<{
+  familyId: string;
+  action: 'upgrade' | 'downgrade' | 'extend' | 'cancel';
+  options?: any;
+}>) => {
+  const results = [];
+
+  for (const operation of operations) {
+    try {
+      let result;
+
+      switch (operation.action) {
+        case 'upgrade':
+          result = await upgradeFamilyToPro(operation.familyId, operation.options);
+          break;
+        case 'downgrade':
+          result = await downgradeFamilyAccount(operation.familyId, operation.options);
+          break;
+        case 'extend':
+          result = await extendFamilySubscription(
+            operation.familyId,
+            operation.options?.months || 1,
+            operation.options?.orderId
+          );
+          break;
+        case 'cancel':
+          result = await downgradeFamilyAccount(operation.familyId, { immediate: true, ...operation.options });
+          break;
+        default:
+          throw new Error(`Unknown action: ${operation.action}`);
+      }
+
+      results.push({
+        familyId: operation.familyId,
+        success: true,
+        result,
+      });
+    } catch (error) {
+      results.push({
+        familyId: operation.familyId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  return results;
 };
 
 export const getChildById = async (familyId: string, childId: string) => {
@@ -218,6 +820,23 @@ export const getChildById = async (familyId: string, childId: string) => {
 export const getChoreById = async (familyId: string, choreId: string) => {
   return db.query.chores.findFirst({
     where: and(eq(chores.id, choreId), eq(chores.familyId, familyId)),
+    columns: {
+      id: true,
+      familyId: true,
+      name: true,
+      points: true,
+      status: true,
+      submittedByChildId: true,
+      submittedAt: true,
+      emotion: true,
+      photoUrl: true,
+      createdAt: true,
+      // Exclude gamification columns for now
+      // xpReward: true,
+      // questChainId: true,
+      // isMainQuest: true,
+      // chainOrder: true,
+    },
     with: {
       assignments: true,
     },
@@ -234,7 +853,62 @@ export const getRewardById = async (familyId: string, rewardId: string) => {
 };
 
 export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof loadFamilyWithRelations>>> | NonNullable<Awaited<ReturnType<typeof getFamilyByCode>>>): SerializableFamily => {
-  const childrenData: SerializableChild[] = family.children.map((child) => ({
+  // Type assertion - we know this structure from the database queries
+  const typedFamily = family as {
+    id: string;
+    familyCode: string;
+    familyName: string;
+    city: string;
+    email: string;
+    createdAt: Date | null;
+    recoveryEmail: string | null;
+    subscriptionPlan: string | null;
+    subscriptionStatus: string | null;
+    subscriptionInterval: string | null;
+    subscriptionRenewalDate: Date | null;
+    subscriptionLastPaymentAt: Date | null;
+    subscriptionOrderId: string | null;
+    children: Array<{
+      id: string;
+      name: string;
+      pin: string;
+      points: number;
+      totalPointsEver: number;
+      avatar: string;
+      createdAt: Date | null;
+    }>;
+    chores: Array<{
+      id: string;
+      name: string;
+      points: number;
+      status: string;
+      submittedByChildId: string | null;
+      submittedAt: Date | null;
+      emotion: string | null;
+      photoUrl: string | null;
+      createdAt: Date | null;
+      assignments: Array<{ childId: string }>;
+    }>;
+    rewards: Array<{
+      id: string;
+      name: string;
+      points: number;
+      type: string;
+      createdAt: Date | null;
+      assignments: Array<{ childId: string }>;
+    }>;
+    pendingRewards: Array<{
+      id: string;
+      childId: string;
+      rewardId: string;
+      points: number;
+      redeemedAt: Date;
+      child: { name: string };
+      reward: { name: string };
+    }>;
+  };
+
+  const childrenData: SerializableChild[] = typedFamily.children.map((child) => ({
     id: child.id,
     name: child.name,
     pin: child.pin,
@@ -246,7 +920,7 @@ export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof lo
 
   const childIdToName = new Map(childrenData.map((child) => [child.id, child.name] as const));
 
-  const rewardsData: SerializableReward[] = family.rewards.map((reward) => ({
+  const rewardsData: SerializableReward[] = typedFamily.rewards.map((reward) => ({
     id: reward.id,
     name: reward.name,
     points: reward.points,
@@ -257,7 +931,7 @@ export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof lo
 
   const rewardsMap = new Map(rewardsData.map((reward) => [reward.id, reward.name] as const));
 
-  const choresData: SerializableChore[] = family.chores.map((chore) => ({
+  const choresData: SerializableChore[] = typedFamily.chores.map((chore) => ({
     id: chore.id,
     name: chore.name,
     points: chore.points,
@@ -270,7 +944,7 @@ export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof lo
     createdAt: toSerializableDate(chore.createdAt),
   }));
 
-  const pendingRewardsData: SerializablePendingReward[] = family.pendingRewards.map((pending) => ({
+  const pendingRewardsData: SerializablePendingReward[] = typedFamily.pendingRewards.map((pending) => ({
     id: pending.id,
     childId: pending.childId,
     childName: childIdToName.get(pending.childId) ?? '',
@@ -281,20 +955,20 @@ export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof lo
   }));
 
   return {
-    id: family.id,
-    familyCode: family.familyCode,
-    familyName: family.familyName,
-    city: family.city,
-    email: family.email,
-    createdAt: toSerializableDate(family.createdAt),
-    recoveryEmail: family.recoveryEmail,
+    id: typedFamily.id,
+    familyCode: typedFamily.familyCode,
+    familyName: typedFamily.familyName,
+    city: typedFamily.city,
+    email: typedFamily.email,
+    createdAt: toSerializableDate(typedFamily.createdAt),
+    recoveryEmail: typedFamily.recoveryEmail,
     subscription: {
-      plan: family.subscriptionPlan ?? null,
-      status: family.subscriptionStatus ?? null,
-      interval: family.subscriptionInterval ?? null,
-      renewalDate: toSerializableDate(family.subscriptionRenewalDate),
-      lastPaymentAt: toSerializableDate(family.subscriptionLastPaymentAt),
-      orderId: family.subscriptionOrderId ?? null,
+      plan: typedFamily.subscriptionPlan ?? null,
+      status: typedFamily.subscriptionStatus ?? null,
+      interval: typedFamily.subscriptionInterval ?? null,
+      renewalDate: toSerializableDate(typedFamily.subscriptionRenewalDate),
+      lastPaymentAt: toSerializableDate(typedFamily.subscriptionLastPaymentAt),
+      orderId: typedFamily.subscriptionOrderId ?? null,
     },
     children: childrenData,
     chores: choresData,
@@ -315,6 +989,7 @@ export const saveChild = async (params: {
       .update(children)
       .set({ name: params.name, pin: params.pin, avatar: params.avatar })
       .where(and(eq(children.id, params.childId), eq(children.familyId, params.familyId)));
+    await CacheInvalidation.invalidateFamilyData(params.familyId);
     return params.childId;
   }
 
@@ -328,6 +1003,7 @@ export const saveChild = async (params: {
     })
     .returning({ id: children.id });
 
+  await CacheInvalidation.invalidateFamilyData(params.familyId);
   return child.id;
 };
 
@@ -363,19 +1039,18 @@ export const saveChore = async (params: {
   const assignedTo = Array.from(new Set(params.assignedTo));
 
   if (params.choreId) {
-    const updatePayload: Partial<typeof chores.$inferInsert> = {
-      name: params.name,
-      points: params.points,
-      status: params.status ?? 'available',
-      submittedByChildId: params.submittedBy ?? null,
-      submittedAt: params.submittedAt ?? null,
-      emotion: params.emotion ?? null,
-      photoUrl: params.photoUrl ?? null,
-    };
-    await db
-      .update(chores)
-      .set(updatePayload)
-      .where(and(eq(chores.id, params.choreId), eq(chores.familyId, params.familyId)));
+    // Use raw SQL to avoid Drizzle schema issues
+    await db.execute(sql`
+      UPDATE chores
+      SET name = ${params.name},
+          points = ${params.points},
+          status = ${params.status ?? 'available'},
+          submitted_by_child_id = ${params.submittedBy ?? null},
+          submitted_at = ${params.submittedAt ?? null},
+          emotion = ${params.emotion ?? null},
+          photo_url = ${params.photoUrl ?? null}
+      WHERE id = ${params.choreId} AND family_id = ${params.familyId}
+    `);
 
     await db.delete(choreAssignments).where(eq(choreAssignments.choreId, params.choreId));
     if (assignedTo.length > 0) {
@@ -386,7 +1061,7 @@ export const saveChore = async (params: {
     return params.choreId;
   }
 
-  const insertPayload: typeof chores.$inferInsert = {
+  const insertPayload: any = {
     familyId: params.familyId,
     name: params.name,
     points: params.points,
@@ -395,12 +1070,25 @@ export const saveChore = async (params: {
     submittedAt: params.submittedAt ?? null,
     emotion: params.emotion ?? null,
     photoUrl: params.photoUrl ?? null,
+    // Temporarily exclude gamification columns until migration is fixed
+    // xpReward: 0,
+    // questChainId: null,
+    // isMainQuest: 0,
+    // chainOrder: null,
+    // recurrenceType: 'once',
+    // recurrenceDays: [],
+    // isTemplate: 0,
+    // templateId: null,
+    // nextDueDate: null,
   };
 
-  const [chore] = await db
-    .insert(chores)
-    .values(insertPayload)
-    .returning({ id: chores.id });
+  // Use raw SQL to avoid Drizzle schema issues with missing columns
+  const result = await db.execute(sql`
+    INSERT INTO chores (family_id, name, points, status, submitted_by_child_id, submitted_at, emotion, photo_url, created_at)
+    VALUES (${params.familyId}, ${params.name}, ${params.points}, ${params.status ?? 'available'}, ${params.submittedBy ?? null}, ${params.submittedAt ?? null}, ${params.emotion ?? null}, ${params.photoUrl ?? null}, ${new Date()})
+    RETURNING id
+  `);
+  const chore = { id: (result as any).rows[0].id };
 
   if (assignedTo.length > 0) {
     await db.insert(choreAssignments).values(
@@ -537,16 +1225,64 @@ export const submitChoreForApproval = async (params: {
   photoUrl?: string | null;
   submittedAt?: Date;
 }) => {
-  await db
-    .update(chores)
-    .set({
-      status: 'submitted',
-      submittedByChildId: params.childId,
-      submittedAt: params.submittedAt ?? new Date(),
-      emotion: params.emotion ?? null,
-      photoUrl: params.photoUrl ?? null,
-    })
-    .where(and(eq(chores.id, params.choreId), eq(chores.familyId, params.familyId)));
+  // First check if the chore exists in the database
+  const existingChore = await db.query.chores.findFirst({
+    where: and(eq(chores.id, params.choreId), eq(chores.familyId, params.familyId)),
+  });
+
+  if (existingChore) {
+    // Update existing chore
+    await db
+      .update(chores)
+      .set({
+        status: 'submitted',
+        submittedByChildId: params.childId,
+        submittedAt: params.submittedAt ?? new Date(),
+        emotion: params.emotion ?? null,
+        photoUrl: params.photoUrl ?? null,
+      })
+      .where(and(eq(chores.id, params.choreId), eq(chores.familyId, params.familyId)));
+  } else {
+    // Check if this is a sample quest chore that needs to be created
+    // Import the sample chores dynamically to avoid circular dependencies
+    const { QUEST_CHAIN_CHORES } = await import('@/lib/quest-utils');
+    const allQuestChores = Object.values(QUEST_CHAIN_CHORES).flat();
+    const sampleChore = allQuestChores.find(c => c.id === params.choreId);
+
+    if (sampleChore) {
+      // Create a new chore record based on the sample chore
+      // Use raw SQL to avoid schema issues since new columns might not exist yet
+      try {
+        await db.execute(sql`
+          INSERT INTO chores (
+            id, family_id, name, points, status, submitted_by_child_id,
+            submitted_at, emotion, photo_url, created_at
+          ) VALUES (
+            ${params.choreId}, ${params.familyId}, ${sampleChore.name},
+            ${sampleChore.points}, 'submitted', ${params.childId},
+            ${params.submittedAt ?? new Date()}, ${params.emotion ?? null},
+            ${params.photoUrl ?? null}, ${new Date()}
+          )
+        `);
+      } catch (error) {
+        // If the above fails due to missing columns, try with minimal columns
+        console.log('Falling back to minimal chore creation');
+        await db.insert(chores).values({
+          id: params.choreId,
+          familyId: params.familyId,
+          name: sampleChore.name,
+          points: sampleChore.points,
+          status: 'submitted',
+          submittedByChildId: params.childId,
+          submittedAt: params.submittedAt ?? new Date(),
+          emotion: params.emotion ?? null,
+          photoUrl: params.photoUrl ?? null,
+        });
+      }
+    } else {
+      throw new Error('Chore not found');
+    }
+  }
 };
 
 export const approveChore = async (familyId: string, choreId: string) => {
@@ -562,7 +1298,9 @@ export const approveChore = async (familyId: string, choreId: string) => {
     })
     .where(eq(chores.id, choreId));
 
+  // Award points and XP
   await updateChildPoints(chore.submittedByChildId, chore.points);
+  await updateChildXp(chore.submittedByChildId, chore.xpReward || 0);
 };
 
 export const rejectChore = async (familyId: string, choreId: string) => {
@@ -588,6 +1326,16 @@ export const updateChildPoints = async (childId: string, delta: number) => {
     UPDATE children
     SET points = points + ${delta},
         total_points_ever = total_points_ever + ${incrementTotalEver}
+    WHERE id = ${childId}
+  `);
+};
+
+export const updateChildXp = async (childId: string, delta: number) => {
+  const incrementTotalEver = Math.max(delta, 0);
+  await db.execute(sql`
+    UPDATE children
+    SET xp = xp + ${delta},
+        total_xp_ever = total_xp_ever + ${incrementTotalEver}
     WHERE id = ${childId}
   `);
 };
@@ -850,24 +1598,46 @@ type FamilySummaryRecord = {
 };
 
 export const listFamiliesForAdmin = async (): Promise<FamilySummaryRecord[]> => {
-  const records = await db.query.families.findMany({
-    with: {
-      children: true,
-    },
-    orderBy: desc(families.createdAt),
-  });
+  // Use a more efficient query that gets children count via SQL aggregation
+  const records = await db
+    .select({
+      id: families.id,
+      familyName: families.familyName,
+      city: families.city,
+      email: families.email,
+      familyCode: families.familyCode,
+      createdAt: families.createdAt,
+      subscriptionStatus: families.subscriptionStatus,
+      subscriptionPlan: families.subscriptionPlan,
+      subscriptionInterval: families.subscriptionInterval,
+      childrenCount: sql<number>`coalesce(count(${children.id}), 0)`,
+    })
+    .from(families)
+    .leftJoin(children, eq(families.id, children.familyId))
+    .groupBy(
+      families.id,
+      families.familyName,
+      families.city,
+      families.email,
+      families.familyCode,
+      families.createdAt,
+      families.subscriptionStatus,
+      families.subscriptionPlan,
+      families.subscriptionInterval
+    )
+    .orderBy(desc(families.createdAt));
 
-  return records.map((family) => ({
-    id: family.id,
-    familyName: family.familyName,
-    city: family.city,
-    email: family.email,
-    familyCode: family.familyCode,
-    createdAt: family.createdAt,
-    childrenCount: family.children.length,
-    subscriptionStatus: family.subscriptionStatus ?? null,
-    subscriptionPlan: family.subscriptionPlan ?? null,
-    subscriptionInterval: family.subscriptionInterval ?? null,
+  return records.map((record) => ({
+    id: record.id,
+    familyName: record.familyName,
+    city: record.city,
+    email: record.email,
+    familyCode: record.familyCode,
+    createdAt: record.createdAt,
+    childrenCount: Number(record.childrenCount) || 0,
+    subscriptionStatus: record.subscriptionStatus ?? null,
+    subscriptionPlan: record.subscriptionPlan ?? null,
+    subscriptionInterval: record.subscriptionInterval ?? null,
   }));
 };
 
@@ -944,11 +1714,40 @@ export const deleteFamilyAdmin = async (familyId: string) => {
 };
 
 export const getFinancialOverview = async () => {
-  const familiesData = await db.query.families.findMany({ orderBy: desc(families.createdAt) });
+  // Get aggregated stats using SQL for better performance
+  const [statsResult] = await db
+    .select({
+      totalRevenue: sql<number>`
+        coalesce(sum(
+          case
+            when subscription_status = 'active' and subscription_interval = 'yearly' then ${PLAN_PRICING.yearly}
+            when subscription_status = 'active' and subscription_interval = 'monthly' then ${PLAN_PRICING.monthly}
+            else 0
+          end
+        ), 0) / 100.0
+      `,
+      activeSubscriptions: sql<number>`count(case when subscription_status = 'active' then 1 end)`,
+    })
+    .from(families);
 
-  const premiumFamilies = familiesData.filter((family) => family.subscriptionStatus === 'active');
+  // Get recent premium subscriptions (limit to 10 for performance)
+  const recentSubscriptions = await db.query.families.findMany({
+    where: eq(families.subscriptionStatus, 'active'),
+    columns: {
+      id: true,
+      familyName: true,
+      email: true,
+      subscriptionPlan: true,
+      subscriptionInterval: true,
+      subscriptionLastPaymentAt: true,
+      createdAt: true,
+      subscriptionStatus: true,
+    },
+    orderBy: desc(families.subscriptionLastPaymentAt ?? families.createdAt),
+    limit: 10,
+  });
 
-  const recentSubscriptions = premiumFamilies.slice(0, 10).map((family) => ({
+  const formattedRecentSubscriptions = recentSubscriptions.map((family) => ({
     id: family.id,
     familyName: family.familyName,
     email: family.email,
@@ -959,18 +1758,139 @@ export const getFinancialOverview = async () => {
     status: family.subscriptionStatus ?? 'inactive',
   }));
 
-  const totalRevenue = premiumFamilies.reduce((sum, family) => {
-    const price = family.subscriptionInterval === 'yearly' ? PLAN_PRICING.yearly : PLAN_PRICING.monthly;
-    return sum + price;
-  }, 0);
+  const totalRevenue = Number(statsResult.totalRevenue) || 0;
+  const activeSubscriptions = Number(statsResult.activeSubscriptions) || 0;
 
   return {
     stats: {
       totalRevenue,
-      activeSubscriptions: premiumFamilies.length,
-      monthlyGrowth: 0,
-      avgSubscriptionValue: premiumFamilies.length > 0 ? totalRevenue / premiumFamilies.length : 0,
+      activeSubscriptions,
+      monthlyGrowth: 0, // TODO: Implement monthly growth calculation
+      avgSubscriptionValue: activeSubscriptions > 0 ? totalRevenue / activeSubscriptions : 0,
     },
-    recentSubscriptions,
+    recentSubscriptions: formattedRecentSubscriptions,
   };
+};
+
+// ===== EMAIL VERIFICATION FUNCTIONS =====
+
+/**
+ * Generate a 6-digit verification code
+ */
+export const generateVerificationCode = (): string => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+/**
+ * Create and store a verification code
+ */
+export const createVerificationCode = async (params: {
+  email: string;
+  purpose: 'registration' | 'password_reset';
+  expiresInMinutes?: number;
+}): Promise<string> => {
+  const { email, purpose, expiresInMinutes = 15 } = params;
+  const code = generateVerificationCode();
+  const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+
+  try {
+    // Clean up expired codes for this email/purpose combination
+    await db
+      .delete(verificationCodes)
+      .where(and(
+        eq(verificationCodes.email, email),
+        eq(verificationCodes.purpose, purpose),
+        lte(verificationCodes.expiresAt, new Date())
+      ));
+
+    // Insert new verification code
+    await db.insert(verificationCodes).values({
+      email,
+      code,
+      purpose,
+      expiresAt,
+    });
+
+    return code;
+  } catch (error: any) {
+    // If table doesn't exist, create it and retry
+    if (error.message?.includes('relation "verification_codes" does not exist')) {
+      console.log('Creating verification_codes table...');
+      await db.execute(sql.unsafe(`
+        CREATE TABLE IF NOT EXISTS verification_codes (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          email varchar(255) NOT NULL,
+          code varchar(6) NOT NULL,
+          purpose varchar(50) NOT NULL,
+          expires_at timestamp with time zone NOT NULL,
+          used_at timestamp with time zone,
+          created_at timestamp with time zone DEFAULT now() NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);
+        CREATE INDEX IF NOT EXISTS idx_verification_codes_expires_at ON verification_codes(expires_at);
+      `));
+
+      // Retry the operation
+      await db
+        .delete(verificationCodes)
+        .where(and(
+          eq(verificationCodes.email, email),
+          eq(verificationCodes.purpose, purpose),
+          lte(verificationCodes.expiresAt, new Date())
+        ));
+
+      await db.insert(verificationCodes).values({
+        email,
+        code,
+        purpose,
+        expiresAt,
+      });
+
+      return code;
+    }
+    throw error;
+  }
+};
+
+/**
+ * Verify a code and mark it as used
+ */
+export const verifyCode = async (params: {
+  email: string;
+  code: string;
+  purpose: 'registration' | 'password_reset';
+}): Promise<boolean> => {
+  const { email, code, purpose } = params;
+
+  const verificationRecord = await db.query.verificationCodes.findFirst({
+    where: and(
+      eq(verificationCodes.email, email),
+      eq(verificationCodes.code, code),
+      eq(verificationCodes.purpose, purpose),
+      gte(verificationCodes.expiresAt, new Date()),
+      isNull(verificationCodes.usedAt)
+    ),
+  });
+
+  if (!verificationRecord) {
+    return false;
+  }
+
+  // Mark code as used
+  await db
+    .update(verificationCodes)
+    .set({ usedAt: new Date() })
+    .where(eq(verificationCodes.id, verificationRecord.id));
+
+  return true;
+};
+
+/**
+ * Clean up expired verification codes (can be called periodically)
+ */
+export const cleanupExpiredVerificationCodes = async (): Promise<void> => {
+  await db
+    .delete(verificationCodes)
+    .where(lte(verificationCodes.expiresAt, new Date()));
 };

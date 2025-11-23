@@ -38,7 +38,7 @@ export const clearSession = async () => {
   const sessionCookie = cookieStore.get(SESSION_COOKIE);
   if (sessionCookie) {
     await db.delete(sessions).where(eq(sessions.token, sessionCookie.value));
-    cookieStore.delete(SESSION_COOKIE, { path: '/' });
+    cookieStore.set(SESSION_COOKIE, '', { expires: new Date(0), path: '/' });
   }
 };
 
@@ -57,13 +57,13 @@ export const getSession = async () => {
   });
 
   if (!session) {
-    cookieStore.delete(SESSION_COOKIE, { path: '/' });
+    cookieStore.delete(SESSION_COOKIE);
     return null;
   }
 
   if (isBefore(session.expiresAt, new Date())) {
     await db.delete(sessions).where(eq(sessions.id, session.id));
-    cookieStore.delete(SESSION_COOKIE, { path: '/' });
+    cookieStore.set(SESSION_COOKIE, '', { expires: new Date(0), path: '/' });
     return null;
   }
 

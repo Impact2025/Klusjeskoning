@@ -8,7 +8,11 @@ import type { Metadata } from 'next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { fetchBlogPostBySlug, fetchPublishedBlogPosts } from '@/lib/content';
+import { fetchBlogPostBySlug, fetchPublishedBlogPosts, calculateReadingTime, getRelatedPosts } from '@/lib/content';
+import { SocialShare } from '@/components/blog/SocialShare';
+import { NewsletterSignup } from '@/components/blog/NewsletterSignup';
+import { TableOfContents } from '@/components/blog/TableOfContents';
+import { Clock, ArrowLeft, Share2 } from 'lucide-react';
 
 const formatDate = (date: Date) => format(date, 'd MMM yyyy', { locale: nl });
 const hasValidImageUrl = (url?: string | null) => {
@@ -54,11 +58,13 @@ export default async function BlogPostPage({ params }: { params: Promise<BlogPos
   }
 
   const publishedDate = (post.publishedAt ?? post.createdAt).toDate();
+  const readingTime = calculateReadingTime(post.content);
+  const postUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://klusjeskoningapp.nl'}/blog/${post.slug}`;
 
   const allPosts = await fetchPublishedBlogPosts();
   const otherPosts = allPosts.filter((candidate) => candidate.id !== post.id);
   const mostReadPosts = otherPosts.slice(0, 3);
-  const latestPosts = otherPosts.slice(0, 3);
+  const relatedPosts = await getRelatedPosts(post.id, 3);
 
   const tagFrequency = otherPosts.reduce<Map<string, number>>((acc, current) => {
     current.tags.forEach((tag) => {
@@ -86,6 +92,10 @@ export default async function BlogPostPage({ params }: { params: Promise<BlogPos
             <header className="space-y-6 text-center lg:text-left">
               <div className="flex flex-wrap justify-center gap-3 text-sm text-slate-500 lg:justify-start">
                 <span>{formatDate(publishedDate)}</span>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  <span>{readingTime} min lezen</span>
+                </div>
                 {post.tags.map((tag) => (
                   <Badge key={tag} className="bg-primary/10 text-primary">
                     #{tag}
@@ -94,6 +104,16 @@ export default async function BlogPostPage({ params }: { params: Promise<BlogPos
               </div>
               <h1 className="font-brand text-4xl leading-snug text-slate-900 sm:text-5xl">{post.title}</h1>
               <p className="text-lg text-slate-600">{post.excerpt}</p>
+
+              {/* Social Sharing */}
+              <div className="flex justify-center lg:justify-start">
+                <SocialShare
+                  title={post.title}
+                  description={post.excerpt}
+                  url={postUrl}
+                  tags={post.tags}
+                />
+              </div>
             </header>
 
             {hasValidImageUrl(post.coverImageUrl) && (
@@ -113,15 +133,15 @@ export default async function BlogPostPage({ params }: { params: Promise<BlogPos
               <div dangerouslySetInnerHTML={{ __html: post.content }} />
             </div>
 
-            {latestPosts.length > 0 && (
+            {relatedPosts.length > 0 && (
               <section className="space-y-6">
                 <div className="space-y-2 text-center lg:text-left">
-                  <Badge className="bg-primary/10 text-primary">Nog meer lezen</Badge>
+                  <Badge className="bg-primary/10 text-primary">Gerelateerde artikelen</Badge>
                   <h2 className="text-2xl font-semibold text-slate-900">Ontdek meer verhalen</h2>
-                  <p className="text-sm text-slate-600">Deze recente artikelen sluiten aan bij het thema van KlusjesKoning.</p>
+                  <p className="text-sm text-slate-600">Deze artikelen sluiten aan bij het thema van dit verhaal.</p>
                 </div>
                 <div className="grid gap-6 sm:grid-cols-2">
-                  {latestPosts.map((related) => {
+                  {relatedPosts.map((related) => {
                     const relatedDate = (related.publishedAt ?? related.createdAt).toDate();
                     const hasCover = hasValidImageUrl(related.coverImageUrl);
                     return (
@@ -156,10 +176,20 @@ export default async function BlogPostPage({ params }: { params: Promise<BlogPos
           </article>
 
           <aside className="space-y-8">
+
+            {/* Table of Contents */}
+            <TableOfContents content={post.content} />
+
+            {/* Newsletter Signup */}
+            <NewsletterSignup />
+
             {mostReadPosts.length > 0 && (
               <Card className="border-slate-100 bg-white/90 shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-lg text-slate-900">Meest gelezen</CardTitle>
+                  <CardTitle className="text-lg text-slate-900 flex items-center gap-2">
+                    <Share2 className="h-5 w-5 text-primary" />
+                    Meest gelezen
+                  </CardTitle>
                   <CardDescription className="text-slate-600">Populaire artikelen die je niet mag missen.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -169,7 +199,7 @@ export default async function BlogPostPage({ params }: { params: Promise<BlogPos
                       <div key={item.id} className="flex items-start gap-3">
                         <span className="mt-0.5 text-sm font-semibold text-primary">{index + 1}.</span>
                         <div className="space-y-1">
-                          <Link href={`/blog/${item.slug}`} className="font-medium text-slate-900 hover:text-primary">
+                          <Link href={`/blog/${item.slug}`} className="font-medium text-slate-900 hover:text-primary transition-colors">
                             {item.title}
                           </Link>
                           <p className="text-xs text-slate-500">{formatDate(itemDate)}</p>

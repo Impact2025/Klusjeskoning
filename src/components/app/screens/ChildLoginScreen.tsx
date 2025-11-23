@@ -41,7 +41,14 @@ export default function ChildLoginScreen() {
           <ArrowLeft className="h-6 w-6 text-accent" />
         </Button>
         <h2 className="font-brand text-3xl text-center flex-grow text-accent">Hallo Klusser!</h2>
-        <div className="w-10"></div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => window.location.href = '/'}
+          className="text-accent hover:text-accent/80"
+        >
+          🏠 Home
+        </Button>
       </header>
       <main className="flex-grow flex flex-col justify-center items-center text-center">
         {avatarImage && (
