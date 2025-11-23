@@ -69,6 +69,8 @@ export function validateRequestOrigin(
       const allowedDomains = [
         'klusjeskoning.nl',
         'klusjeskoningapp.nl',
+        'klusjeskoning.app',
+        'www.klusjeskoning.app',
         'localhost',
         '127.0.0.1',
         ...allowedOrigins
