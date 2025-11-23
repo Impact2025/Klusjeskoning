@@ -159,6 +159,26 @@ export const pendingRewards = pgTable('pending_rewards', {
   redeemedAt: timestamp('redeemed_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const transactionTypeEnum = pgEnum('transaction_type', ['earned', 'spent', 'refunded', 'bonus', 'penalty']);
+
+export const pointsTransactions = pgTable('points_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  type: transactionTypeEnum('type').notNull(),
+  amount: integer('amount').notNull(), // positive for earned, negative for spent
+  description: varchar('description', { length: 255 }).notNull(),
+  relatedChoreId: uuid('related_chore_id').references(() => chores.id, { onDelete: 'set null' }),
+  relatedRewardId: uuid('related_reward_id').references(() => rewards.id, { onDelete: 'set null' }),
+  balanceBefore: integer('balance_before').notNull(),
+  balanceAfter: integer('balance_after').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const goodCauses = pgTable('good_causes', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
@@ -278,6 +298,8 @@ export type Coupon = typeof coupons.$inferSelect;
 export type NewCoupon = typeof coupons.$inferInsert;
 export type CouponUsage = typeof couponUsages.$inferSelect;
 export type NewCouponUsage = typeof couponUsages.$inferInsert;
+export type PointsTransaction = typeof pointsTransactions.$inferSelect;
+export type NewPointsTransaction = typeof pointsTransactions.$inferInsert;
 
 // Gamification Types
 export type Badge = typeof badges.$inferSelect;
@@ -681,5 +703,24 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   child: one(children, {
     fields: [notifications.childId],
     references: [children.id],
+  }),
+}));
+
+export const pointsTransactionsRelations = relations(pointsTransactions, ({ one }) => ({
+  family: one(families, {
+    fields: [pointsTransactions.familyId],
+    references: [families.id],
+  }),
+  child: one(children, {
+    fields: [pointsTransactions.childId],
+    references: [children.id],
+  }),
+  relatedChore: one(chores, {
+    fields: [pointsTransactions.relatedChoreId],
+    references: [chores.id],
+  }),
+  relatedReward: one(rewards, {
+    fields: [pointsTransactions.relatedRewardId],
+    references: [rewards.id],
   }),
 }));

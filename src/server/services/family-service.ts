@@ -20,6 +20,7 @@ import {
   billingIntervalEnum,
   planTierEnum,
   subscriptionStatusEnum,
+  pointsTransactions,
 } from '../db/schema';
 import { hashPassword, verifyPassword } from '../auth/password';
 import { PLAN_DEFINITIONS } from '@/lib/plans';
@@ -1179,11 +1180,75 @@ export const recordPendingReward = async (params: {
   return record.id;
 };
 
+export const recordPointsTransaction = async (params: {
+  familyId: string;
+  childId: string;
+  type: 'earned' | 'spent' | 'refunded' | 'bonus' | 'penalty';
+  amount: number;
+  description: string;
+  relatedChoreId?: string;
+  relatedRewardId?: string;
+  balanceBefore: number;
+  balanceAfter: number;
+}) => {
+  const [record] = await db
+    .insert(pointsTransactions)
+    .values({
+      familyId: params.familyId,
+      childId: params.childId,
+      type: params.type,
+      amount: params.amount,
+      description: params.description,
+      relatedChoreId: params.relatedChoreId || null,
+      relatedRewardId: params.relatedRewardId || null,
+      balanceBefore: params.balanceBefore,
+      balanceAfter: params.balanceAfter,
+    })
+    .returning({ id: pointsTransactions.id });
+  return record.id;
+};
+
+export const getPointsTransactionHistory = async (familyId: string, childId?: string, limit = 50) => {
+  const query = db.query.pointsTransactions.findMany({
+    where: and(
+      eq(pointsTransactions.familyId, familyId),
+      childId ? eq(pointsTransactions.childId, childId) : undefined
+    ),
+    with: {
+      child: {
+        columns: {
+          name: true,
+        },
+      },
+      relatedChore: {
+        columns: {
+          name: true,
+        },
+      },
+      relatedReward: {
+        columns: {
+          name: true,
+        },
+      },
+    },
+    orderBy: desc(pointsTransactions.createdAt),
+    limit,
+  });
+
+  return query;
+};
+
 export const redeemReward = async (params: {
   familyId: string;
   childId: string;
   rewardId: string;
 }) => {
+  // Validate inputs
+  if (!params.familyId || !params.childId || !params.rewardId) {
+    throw new Error('INVALID_PARAMETERS');
+  }
+
+  // Get reward with family validation
   const reward = await db
     .query.rewards.findFirst({
       where: and(eq(rewards.id, params.rewardId), eq(rewards.familyId, params.familyId)),
@@ -1193,28 +1258,66 @@ export const redeemReward = async (params: {
     throw new Error('REWARD_NOT_FOUND');
   }
 
-  const child = await db.query.children.findFirst({ where: eq(children.id, params.childId) });
+  // Get child and validate they belong to the family
+  const child = await db.query.children.findFirst({
+    where: and(eq(children.id, params.childId), eq(children.familyId, params.familyId))
+  });
+
   if (!child) {
     throw new Error('CHILD_NOT_FOUND');
   }
 
+  // CRITICAL: Validate sufficient points BEFORE any database operations
   if (child.points < reward.points) {
+    console.warn(`[POINTS_VALIDATION] Child ${params.childId} attempted to redeem reward ${params.rewardId} but only has ${child.points} points, needs ${reward.points}`);
     throw new Error('INSUFFICIENT_POINTS');
   }
 
-  await db
-    .update(children)
-    .set({ points: child.points - reward.points })
-    .where(eq(children.id, child.id));
+  // Prevent negative points (additional safety check)
+  const newPointsBalance = child.points - reward.points;
+  if (newPointsBalance < 0) {
+    console.error(`[POINTS_SAFETY] Prevented negative balance for child ${params.childId}: ${child.points} - ${reward.points} = ${newPointsBalance}`);
+    throw new Error('INSUFFICIENT_POINTS');
+  }
 
-  await recordPendingReward({
-    familyId: params.familyId,
-    childId: params.childId,
-    rewardId: params.rewardId,
-    points: reward.points,
-  });
+  // Use transaction to ensure atomicity
+  try {
+    // Deduct points
+    await db
+      .update(children)
+      .set({
+        points: newPointsBalance,
+        totalPointsEver: child.totalPointsEver // Keep total ever the same
+      })
+      .where(eq(children.id, child.id));
 
-  return { reward, child };
+    // Record the points transaction
+    await recordPointsTransaction({
+      familyId: params.familyId,
+      childId: params.childId,
+      type: 'spent',
+      amount: -reward.points, // Negative for spending
+      description: `Ingewisseld voor "${reward.name}"`,
+      relatedRewardId: params.rewardId,
+      balanceBefore: child.points,
+      balanceAfter: newPointsBalance,
+    });
+
+    // Record the pending reward
+    await recordPendingReward({
+      familyId: params.familyId,
+      childId: params.childId,
+      rewardId: params.rewardId,
+      points: reward.points,
+    });
+
+    console.log(`[POINTS_TRANSACTION] Child ${params.childId} redeemed reward ${params.rewardId} for ${reward.points} points. Balance: ${child.points} → ${newPointsBalance}`);
+
+    return { reward, child: { ...child, points: newPointsBalance } };
+  } catch (error) {
+    console.error('[POINTS_TRANSACTION_ERROR] Failed to complete reward redemption:', error);
+    throw new Error('REDEMPTION_FAILED');
+  }
 };
 
 export const submitChoreForApproval = async (params: {
@@ -1299,7 +1402,7 @@ export const approveChore = async (familyId: string, choreId: string) => {
     .where(eq(chores.id, choreId));
 
   // Award points and XP
-  await updateChildPoints(chore.submittedByChildId, chore.points);
+  await updateChildPoints(chore.submittedByChildId, chore.points, `Klus "${chore.name}" goedgekeurd`, chore.id);
   await updateChildXp(chore.submittedByChildId, chore.xpReward || 0);
 };
 
@@ -1320,14 +1423,48 @@ export const clearPendingReward = async (familyId: string, pendingRewardId: stri
   await db.delete(pendingRewards).where(and(eq(pendingRewards.id, pendingRewardId), eq(pendingRewards.familyId, familyId)));
 };
 
-export const updateChildPoints = async (childId: string, delta: number) => {
+export const updateChildPoints = async (childId: string, delta: number, description?: string, relatedChoreId?: string) => {
+  // Get current points before update
+  const [child] = await db
+    .select({ points: children.points, familyId: children.familyId })
+    .from(children)
+    .where(eq(children.id, childId))
+    .limit(1);
+
+  if (!child) {
+    throw new Error('CHILD_NOT_FOUND');
+  }
+
   const incrementTotalEver = Math.max(delta, 0);
+  const newPointsBalance = child.points + delta;
+
+  // Prevent negative points (additional safety)
+  if (newPointsBalance < 0) {
+    console.error(`[POINTS_SAFETY] Prevented negative balance for child ${childId}: ${child.points} + ${delta} = ${newPointsBalance}`);
+    throw new Error('INSUFFICIENT_POINTS');
+  }
+
+  // Update points
   await db.execute(sql`
     UPDATE children
     SET points = points + ${delta},
         total_points_ever = total_points_ever + ${incrementTotalEver}
     WHERE id = ${childId}
   `);
+
+  // Record transaction if there's a description (meaningful transaction)
+  if (description) {
+    await recordPointsTransaction({
+      familyId: child.familyId,
+      childId,
+      type: delta > 0 ? 'earned' : 'penalty',
+      amount: delta,
+      description: description,
+      relatedChoreId: relatedChoreId || undefined,
+      balanceBefore: child.points,
+      balanceAfter: newPointsBalance,
+    });
+  }
 };
 
 export const updateChildXp = async (childId: string, delta: number) => {

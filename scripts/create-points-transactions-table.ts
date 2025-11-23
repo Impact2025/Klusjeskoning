@@ -1,7 +1,7 @@
-import { db } from '../src/server/db/client';
 import { sql } from 'drizzle-orm';
+import { db } from '../src/server/db/client';
 
-async function runSQL() {
+async function createPointsTransactionsTable() {
   try {
     console.log('Creating points_transactions table...');
 
@@ -25,14 +25,17 @@ async function runSQL() {
       CREATE INDEX IF NOT EXISTS idx_points_transactions_type ON points_transactions(type);
     `);
 
-    console.log('Points transactions table created successfully!');
+    console.log('✅ Points transactions table created successfully!');
   } catch (error) {
-    console.error('Error creating points transactions table:', error);
+    console.error('❌ Error creating points transactions table:', error);
     process.exit(1);
   }
 }
 
-runSQL().then(() => {
+createPointsTransactionsTable().then(() => {
   console.log('Migration completed.');
   process.exit(0);
+}).catch((error) => {
+  console.error('Migration failed:', error);
+  process.exit(1);
 });
