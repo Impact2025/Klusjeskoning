@@ -610,7 +610,7 @@ export async function POST(request: Request) {
         if (!family) {
           return errorResponse('Gezin niet gevonden.', 404);
         }
-        const child = family.children.find(c => c.id === data.childId);
+        const child = (family as any).children.find((c: any) => c.id === data.childId);
         if (!child || child.pin !== data.pin) {
           return errorResponse('Onjuiste pincode.', 401);
         }
