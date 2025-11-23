@@ -23,7 +23,8 @@ import {
   Edit,
   Trash2,
   Home,
-  Menu
+  Menu,
+  RefreshCw
 } from 'lucide-react';
 import type { Chore, Child, Reward } from '@/lib/types';
 import AddChildModal from '../models/AddChildModal';
@@ -35,6 +36,7 @@ import EditRewardModal from '../models/EditRewardModal';
 
 export default function ParentDashboard() {
   const { family, logout, approveChore, deleteItem } = useApp();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<Chore[]>([]);
   const [emptySavings, setEmptySavings] = useState<Child[]>([]);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -74,6 +76,17 @@ export default function ParentDashboard() {
   const handleQuickApprove = async (choreId: string) => {
     // One-click approval without confirmation
     await handleApproveChore(choreId);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Force a page refresh to get latest data
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+      setIsRefreshing(false);
+    }
   };
 
   const handleEditChild = (child: Child) => {
@@ -132,6 +145,9 @@ export default function ParentDashboard() {
               ⭐ Upgrade naar Premium
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setActiveTab('settings')}>
             <Settings className="h-4 w-4" />
           </Button>
@@ -165,6 +181,9 @@ export default function ParentDashboard() {
               ⭐ Premium
             </Button>
           )}
+          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => setActiveTab('settings')}>
             <Settings className="h-4 w-4" />
           </Button>
@@ -603,7 +622,11 @@ export default function ParentDashboard() {
                   <CardContent className="text-center py-12">
                     <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">Alles is in orde!</h3>
-                    <p className="text-gray-600">Geen acties vereist op dit moment.</p>
+                    <p className="text-gray-600 mb-4">Geen acties vereist op dit moment.</p>
+                    <div className="text-sm text-gray-500 space-y-2">
+                      <p>💡 Tip: Klik op het refresh-icoon als je verwacht dat er klusjes zijn ingediend door je kinderen.</p>
+                      <p>Kinderen kunnen klusjes indienen via hun eigen dashboard.</p>
+                    </div>
                   </CardContent>
                 </Card>
               )}
