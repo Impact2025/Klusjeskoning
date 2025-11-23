@@ -40,8 +40,6 @@ export default function ChildDashboard() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isAvatarCustomizerOpen, setAvatarCustomizerOpen] = useState(false);
   const [selectedChoreId, setSelectedChoreId] = useState<string | null>(null);
-  
-  if (!user || !family) return null;
 
   // Check if child has completed onboarding
   useEffect(() => {
@@ -53,6 +51,8 @@ export default function ChildDashboard() {
       }
     }
   }, [user]);
+
+  if (!user || !family) return null;
 
   const now = Timestamp.now();
   const nowMillis = now.toMillis();
