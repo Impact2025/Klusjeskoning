@@ -1504,10 +1504,17 @@ export const submitChoreForApproval = async (params: {
   submittedAt?: Date;
 }) => {
   // First check if the chore exists in the database using raw SQL
-  const existingChoreResult = await db.execute(sql`
-    SELECT id, family_id, name, points, status FROM chores
-    WHERE id = ${params.choreId} AND family_id = ${params.familyId}
-  `);
+  // Handle both UUID and string IDs (for sample quest chores)
+  let existingChoreResult;
+  try {
+    existingChoreResult = await db.execute(sql`
+      SELECT id, family_id, name, points, status FROM chores
+      WHERE id = ${params.choreId} AND family_id = ${params.familyId}
+    `);
+  } catch (error) {
+    // If the query fails (likely due to UUID validation), assume it's a sample quest chore
+    existingChoreResult = { rows: [] };
+  }
 
   if (existingChoreResult.rows.length > 0) {
     // Update existing chore to submitted (pending approval)
@@ -1529,12 +1536,13 @@ export const submitChoreForApproval = async (params: {
 
     if (sampleChore) {
       // Create a new chore record as submitted (pending approval)
+      // Use raw SQL to avoid UUID validation issues
       await db.execute(sql`
         INSERT INTO chores (
-          id, family_id, name, points, status, submitted_by_child_id,
+          family_id, name, points, status, submitted_by_child_id,
           submitted_at, emotion, photo_url, created_at
         ) VALUES (
-          ${params.choreId}, ${params.familyId}, ${sampleChore.name},
+          ${params.familyId}, ${sampleChore.name},
           ${sampleChore.points}, 'submitted', ${params.childId},
           ${params.submittedAt ?? new Date()}, ${params.emotion ?? null},
           ${params.photoUrl ?? null}, ${new Date()}
