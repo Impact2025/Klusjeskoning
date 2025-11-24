@@ -680,7 +680,7 @@ export async function POST(request: Request) {
       }
       case 'updateChore': {
         const session = await requireSession();
-        const data = updateChoreSchema.parse(payload as any);
+        const data: z.infer<typeof updateChoreSchema> = updateChoreSchema.parse(payload);
         const existing = await getChoreById(session.familyId, data.choreId);
         if (!existing) {
           return errorResponse('Klusje niet gevonden.', 404);
@@ -1090,6 +1090,34 @@ export async function POST(request: Request) {
           return NextResponse.json({ success: true, message: 'Verification codes table created' });
         } catch (error) {
           console.error('Error creating verification table:', error);
+          return NextResponse.json({ error: 'Failed to create table' }, { status: 500 });
+        }
+      }
+      case 'createPointsTransactionsTable': {
+        try {
+          // Create points_transactions table
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS points_transactions (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+              type varchar(50) NOT NULL CHECK (type IN ('earned', 'spent', 'refunded', 'bonus', 'penalty')),
+              amount integer NOT NULL,
+              description varchar(255) NOT NULL,
+              related_chore_id uuid REFERENCES chores(id) ON DELETE SET NULL,
+              related_reward_id uuid REFERENCES rewards(id) ON DELETE SET NULL,
+              balance_before integer NOT NULL,
+              balance_after integer NOT NULL,
+              created_at timestamp with time zone DEFAULT now() NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_points_transactions_family_child ON points_transactions(family_id, child_id);
+            CREATE INDEX IF NOT EXISTS idx_points_transactions_created_at ON points_transactions(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_points_transactions_type ON points_transactions(type);
+          `);
+          return NextResponse.json({ success: true, message: 'Points transactions table created' });
+        } catch (error) {
+          console.error('Error creating points transactions table:', error);
           return NextResponse.json({ error: 'Failed to create table' }, { status: 500 });
         }
       }
