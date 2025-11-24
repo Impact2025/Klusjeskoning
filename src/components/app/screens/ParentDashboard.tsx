@@ -621,11 +621,13 @@ export default function ParentDashboard() {
                 <Card>
                   <CardContent className="text-center py-12">
                     <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Alles is in orde!</h3>
-                    <p className="text-gray-600 mb-4">Geen acties vereist op dit moment.</p>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Alles loopt automatisch!</h3>
+                    <p className="text-gray-600 mb-4">Klusjes worden nu direct goedgekeurd voor een snellere ervaring.</p>
                     <div className="text-sm text-gray-500 space-y-2">
-                      <p>💡 Tip: Klik op het refresh-icoon als je verwacht dat er klusjes zijn ingediend door je kinderen.</p>
-                      <p>Kinderen kunnen klusjes indienen via hun eigen dashboard.</p>
+                      <p>🎉 Kinderen zien confetti wanneer ze een klusje voltooien</p>
+                      <p>⚡ Punten worden onmiddellijk toegekend</p>
+                      <p>📧 Geen verwarrende notificatie-emails meer</p>
+                      <p>💡 Bekijk het overzicht om te zien welke klusjes zijn voltooid</p>
                     </div>
                   </CardContent>
                 </Card>
