@@ -716,25 +716,7 @@ export async function POST(request: Request) {
           photoUrl: data.photoUrl,
           submittedAt: data.submittedAt ? new Date(data.submittedAt) : new Date(),
         });
-        const familyRecord = await loadFamilyWithRelations(session.familyId);
-        if (familyRecord) {
-          const serialized = serializeFamily(familyRecord);
-          const child = serialized.children.find((c) => c.id === data.childId);
-          const chore = serialized.chores.find((c) => c.id === data.choreId);
-          if (child && chore) {
-            await sendNotification(request, {
-              type: 'chore_submitted',
-              to: (familyRecord as any).email,
-              data: {
-                parentName: (familyRecord as any).familyName,
-                childName: child.name,
-                choreName: chore.name,
-                points: chore.points,
-              },
-            });
-          }
-          return NextResponse.json({ family: serialized });
-        }
+        // No email notification needed since chores are now auto-approved
         return respondWithFamily(session.familyId);
       }
       case 'approveChore': {
