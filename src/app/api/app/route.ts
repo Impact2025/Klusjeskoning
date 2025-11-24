@@ -688,7 +688,7 @@ export async function POST(request: Request) {
         await saveChore({
           familyId: session.familyId,
           choreId: data.choreId,
-          name: data.name ?? existing.name,
+          name: (data.name as string) ?? existing.name,
           points: data.points ?? existing.points,
           assignedTo: data.assignedTo ?? existing.assignments.map((assignment) => assignment.childId),
           status: data.status ?? existing.status,
