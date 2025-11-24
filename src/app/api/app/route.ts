@@ -716,7 +716,20 @@ export async function POST(request: Request) {
           photoUrl: data.photoUrl,
           submittedAt: data.submittedAt ? new Date(data.submittedAt) : new Date(),
         });
-        // No email notification needed since chores are now auto-approved
+
+        // Send email notification to parent about chore submission
+        await sendNotification(request, {
+          type: 'chore_submitted',
+          to: session.family.email,
+          data: {
+            parentName: session.family.familyName,
+            choreId: data.choreId,
+            childId: data.childId,
+            emotion: data.emotion,
+            submittedAt: data.submittedAt || new Date().toISOString(),
+          },
+        });
+
         return respondWithFamily(session.familyId);
       }
       case 'approveChore': {

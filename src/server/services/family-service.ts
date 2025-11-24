@@ -1510,20 +1510,16 @@ export const submitChoreForApproval = async (params: {
   `);
 
   if (existingChoreResult.rows.length > 0) {
-    // Update existing chore to approved (auto-approve)
+    // Update existing chore to submitted (pending approval)
     await db.execute(sql`
       UPDATE chores SET
-        status = 'approved',
+        status = 'submitted',
         submitted_by_child_id = ${params.childId},
         submitted_at = ${params.submittedAt ?? new Date()},
         emotion = ${params.emotion ?? null},
         photo_url = ${params.photoUrl ?? null}
       WHERE id = ${params.choreId} AND family_id = ${params.familyId}
     `);
-
-    // Award points immediately
-    const existingChore = existingChoreResult.rows[0];
-    await updateChildPoints(params.childId, Number(existingChore.points), `Klus "${existingChore.name}" automatisch goedgekeurd`, params.choreId);
   } else {
     // Check if this is a sample quest chore that needs to be created
     // Import the sample chores dynamically to avoid circular dependencies
@@ -1532,21 +1528,18 @@ export const submitChoreForApproval = async (params: {
     const sampleChore = allQuestChores.find(c => c.id === params.choreId);
 
     if (sampleChore) {
-      // Create a new chore record and auto-approve it
+      // Create a new chore record as submitted (pending approval)
       await db.execute(sql`
         INSERT INTO chores (
           id, family_id, name, points, status, submitted_by_child_id,
           submitted_at, emotion, photo_url, created_at
         ) VALUES (
           ${params.choreId}, ${params.familyId}, ${sampleChore.name},
-          ${sampleChore.points}, 'approved', ${params.childId},
+          ${sampleChore.points}, 'submitted', ${params.childId},
           ${params.submittedAt ?? new Date()}, ${params.emotion ?? null},
           ${params.photoUrl ?? null}, ${new Date()}
         )
       `);
-
-      // Award points immediately
-      await updateChildPoints(params.childId, sampleChore.points, `Klus "${sampleChore.name}" automatisch goedgekeurd`, params.choreId);
     } else {
       throw new Error('Chore not found');
     }

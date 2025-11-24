@@ -541,7 +541,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       applyFamily(result.family ?? null);
       notify('success', 'Top gedaan!', 'Klusje is ter controle verstuurd.');
-      confetti({ particleCount: 150, spread: 120, origin: { y: 0.6 } });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Er ging iets mis bij het indienen van het klusje.';
       notify('destructive', 'Fout', message);
