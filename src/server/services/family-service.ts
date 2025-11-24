@@ -1503,26 +1503,27 @@ export const submitChoreForApproval = async (params: {
   photoUrl?: string | null;
   submittedAt?: Date;
 }) => {
-  // First check if the chore exists in the database
-  const existingChore = await db.query.chores.findFirst({
-    where: and(eq(chores.id, params.choreId), eq(chores.familyId, params.familyId)),
-  });
+  // First check if the chore exists in the database using raw SQL
+  const existingChoreResult = await db.execute(sql`
+    SELECT id, family_id, name, points, status FROM chores
+    WHERE id = ${params.choreId} AND family_id = ${params.familyId}
+  `);
 
-  if (existingChore) {
-    // Update existing chore to submitted first
-    await db
-      .update(chores)
-      .set({
-        status: 'submitted',
-        submittedByChildId: params.childId,
-        submittedAt: params.submittedAt ?? new Date(),
-        emotion: params.emotion ?? null,
-        photoUrl: params.photoUrl ?? null,
-      })
-      .where(and(eq(chores.id, params.choreId), eq(chores.familyId, params.familyId)));
+  if (existingChoreResult.rows.length > 0) {
+    // Update existing chore to approved (auto-approve)
+    await db.execute(sql`
+      UPDATE chores SET
+        status = 'approved',
+        submitted_by_child_id = ${params.childId},
+        submitted_at = ${params.submittedAt ?? new Date()},
+        emotion = ${params.emotion ?? null},
+        photo_url = ${params.photoUrl ?? null}
+      WHERE id = ${params.choreId} AND family_id = ${params.familyId}
+    `);
 
-    // Auto-approve the chore immediately
-    await approveChore(params.familyId, params.choreId);
+    // Award points immediately
+    const existingChore = existingChoreResult.rows[0];
+    await updateChildPoints(params.childId, Number(existingChore.points), `Klus "${existingChore.name}" automatisch goedgekeurd`, params.choreId);
   } else {
     // Check if this is a sample quest chore that needs to be created
     // Import the sample chores dynamically to avoid circular dependencies
@@ -1531,38 +1532,21 @@ export const submitChoreForApproval = async (params: {
     const sampleChore = allQuestChores.find(c => c.id === params.choreId);
 
     if (sampleChore) {
-      // Create a new chore record based on the sample chore
-      // Use raw SQL to avoid schema issues since new columns might not exist yet
-      try {
-        await db.execute(sql`
-          INSERT INTO chores (
-            id, family_id, name, points, status, submitted_by_child_id,
-            submitted_at, emotion, photo_url, created_at
-          ) VALUES (
-            ${params.choreId}, ${params.familyId}, ${sampleChore.name},
-            ${sampleChore.points}, 'submitted', ${params.childId},
-            ${params.submittedAt ?? new Date()}, ${params.emotion ?? null},
-            ${params.photoUrl ?? null}, ${new Date()}
-          )
-        `);
-      } catch (error) {
-        // If the above fails due to missing columns, try with minimal columns
-        console.log('Falling back to minimal chore creation');
-        await db.insert(chores).values({
-          id: params.choreId,
-          familyId: params.familyId,
-          name: sampleChore.name,
-          points: sampleChore.points,
-          status: 'submitted',
-          submittedByChildId: params.childId,
-          submittedAt: params.submittedAt ?? new Date(),
-          emotion: params.emotion ?? null,
-          photoUrl: params.photoUrl ?? null,
-        });
-      }
+      // Create a new chore record and auto-approve it
+      await db.execute(sql`
+        INSERT INTO chores (
+          id, family_id, name, points, status, submitted_by_child_id,
+          submitted_at, emotion, photo_url, created_at
+        ) VALUES (
+          ${params.choreId}, ${params.familyId}, ${sampleChore.name},
+          ${sampleChore.points}, 'approved', ${params.childId},
+          ${params.submittedAt ?? new Date()}, ${params.emotion ?? null},
+          ${params.photoUrl ?? null}, ${new Date()}
+        )
+      `);
 
-      // Auto-approve the newly created chore
-      await approveChore(params.familyId, params.choreId);
+      // Award points immediately
+      await updateChildPoints(params.childId, sampleChore.points, `Klus "${sampleChore.name}" automatisch goedgekeurd`, params.choreId);
     } else {
       throw new Error('Chore not found');
     }

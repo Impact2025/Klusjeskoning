@@ -38,6 +38,7 @@ export default function ParentDashboard() {
   const { family, logout, approveChore, deleteItem } = useApp();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<Chore[]>([]);
+  const [recentlyCompletedChores, setRecentlyCompletedChores] = useState<Chore[]>([]);
   const [emptySavings, setEmptySavings] = useState<Child[]>([]);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [isAddChildOpen, setIsAddChildOpen] = useState(false);
@@ -57,6 +58,13 @@ export default function ParentDashboard() {
       // Get pending chore approvals
       const pending = family.chores.filter(chore => chore.status === 'submitted');
       setPendingApprovals(pending);
+
+      // Get recently completed chores (auto-approved)
+      const recentlyCompleted = family.chores
+        .filter(chore => chore.status === 'approved')
+        .sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime())
+        .slice(0, 10); // Show last 10 completed chores
+      setRecentlyCompletedChores(recentlyCompleted);
 
       // Get children with empty savings (mock data for now)
       const empty = family.children.filter(child => child.points < 50);
@@ -619,16 +627,46 @@ export default function ParentDashboard() {
                 </Card>
               ) : (
                 <Card>
-                  <CardContent className="text-center py-12">
-                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Alles loopt automatisch!</h3>
-                    <p className="text-gray-600 mb-4">Klusjes worden nu direct goedgekeurd voor een snellere ervaring.</p>
-                    <div className="text-sm text-gray-500 space-y-2">
-                      <p>🎉 Kinderen zien confetti wanneer ze een klusje voltooien</p>
-                      <p>⚡ Punten worden onmiddellijk toegekend</p>
-                      <p>📧 Geen verwarrende notificatie-emails meer</p>
-                      <p>💡 Bekijk het overzicht om te zien welke klusjes zijn voltooid</p>
+                  <CardContent className="py-8">
+                    <div className="text-center mb-6">
+                      <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Alles loopt automatisch!</h3>
+                      <p className="text-gray-600 mb-4">Klusjes worden nu direct goedgekeurd voor een snellere ervaring.</p>
+                      <div className="text-sm text-gray-500 space-y-2">
+                        <p>🎉 Kinderen zien confetti wanneer ze een klusje voltooien</p>
+                        <p>⚡ Punten worden onmiddellijk toegekend</p>
+                        <p>📧 Geen verwarrende notificatie-emails meer</p>
+                      </div>
                     </div>
+
+                    {/* Recently Completed Chores */}
+                    {recentlyCompletedChores.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-800 mb-3 flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                          Recent voltooide klusjes
+                        </h4>
+                        <div className="space-y-2">
+                          {recentlyCompletedChores.map((chore) => (
+                            <div key={chore.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                              <div className="flex items-center gap-3">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <div>
+                                  <p className="font-medium text-green-800">{chore.name}</p>
+                                  <p className="text-sm text-green-600">
+                                    {family.children.find(c => c.id === chore.submittedBy)?.name}
+                                    {chore.submittedAt && ` • ${new Date(chore.submittedAt).toLocaleDateString('nl-NL')}`}
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                                +{chore.points} punten
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
