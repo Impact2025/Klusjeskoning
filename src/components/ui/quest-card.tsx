@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import confetti from 'canvas-confetti';
 import { Button } from './button';
 import { Badge } from './badge';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
@@ -88,7 +89,11 @@ export function QuestCard({
         {/* Action Button */}
         {!isCompleted && !isSubmitted && (
           <Button
-            onClick={() => onComplete(chore.id)}
+            onClick={() => {
+              // Trigger confetti animation
+              confetti({ particleCount: 150, spread: 120, origin: { y: 0.6 } });
+              onComplete(chore.id);
+            }}
             className={cn(
               'w-full transition-all duration-200',
               isHovered && 'scale-105'

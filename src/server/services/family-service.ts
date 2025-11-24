@@ -93,7 +93,11 @@ export type SerializableFamily = {
   pendingRewards: SerializablePendingReward[];
 };
 
-const toSerializableDate = (date?: Date | null): SerializableDate => date?.toISOString() ?? null;
+const toSerializableDate = (date?: Date | string | null): SerializableDate => {
+  if (!date) return null;
+  if (typeof date === 'string') return date;
+  return date.toISOString();
+};
 
 const DEFAULT_CODE_ATTEMPTS = 10;
 
@@ -227,73 +231,137 @@ export const getFamilyById = async (familyId: string) => {
 };
 
 export const getFamilyByCode = async (code: string) => {
-  return db.query.families.findFirst({
-    where: eq(families.familyCode, code.toUpperCase()),
-    with: {
-      children: {
-        columns: {
-          id: true,
-          familyId: true,
-          name: true,
-          pin: true,
-          points: true,
-          totalPointsEver: true,
-          avatar: true,
-          createdAt: true,
-          // Exclude gamification columns for now
-          // xp: true,
-          // totalXpEver: true,
-        },
+  // Use raw SQL to avoid schema issues with missing columns
+  const familyResult = await db.execute(sql`
+    SELECT
+      f.id, f.family_code, f.family_name, f.city, f.email, f.created_at,
+      f.recovery_email, f.subscription_plan, f.subscription_status,
+      f.subscription_interval, f.subscription_renewal_date,
+      f.subscription_last_payment_at, f.subscription_order_id
+    FROM families f
+    WHERE f.family_code = ${code.toUpperCase()}
+  `);
+
+  if (familyResult.rows.length === 0) {
+    return null;
+  }
+
+  const family = familyResult.rows[0];
+
+  // Get children
+  const childrenResult = await db.execute(sql`
+    SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
+    FROM children
+    WHERE family_id = ${family.id}
+  `);
+
+  // Get chores - exclude problematic columns that may not exist
+  const choresResult = await db.execute(sql`
+    SELECT
+      c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
+      c.submitted_at, c.emotion, c.photo_url, c.created_at
+    FROM chores c
+    WHERE c.family_id = ${family.id}
+  `);
+
+  // Get chore assignments
+  const assignmentsResult = await db.execute(sql`
+    SELECT ca.chore_id, ca.child_id, ca.assigned_at
+    FROM chore_assignments ca
+    WHERE ca.chore_id IN (
+      SELECT id FROM chores WHERE family_id = ${family.id}
+    )
+  `);
+
+  // Get rewards
+  const rewardsResult = await db.execute(sql`
+    SELECT id, family_id, name, points, type, created_at
+    FROM rewards
+    WHERE family_id = ${family.id}
+  `);
+
+  // Get reward assignments
+  const rewardAssignmentsResult = await db.execute(sql`
+    SELECT ra.reward_id, ra.child_id, ra.assigned_at
+    FROM reward_assignments ra
+    WHERE ra.reward_id IN (
+      SELECT id FROM rewards WHERE family_id = ${family.id}
+    )
+  `);
+
+  // Get pending rewards
+  const pendingRewardsResult = await db.execute(sql`
+    SELECT
+      pr.id, pr.family_id, pr.child_id, pr.reward_id, pr.points, pr.redeemed_at,
+      c.name as child_name, r.name as reward_name
+    FROM pending_rewards pr
+    LEFT JOIN children c ON pr.child_id = c.id
+    LEFT JOIN rewards r ON pr.reward_id = r.id
+    WHERE pr.family_id = ${family.id}
+  `);
+
+  // Build the family object
+  return {
+    id: family.id,
+    familyCode: family.family_code,
+    familyName: family.family_name,
+    city: family.city,
+    email: family.email,
+    createdAt: family.created_at,
+    recoveryEmail: family.recovery_email,
+    subscriptionPlan: family.subscription_plan,
+    subscriptionStatus: family.subscription_status,
+    subscriptionInterval: family.subscription_interval,
+    subscriptionRenewalDate: family.subscription_renewal_date,
+    subscriptionLastPaymentAt: family.subscription_last_payment_at,
+    subscriptionOrderId: family.subscription_order_id,
+    children: childrenResult.rows.map(child => ({
+      id: child.id,
+      familyId: child.family_id,
+      name: child.name,
+      pin: child.pin,
+      points: Number(child.points),
+      totalPointsEver: Number(child.total_points_ever),
+      avatar: child.avatar,
+      createdAt: child.created_at,
+    })),
+    chores: choresResult.rows.map(chore => ({
+      id: chore.id,
+      familyId: chore.family_id,
+      name: chore.name,
+      points: Number(chore.points),
+      status: chore.status,
+      submittedByChildId: chore.submitted_by_child_id,
+      submittedAt: chore.submitted_at,
+      emotion: chore.emotion,
+      photoUrl: chore.photo_url,
+      createdAt: chore.created_at,
+      assignments: assignmentsResult.rows.filter(a => a.chore_id === chore.id),
+    })),
+    rewards: rewardsResult.rows.map(reward => ({
+      id: reward.id,
+      familyId: reward.family_id,
+      name: reward.name,
+      points: Number(reward.points),
+      type: reward.type,
+      createdAt: reward.created_at,
+      assignments: rewardAssignmentsResult.rows.filter(a => a.reward_id === reward.id),
+    })),
+    pendingRewards: pendingRewardsResult.rows.map(pending => ({
+      id: pending.id,
+      familyId: pending.family_id,
+      childId: pending.child_id,
+      rewardId: pending.reward_id,
+      points: Number(pending.points),
+      redeemedAt: pending.redeemed_at,
+      child: {
+        name: pending.child_name,
       },
-      chores: {
-        columns: {
-          id: true,
-          familyId: true,
-          name: true,
-          points: true,
-          status: true,
-          submittedByChildId: true,
-          submittedAt: true,
-          emotion: true,
-          photoUrl: true,
-          createdAt: true,
-          // Exclude gamification columns for now
-          // xpReward: true,
-          // questChainId: true,
-          // isMainQuest: true,
-          // chainOrder: true,
-        },
-        with: {
-          assignments: true,
-        },
+      reward: {
+        name: pending.reward_name,
       },
-      rewards: {
-        with: {
-          assignments: true,
-        },
-      },
-      pendingRewards: {
-        with: {
-          child: {
-            columns: {
-              id: true,
-              familyId: true,
-              name: true,
-              pin: true,
-              points: true,
-              totalPointsEver: true,
-              avatar: true,
-              createdAt: true,
-              // Exclude gamification columns for now
-              // xp: true,
-              // totalXpEver: true,
-            },
-          },
-          reward: true,
-        },
-      },
-    },
-  });
+    })),
+  };
 };
 
 export const loadFamilyWithRelations = async (familyId: string) => {
@@ -303,53 +371,150 @@ export const loadFamilyWithRelations = async (familyId: string) => {
     return cachedFamily;
   }
 
-  // Fetch from database
-  const family = await db.query.families.findFirst({
-    where: eq(families.id, familyId),
-    with: {
-      children: true,
-      chores: {
-        with: {
-          assignments: true,
-        },
-        columns: {
-          id: true,
-          familyId: true,
-          name: true,
-          points: true,
-          status: true,
-          submittedByChildId: true,
-          submittedAt: true,
-          emotion: true,
-          photoUrl: true,
-          createdAt: true,
-          // Exclude new gamification columns for now - database migration needed
-          // xpReward: true,
-          // questChainId: true,
-          // isMainQuest: true,
-          // chainOrder: true,
-        },
-      },
-      rewards: {
-        with: {
-          assignments: true,
-        },
-      },
-      pendingRewards: {
-        with: {
-          child: true,
-          reward: true,
-        },
-      },
-    },
-  });
+  // Fetch from database - use raw SQL to avoid schema issues with missing columns
+  const familyResult = await db.execute(sql`
+    SELECT
+      f.id, f.family_code, f.family_name, f.city, f.email, f.created_at,
+      f.recovery_email, f.subscription_plan, f.subscription_status,
+      f.subscription_interval, f.subscription_renewal_date,
+      f.subscription_last_payment_at, f.subscription_order_id
+    FROM families f
+    WHERE f.id = ${familyId}
+  `);
 
-  // Cache the result if found
-  if (family) {
-    await FamilyCache.set(familyId, family);
+  if (familyResult.rows.length === 0) {
+    return null;
   }
 
-  return family;
+  const family = familyResult.rows[0];
+
+  // Get children
+  const childrenResult = await db.execute(sql`
+    SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
+    FROM children
+    WHERE family_id = ${familyId}
+  `);
+
+  // Get chores - exclude problematic columns that may not exist
+  const choresResult = await db.execute(sql`
+    SELECT
+      c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
+      c.submitted_at, c.emotion, c.photo_url, c.created_at
+    FROM chores c
+    WHERE c.family_id = ${familyId}
+  `);
+
+  // Get chore assignments
+  const assignmentsResult = await db.execute(sql`
+    SELECT ca.chore_id, ca.child_id, ca.assigned_at
+    FROM chore_assignments ca
+    WHERE ca.chore_id IN (
+      SELECT id FROM chores WHERE family_id = ${familyId}
+    )
+  `);
+
+  // Get rewards
+  const rewardsResult = await db.execute(sql`
+    SELECT id, family_id, name, points, type, created_at
+    FROM rewards
+    WHERE family_id = ${familyId}
+  `);
+
+  // Get reward assignments
+  const rewardAssignmentsResult = await db.execute(sql`
+    SELECT ra.reward_id, ra.child_id, ra.assigned_at
+    FROM reward_assignments ra
+    WHERE ra.reward_id IN (
+      SELECT id FROM rewards WHERE family_id = ${familyId}
+    )
+  `);
+
+  // Get pending rewards
+  const pendingRewardsResult = await db.execute(sql`
+    SELECT
+      pr.id, pr.family_id, pr.child_id, pr.reward_id, pr.points, pr.redeemed_at,
+      c.name as child_name, r.name as reward_name
+    FROM pending_rewards pr
+    LEFT JOIN children c ON pr.child_id = c.id
+    LEFT JOIN rewards r ON pr.reward_id = r.id
+    WHERE pr.family_id = ${familyId}
+  `);
+
+  // Build the family object
+  const familyData = {
+    id: family.id,
+    familyCode: family.family_code,
+    familyName: family.family_name,
+    city: family.city,
+    email: family.email,
+    createdAt: family.created_at,
+    recoveryEmail: family.recovery_email,
+    subscriptionPlan: family.subscription_plan,
+    subscriptionStatus: family.subscription_status,
+    subscriptionInterval: family.subscription_interval,
+    subscriptionRenewalDate: family.subscription_renewal_date,
+    subscriptionLastPaymentAt: family.subscription_last_payment_at,
+    subscriptionOrderId: family.subscription_order_id,
+    children: childrenResult.rows.map(child => ({
+      id: child.id,
+      familyId: child.family_id,
+      name: child.name,
+      pin: child.pin,
+      points: Number(child.points),
+      totalPointsEver: Number(child.total_points_ever),
+      avatar: child.avatar,
+      createdAt: child.created_at,
+      // Exclude gamification columns for now
+      // xp: child.xp,
+      // totalXpEver: child.total_xp_ever,
+    })),
+    chores: choresResult.rows.map(chore => ({
+      id: chore.id,
+      familyId: chore.family_id,
+      name: chore.name,
+      points: Number(chore.points),
+      status: chore.status,
+      submittedByChildId: chore.submitted_by_child_id,
+      submittedAt: chore.submitted_at,
+      emotion: chore.emotion,
+      photoUrl: chore.photo_url,
+      createdAt: chore.created_at,
+      // Exclude gamification columns for now
+      // xpReward: Number(chore.xp_reward),
+      // questChainId: chore.quest_chain_id,
+      // isMainQuest: Boolean(chore.is_main_quest),
+      // chainOrder: chore.chain_order,
+      assignments: assignmentsResult.rows.filter(a => a.chore_id === chore.id),
+    })),
+    rewards: rewardsResult.rows.map(reward => ({
+      id: reward.id,
+      familyId: reward.family_id,
+      name: reward.name,
+      points: Number(reward.points),
+      type: reward.type,
+      createdAt: reward.created_at,
+      assignments: rewardAssignmentsResult.rows.filter(a => a.reward_id === reward.id),
+    })),
+    pendingRewards: pendingRewardsResult.rows.map(pending => ({
+      id: pending.id,
+      familyId: pending.family_id,
+      childId: pending.child_id,
+      rewardId: pending.reward_id,
+      points: Number(pending.points),
+      redeemedAt: pending.redeemed_at,
+      child: {
+        name: pending.child_name,
+      },
+      reward: {
+        name: pending.reward_name,
+      },
+    })),
+  };
+
+  // Cache the result if found
+  await FamilyCache.set(familyId, familyData);
+
+  return familyData;
 };
 
 // ===== COUPON MANAGEMENT FUNCTIONS =====
@@ -819,29 +984,39 @@ export const getChildById = async (familyId: string, childId: string) => {
 };
 
 export const getChoreById = async (familyId: string, choreId: string) => {
-  return db.query.chores.findFirst({
-    where: and(eq(chores.id, choreId), eq(chores.familyId, familyId)),
-    columns: {
-      id: true,
-      familyId: true,
-      name: true,
-      points: true,
-      status: true,
-      submittedByChildId: true,
-      submittedAt: true,
-      emotion: true,
-      photoUrl: true,
-      createdAt: true,
-      // Exclude gamification columns for now
-      // xpReward: true,
-      // questChainId: true,
-      // isMainQuest: true,
-      // chainOrder: true,
-    },
-    with: {
-      assignments: true,
-    },
-  });
+  // Use raw SQL to avoid schema issues
+  const result = await db.execute(sql`
+    SELECT
+      c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
+      c.submitted_at, c.emotion, c.photo_url, c.created_at
+    FROM chores c
+    WHERE c.id = ${choreId} AND c.family_id = ${familyId}
+  `);
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const chore = result.rows[0];
+
+  // Get assignments
+  const assignmentsResult = await db.execute(sql`
+    SELECT child_id, assigned_at FROM chore_assignments WHERE chore_id = ${choreId}
+  `);
+
+  return {
+    id: chore.id,
+    familyId: chore.family_id,
+    name: chore.name,
+    points: Number(chore.points),
+    status: chore.status,
+    submittedByChildId: chore.submitted_by_child_id,
+    submittedAt: chore.submitted_at,
+    emotion: chore.emotion,
+    photoUrl: chore.photo_url,
+    createdAt: chore.created_at,
+    assignments: assignmentsResult.rows,
+  };
 };
 
 export const getRewardById = async (familyId: string, rewardId: string) => {
@@ -1334,7 +1509,7 @@ export const submitChoreForApproval = async (params: {
   });
 
   if (existingChore) {
-    // Update existing chore
+    // Update existing chore to submitted first
     await db
       .update(chores)
       .set({
@@ -1345,6 +1520,9 @@ export const submitChoreForApproval = async (params: {
         photoUrl: params.photoUrl ?? null,
       })
       .where(and(eq(chores.id, params.choreId), eq(chores.familyId, params.familyId)));
+
+    // Auto-approve the chore immediately
+    await approveChore(params.familyId, params.choreId);
   } else {
     // Check if this is a sample quest chore that needs to be created
     // Import the sample chores dynamically to avoid circular dependencies
@@ -1382,6 +1560,9 @@ export const submitChoreForApproval = async (params: {
           photoUrl: params.photoUrl ?? null,
         });
       }
+
+      // Auto-approve the newly created chore
+      await approveChore(params.familyId, params.choreId);
     } else {
       throw new Error('Chore not found');
     }
@@ -1389,21 +1570,32 @@ export const submitChoreForApproval = async (params: {
 };
 
 export const approveChore = async (familyId: string, choreId: string) => {
-  const chore = await db.query.chores.findFirst({ where: and(eq(chores.id, choreId), eq(chores.familyId, familyId)) });
-  if (!chore || !chore.submittedByChildId) {
+  // Get chore using raw SQL
+  const choreResult = await db.execute(sql`
+    SELECT id, family_id, name, points, status, submitted_by_child_id, submitted_at, emotion, photo_url, created_at
+    FROM chores
+    WHERE id = ${choreId} AND family_id = ${familyId}
+  `);
+
+  if (choreResult.rows.length === 0) {
+    throw new Error('CHORE_NOT_FOUND');
+  }
+
+  const chore = choreResult.rows[0];
+
+  if (!chore.submitted_by_child_id) {
     throw new Error('CHORE_NOT_SUBMITTED');
   }
 
-  await db
-    .update(chores)
-    .set({
-      status: 'approved',
-    })
-    .where(eq(chores.id, choreId));
+  // Update chore status
+  await db.execute(sql`
+    UPDATE chores SET status = 'approved' WHERE id = ${choreId}
+  `);
 
   // Award points and XP
-  await updateChildPoints(chore.submittedByChildId, chore.points, `Klus "${chore.name}" goedgekeurd`, chore.id);
-  await updateChildXp(chore.submittedByChildId, chore.xpReward || 0);
+  await updateChildPoints(chore.submitted_by_child_id, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, chore.id);
+  // Note: XP reward is not available in current schema, so we skip it for now
+  // await updateChildXp(chore.submittedByChildId, chore.xpReward || 0);
 };
 
 export const rejectChore = async (familyId: string, choreId: string) => {
