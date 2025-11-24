@@ -680,7 +680,7 @@ export async function POST(request: Request) {
       }
       case 'updateChore': {
         const session = await requireSession();
-        const data = updateChoreSchema.parse(payload);
+        const data: z.infer<typeof updateChoreSchema> = updateChoreSchema.parse(payload);
         const existing = await getChoreById(session.familyId, data.choreId);
         if (!existing) {
           return errorResponse('Klusje niet gevonden.', 404);
@@ -688,7 +688,7 @@ export async function POST(request: Request) {
         await saveChore({
           familyId: session.familyId,
           choreId: data.choreId,
-          name: (data.name as string) ?? existing.name,
+          name: data.name ?? existing.name,
           points: data.points ?? existing.points,
           assignedTo: data.assignedTo ?? existing.assignments.map((assignment) => assignment.childId),
           status: data.status ?? existing.status,
