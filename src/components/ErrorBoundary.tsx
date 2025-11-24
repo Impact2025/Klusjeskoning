@@ -1,11 +1,13 @@
 'use client';
 
 import React from 'react';
-import * as Sentry from '@sentry/nextjs';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ErrorBoundaryState {
   hasError: boolean;
-  error?: Error;
+  error: Error | undefined;
+  errorInfo: React.ErrorInfo | undefined;
 }
 
 interface ErrorBoundaryProps {
@@ -16,34 +18,40 @@ interface ErrorBoundaryProps {
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: undefined, errorInfo: undefined };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error, errorInfo: undefined };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error to Sentry
-    Sentry.captureException(error, {
-      contexts: {
-        react: {
-          componentStack: errorInfo.componentStack,
-        },
-      },
+    this.setState({
+      error,
+      errorInfo,
     });
 
-    console.error('Error caught by boundary:', error, errorInfo);
+    // Log error to monitoring service in production
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Error Boundary caught an error:', error, errorInfo);
+
+      // Here you would send to error monitoring service like Sentry
+      // Example: Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } });
+    }
   }
 
   resetError = () => {
-    this.setState({ hasError: false, error: undefined });
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
   };
 
   render() {
     if (this.state.hasError) {
-      const FallbackComponent = this.props.fallback || DefaultErrorFallback;
-      return <FallbackComponent error={this.state.error} resetError={this.resetError} />;
+      if (this.props.fallback) {
+        const FallbackComponent = this.props.fallback;
+        return <FallbackComponent error={this.state.error} resetError={this.resetError} />;
+      }
+
+      return <DefaultErrorFallback error={this.state.error} resetError={this.resetError} />;
     }
 
     return this.props.children;
@@ -52,47 +60,42 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 function DefaultErrorFallback({ error, resetError }: { error?: Error; resetError: () => void }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
-        <div className="mb-4">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-            <svg
-              className="h-6 w-6 text-red-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
-          </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
+        <div className="flex justify-center mb-4">
+          <AlertTriangle className="h-12 w-12 text-red-500" />
         </div>
-        <h1 className="text-lg font-medium text-gray-900 mb-2">
+
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">
           Er is iets misgegaan
         </h1>
-        <p className="text-sm text-gray-500 mb-4">
-          Er is een onverwachte fout opgetreden. Het probleem is automatisch gerapporteerd.
+
+        <p className="text-gray-600 mb-6">
+          Er is een onverwachte fout opgetreden. Probeer de pagina te vernieuwen of neem contact op met ondersteuning als het probleem aanhoudt.
         </p>
+
         {process.env.NODE_ENV === 'development' && error && (
           <details className="mb-4 text-left">
-            <summary className="cursor-pointer text-sm text-gray-700 hover:text-gray-900">
-              Technische details (alleen zichtbaar in development)
+            <summary className="cursor-pointer text-sm font-medium text-gray-700 mb-2">
+              Foutdetails (alleen zichtbaar in development)
             </summary>
-            <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
-              {error.stack}
+            <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-32">
+              {error.message}
+              {error.stack && `\n\n${error.stack}`}
             </pre>
           </details>
         )}
-        <button
-          onClick={resetError}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          Probeer opnieuw
-        </button>
+
+        <div className="flex gap-3 justify-center">
+          <Button onClick={resetError} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Opnieuw proberen
+          </Button>
+
+          <Button onClick={() => window.location.reload()}>
+            Pagina vernieuwen
+          </Button>
+        </div>
       </div>
     </div>
   );

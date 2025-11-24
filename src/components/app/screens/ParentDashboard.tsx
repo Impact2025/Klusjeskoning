@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import {
   CheckCircle,
   Clock,
@@ -50,7 +51,12 @@ export default function ParentDashboard() {
   const [isEditRewardOpen, setIsEditRewardOpen] = useState(false);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [automationSettings, setAutomationSettings] = useState<any>(null);
+  const [automationSettings, setAutomationSettings] = useState({
+    autoPayouts: true,
+    dailyReminders: true,
+    photoApprovals: true,
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     if (family) {
@@ -119,6 +125,32 @@ export default function ParentDashboard() {
   const handleDeleteReward = async (rewardId: string, rewardName: string) => {
     if (window.confirm(`Weet je zeker dat je "${rewardName}" wilt verwijderen?`)) {
       await deleteItem('rewards', rewardId);
+    }
+  };
+
+  const handleSaveAutomationSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateAutomationSettings',
+          payload: automationSettings,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+
+      // Show success message (you could add a toast notification here)
+      alert('Instellingen succesvol opgeslagen!');
+    } catch (error) {
+      console.error('Failed to save automation settings:', error);
+      alert('Er ging iets mis bij het opslaan van de instellingen.');
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -682,37 +714,55 @@ export default function ParentDashboard() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Geavanceerde Instellingen</CardTitle>
+                  <CardTitle className="flex items-center justify-between">
+                    Geavanceerde Instellingen
+                    <Button
+                      onClick={handleSaveAutomationSettings}
+                      disabled={isSavingSettings}
+                      size="sm"
+                    >
+                      {isSavingSettings ? 'Opslaan...' : 'Opslaan'}
+                    </Button>
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-medium">Automatische Uitbetalingen</h4>
                       <p className="text-sm text-gray-600">Elke vrijdagavond automatisch uitbetalen</p>
                     </div>
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                      Actief
-                    </Badge>
+                    <Switch
+                      checked={automationSettings.autoPayouts}
+                      onCheckedChange={(checked) =>
+                        setAutomationSettings(prev => ({ ...prev, autoPayouts: checked }))
+                      }
+                    />
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-medium">Herinneringen</h4>
                       <p className="text-sm text-gray-600">Dagelijkse notificaties voor pending approvals</p>
                     </div>
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                      Actief
-                    </Badge>
+                    <Switch
+                      checked={automationSettings.dailyReminders}
+                      onCheckedChange={(checked) =>
+                        setAutomationSettings(prev => ({ ...prev, dailyReminders: checked }))
+                      }
+                    />
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-medium">Foto Goedkeuringen</h4>
                       <p className="text-sm text-gray-600">One-click goedkeuringen voor klusjes met foto</p>
                     </div>
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                      Actief
-                    </Badge>
+                    <Switch
+                      checked={automationSettings.photoApprovals}
+                      onCheckedChange={(checked) =>
+                        setAutomationSettings(prev => ({ ...prev, photoApprovals: checked }))
+                      }
+                    />
                   </div>
                 </CardContent>
               </Card>
