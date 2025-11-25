@@ -45,6 +45,8 @@ export default function SubmitChoreModal({
     chore = allQuestChores.find(c => c.id === choreId);
   }
 
+  console.log('SubmitChoreModal - choreId:', choreId, 'found chore:', chore);
+
   const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -95,7 +97,7 @@ export default function SubmitChoreModal({
       onSubmissionSuccess?.(choreId);
     } catch (err) {
       console.error("Submission failed", err);
-      toast({ variant: "destructive", title: "Fout bij indienen", description: err.message || "Kon het klusje niet indienen." });
+      toast({ variant: "destructive", title: "Fout bij indienen", description: (err as Error)?.message || "Kon het klusje niet indienen." });
       setIsSubmitting(false);
       onSubmissionError?.(choreId);
     }
@@ -103,6 +105,7 @@ export default function SubmitChoreModal({
 
   if (!chore) return null;
 
+  console.log('SubmitChoreModal render - isOpen:', isOpen, 'choreId:', choreId, 'chore found:', !!chore);
   return (
     <Dialog open={isOpen} onOpenChange={handleFullClose}>
       <DialogContent className="sm:max-w-sm text-center">

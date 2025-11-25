@@ -97,6 +97,7 @@ export type Family = {
   chores: Chore[];
   rewards: Reward[];
   pendingRewards: PendingReward[];
+  teamChores?: TeamChore[];
   subscription?: SubscriptionInfo;
 };
 

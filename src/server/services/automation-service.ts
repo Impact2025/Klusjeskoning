@@ -237,7 +237,7 @@ export class AutomationService {
       .where(
         and(
           eq(chores.isTemplate, 1),
-          gte(chores.nextDueDate, now.toDate())
+          lte(chores.nextDueDate, now.toDate())
         )
       );
 

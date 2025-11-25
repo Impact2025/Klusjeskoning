@@ -9,6 +9,8 @@ import { Star, Trophy, CheckCircle, Circle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Chore } from '@/lib/types';
 import SocialReactions from './social-reactions';
+import QuestCelebration, { useQuestCelebration } from '@/components/gamification/QuestCelebration';
+import QuestStoryline from '@/components/gamification/QuestStoryline';
 
 interface QuestCardProps {
   chore: Chore;
@@ -26,6 +28,8 @@ export function QuestCard({
   className
 }: QuestCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [showStoryline, setShowStoryline] = useState(false);
+  const { isCelebrating, celebrate } = useQuestCelebration();
 
   const getQuestTypeColor = () => {
     if (chore.isMainQuest) return 'border-yellow-400 bg-yellow-50';
@@ -40,16 +44,29 @@ export function QuestCard({
   };
 
   return (
-    <Card
-      className={cn(
-        'transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-pointer',
-        getQuestTypeColor(),
-        isCompleted && 'opacity-75',
-        className
-      )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <>
+      <Card
+        className={cn(
+          'transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-pointer',
+          getQuestTypeColor(),
+          isCompleted && 'opacity-75',
+          className
+        )}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={async () => {
+          if (!isCompleted && !isSubmitted) {
+            // Trigger mega celebration
+            await celebrate(chore.xpReward, chore.points);
+            onComplete(chore.id);
+
+            // Show storyline after a brief delay
+            setTimeout(() => {
+              setShowStoryline(true);
+            }, 3500); // After celebration completes
+          }
+        }}
+      >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -120,6 +137,29 @@ export function QuestCard({
         )}
       </CardContent>
     </Card>
+
+    {/* Mega Celebration Overlay */}
+    <QuestCelebration
+      isVisible={isCelebrating}
+      onComplete={() => {}} // Handled by the hook
+      xpGained={chore.xpReward}
+      pointsGained={chore.points}
+    />
+
+    {/* Quest Storyline Modal */}
+    {showStoryline && chore.questChainId && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="w-full max-w-2xl mx-4">
+          <QuestStoryline
+            questChainId={chore.questChainId}
+            completedStep={1} // This would need to be calculated based on actual progress
+            totalSteps={3} // This would need to be dynamic
+            onContinue={() => setShowStoryline(false)}
+          />
+        </div>
+      </div>
+    )}
+  </>
   );
 }
 

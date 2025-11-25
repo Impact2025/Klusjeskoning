@@ -1,5 +1,5 @@
 async function main() {
-  const response = await fetch('http://localhost:9010/api/app', {
+  const response = await fetch('http://localhost:3001/api/app', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

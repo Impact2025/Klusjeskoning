@@ -3,41 +3,17 @@
 import { useApp } from '@/components/app/AppProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Users, CheckCircle, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, CheckCircle, Clock, Trophy } from 'lucide-react';
+import { callAppApi } from '@/lib/api/app-client';
+import { useToast } from '@/hooks/use-toast';
+import type { TeamChore } from '@/lib/types';
 
 export default function TeamChores() {
   const { family } = useApp();
+  const { toast } = useToast();
 
-  // Mock team chores data - in production this would come from the database
-  const teamChores = [
-    {
-      id: '1',
-      name: 'Grote Keuken Schoonmaak',
-      description: 'De hele keuken van boven tot onder schoonmaken',
-      progress: 65,
-      participatingChildren: ['child1', 'child2', 'child3'],
-      totalPoints: 150,
-      status: 'in_progress',
-    },
-    {
-      id: '2',
-      name: 'Tuin Opknappen',
-      description: 'Onkruid wieden en planten water geven',
-      progress: 30,
-      participatingChildren: ['child1', 'child2'],
-      totalPoints: 200,
-      status: 'in_progress',
-    },
-    {
-      id: '3',
-      name: 'Speelkamer Organiseren',
-      description: 'Alle speelgoed opruimen en organiseren',
-      progress: 100,
-      participatingChildren: ['child1', 'child2', 'child3'],
-      totalPoints: 120,
-      status: 'completed',
-    },
-  ];
+  const teamChores: TeamChore[] = family?.teamChores || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -47,11 +23,31 @@ export default function TeamChores() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'in_progress': return <Clock className="h-4 w-4 text-blue-600" />;
-      default: return <Users className="h-4 w-4 text-gray-600" />;
+  const getStatusIcon = (chore: any) => {
+    if (chore.completedAt) {
+      return <CheckCircle className="h-4 w-4 text-green-600" />;
+    }
+    return <Clock className="h-4 w-4 text-blue-600" />;
+  };
+
+  const handleCompleteTeamChore = async (teamChoreId: string, teamChoreName: string) => {
+    if (!confirm(`Weet je zeker dat je "${teamChoreName}" wilt voltooien? Alle deelnemers krijgen punten.`)) {
+      return;
+    }
+
+    try {
+      await callAppApi('completeTeamChore', { teamChoreId });
+      toast({
+        title: 'Team klusje voltooid!',
+        description: `Alle deelnemers hebben hun punten ontvangen.`,
+      });
+    } catch (error) {
+      console.error('Failed to complete team chore:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fout',
+        description: 'Kon team klusje niet voltooien.',
+      });
     }
   };
 
@@ -72,10 +68,9 @@ export default function TeamChores() {
                 <p className="text-sm text-gray-600 mb-2">{chore.description}</p>
                 <div className="flex items-center gap-4 text-sm">
                   <span className="flex items-center">
-                    {getStatusIcon(chore.status)}
-                    <span className={`ml-1 ${getStatusColor(chore.status)}`}>
-                      {chore.status === 'completed' ? 'Voltooid' :
-                       chore.status === 'in_progress' ? 'Bezig' : 'Gepland'}
+                    {getStatusIcon(chore)}
+                    <span className={`ml-1 ${chore.completedAt ? 'text-green-600' : 'text-blue-600'}`}>
+                      {chore.completedAt ? 'Voltooid' : 'Bezig'}
                     </span>
                   </span>
                   <span className="text-yellow-600 font-medium">
@@ -83,6 +78,16 @@ export default function TeamChores() {
                   </span>
                 </div>
               </div>
+              {!chore.completedAt && chore.progress === 100 && (
+                <Button
+                  size="sm"
+                  onClick={() => handleCompleteTeamChore(chore.id, chore.name)}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Trophy className="h-4 w-4 mr-1" />
+                  Voltooien
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -98,7 +103,7 @@ export default function TeamChores() {
                 <Users className="h-4 w-4 mr-1" />
                 <span>{chore.participatingChildren.length} deelnemers</span>
               </div>
-              {chore.status === 'in_progress' && (
+              {!chore.completedAt && (
                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                   Samenwerken!
                 </span>

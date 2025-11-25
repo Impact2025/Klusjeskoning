@@ -301,7 +301,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         setScreen('parentDashboard');
       }
-      notify('success', 'Welkom terug!', 'Je bent succesvol ingelogd.');
+      notify('success', '🎉 Welkom terug!', 'Je bent succesvol ingelogd.');
+      // Welcome celebration for parents
+      confetti({
+        particleCount: 120,
+        spread: 90,
+        origin: { y: 0.3 },
+        colors: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
+      });
     });
   }, [applyFamily, handleAction, notify]);
 
@@ -408,7 +415,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, ({ family: payload }) => {
       applyFamily(payload ?? null);
       setScreen('childDashboard');
-      notify('success', 'Welkom!', `Hoi ${user.name}!`);
+      notify('success', '🎉 Welkom!', `Hoi ${user.name}!`);
+      // Welcome celebration for children
+      confetti({
+        particleCount: 60,
+        spread: 50,
+        origin: { y: 0.8 },
+        colors: ['#f59e0b', '#10b981', '#3b82f6']
+      });
     });
   }, [applyFamily, family, handleAction, notify, user]);
 
@@ -421,7 +435,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     await handleAction<{ family: SerializableFamily }>('addChild', { name, pin, avatar }, ({ family: payload }) => {
       applyFamily(payload ?? null);
-      notify('success', 'Succes', `${name} is toegevoegd!`);
+      notify('success', '🎉 Welkom!', `${name} is toegevoegd aan jullie gezin!`);
+      // Celebrate adding a new family member
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.5 },
+        colors: ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b']
+      });
     });
   }, [applyFamily, family, handleAction, notify]);
 
@@ -482,7 +503,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const approveChore = useCallback(async (choreId: string) => {
     await handleAction<{ family: SerializableFamily }>('approveChore', { id: choreId }, ({ family: payload }) => {
       applyFamily(payload ?? null);
-      notify('success', 'Succes', 'Klusje goedgekeurd.');
+      notify('success', '🎉 Geweldig werk!', 'Klusje goedgekeurd - wat een prestatie!');
+      // Celebrate with confetti when parents approve a chore
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
+      });
     });
   }, [applyFamily, handleAction, notify]);
 
@@ -540,7 +568,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         submittedAt: new Date().toISOString(),
       });
       applyFamily(result.family ?? null);
-      notify('success', 'Top gedaan!', 'Klusje is ter controle verstuurd.');
+      notify('success', '🎉 Top gedaan!', 'Klusje is ter controle verstuurd.');
+      // Celebrate when children submit chores for approval
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.7 },
+        colors: ['#10b981', '#3b82f6', '#f59e0b']
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Er ging iets mis bij het indienen van het klusje.';
       notify('destructive', 'Fout', message);

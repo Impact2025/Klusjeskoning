@@ -511,10 +511,32 @@ export const loadFamilyWithRelations = async (familyId: string) => {
     })),
   };
 
+  // Get team chores
+  const teamChoresResult = await db.execute(sql`
+    SELECT id, family_id, name, description, participating_children, total_points, progress, completed_at, created_at
+    FROM team_chores
+    WHERE family_id = ${familyId}
+    ORDER BY created_at DESC
+  `);
+
+  const teamChoresData = {
+    teamChores: teamChoresResult.rows.map(teamChore => ({
+      id: teamChore.id,
+      familyId: teamChore.family_id,
+      name: teamChore.name,
+      description: teamChore.description,
+      participatingChildren: teamChore.participating_children || [],
+      totalPoints: Number(teamChore.total_points),
+      progress: Number(teamChore.progress),
+      completedAt: teamChore.completed_at,
+      createdAt: teamChore.created_at,
+    })),
+  };
+
   // Cache the result if found
   await FamilyCache.set(familyId, familyData);
 
-  return familyData;
+  return { ...familyData, ...teamChoresData };
 };
 
 // ===== COUPON MANAGEMENT FUNCTIONS =====
@@ -1211,10 +1233,37 @@ export const saveChore = async (params: {
   submittedAt?: Date | null;
   emotion?: string | null;
   photoUrl?: string | null;
+  recurrenceType?: 'none' | 'daily' | 'weekly' | 'custom';
+  recurrenceDays?: string | null;
 }) => {
   const assignedTo = Array.from(new Set(params.assignedTo));
 
   if (params.choreId) {
+    // Handle recurring chores update
+    const recurrenceType = params.recurrenceType ?? 'none';
+    const isTemplate = recurrenceType !== 'none' ? 1 : 0;
+
+    // Calculate next due date for recurring chores
+    let nextDueDate: Date | null = null;
+    if (isTemplate) {
+      const now = new Date();
+      if (recurrenceType === 'daily') {
+        nextDueDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Tomorrow
+      } else if (recurrenceType === 'weekly') {
+        // Use the first selected day of the week
+        const recurrenceDays = params.recurrenceDays ? JSON.parse(params.recurrenceDays) : ['monday'];
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const targetDays = recurrenceDays.map((day: string) => dayNames.indexOf(day.toLowerCase())).filter((day: number) => day >= 0);
+
+        if (targetDays.length > 0) {
+          const currentDay = now.getDay();
+          const nextDay = targetDays.find((day: number) => day > currentDay) ?? targetDays[0];
+          const daysToAdd = nextDay > currentDay ? nextDay - currentDay : 7 - currentDay + nextDay;
+          nextDueDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+        }
+      }
+    }
+
     // Use raw SQL to avoid Drizzle schema issues
     await db.execute(sql`
       UPDATE chores
@@ -1224,7 +1273,11 @@ export const saveChore = async (params: {
           submitted_by_child_id = ${params.submittedBy ?? null},
           submitted_at = ${params.submittedAt ?? null},
           emotion = ${params.emotion ?? null},
-          photo_url = ${params.photoUrl ?? null}
+          photo_url = ${params.photoUrl ?? null},
+          recurrence_type = ${recurrenceType},
+          recurrence_days = ${params.recurrenceDays ?? null},
+          is_template = ${isTemplate},
+          next_due_date = ${nextDueDate}
       WHERE id = ${params.choreId} AND family_id = ${params.familyId}
     `);
 
@@ -1237,6 +1290,31 @@ export const saveChore = async (params: {
     return params.choreId;
   }
 
+  // Handle recurring chores
+  const recurrenceType = params.recurrenceType ?? 'none';
+  const isTemplate = recurrenceType !== 'none' ? 1 : 0;
+
+  // Calculate next due date for recurring chores
+  let nextDueDate: Date | null = null;
+  if (isTemplate) {
+    const now = new Date();
+    if (recurrenceType === 'daily') {
+      nextDueDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Tomorrow
+    } else if (recurrenceType === 'weekly') {
+      // Use the first selected day of the week
+      const recurrenceDays = params.recurrenceDays ? JSON.parse(params.recurrenceDays) : ['monday'];
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const targetDays = recurrenceDays.map((day: string) => dayNames.indexOf(day.toLowerCase())).filter((day: number) => day >= 0);
+
+      if (targetDays.length > 0) {
+        const currentDay = now.getDay();
+        const nextDay = targetDays.find((day: number) => day > currentDay) ?? targetDays[0];
+        const daysToAdd = nextDay > currentDay ? nextDay - currentDay : 7 - currentDay + nextDay;
+        nextDueDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+      }
+    }
+  }
+
   const insertPayload: any = {
     familyId: params.familyId,
     name: params.name,
@@ -1246,22 +1324,17 @@ export const saveChore = async (params: {
     submittedAt: params.submittedAt ?? null,
     emotion: params.emotion ?? null,
     photoUrl: params.photoUrl ?? null,
-    // Temporarily exclude gamification columns until migration is fixed
-    // xpReward: 0,
-    // questChainId: null,
-    // isMainQuest: 0,
-    // chainOrder: null,
-    // recurrenceType: 'once',
-    // recurrenceDays: [],
-    // isTemplate: 0,
-    // templateId: null,
-    // nextDueDate: null,
+    // Recurrence fields
+    recurrenceType,
+    recurrenceDays: params.recurrenceDays ?? null,
+    isTemplate,
+    nextDueDate,
   };
 
   // Use raw SQL to avoid Drizzle schema issues with missing columns
   const result = await db.execute(sql`
-    INSERT INTO chores (family_id, name, points, status, submitted_by_child_id, submitted_at, emotion, photo_url, created_at)
-    VALUES (${params.familyId}, ${params.name}, ${params.points}, ${params.status ?? 'available'}, ${params.submittedBy ?? null}, ${params.submittedAt ?? null}, ${params.emotion ?? null}, ${params.photoUrl ?? null}, ${new Date()})
+    INSERT INTO chores (family_id, name, points, status, submitted_by_child_id, submitted_at, emotion, photo_url, created_at, recurrence_type, recurrence_days, is_template, next_due_date)
+    VALUES (${params.familyId}, ${params.name}, ${params.points}, ${params.status ?? 'available'}, ${params.submittedBy ?? null}, ${params.submittedAt ?? null}, ${params.emotion ?? null}, ${params.photoUrl ?? null}, ${new Date()}, ${recurrenceType}, ${params.recurrenceDays ?? null}, ${isTemplate}, ${nextDueDate})
     RETURNING id
   `);
   const chore = { id: (result as any).rows[0].id };
@@ -1578,22 +1651,21 @@ export const approveChore = async (familyId: string, choreId: string) => {
   `);
 
   // Award points and XP
-  await updateChildPoints(chore.submitted_by_child_id, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, chore.id);
+  await updateChildPoints(chore.submitted_by_child_id, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, chore.id as string);
   // Note: XP reward is not available in current schema, so we skip it for now
   // await updateChildXp(chore.submittedByChildId, chore.xpReward || 0);
 };
 
 export const rejectChore = async (familyId: string, choreId: string) => {
-  await db
-    .update(chores)
-    .set({
-      status: 'available',
-      submittedByChildId: null,
-      submittedAt: null,
-      emotion: null,
-      photoUrl: null,
-    })
-    .where(and(eq(chores.id, choreId), eq(chores.familyId, familyId)));
+  await db.execute(sql`
+    UPDATE chores SET
+      status = 'available',
+      submitted_by_child_id = NULL,
+      submitted_at = NULL,
+      emotion = NULL,
+      photo_url = NULL
+    WHERE id = ${choreId} AND family_id = ${familyId}
+  `);
 };
 
 export const clearPendingReward = async (familyId: string, pendingRewardId: string) => {

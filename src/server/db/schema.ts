@@ -7,6 +7,7 @@ import {
   integer,
   pgEnum,
   primaryKey,
+  date,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -15,7 +16,12 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', ['inactive',
 export const billingIntervalEnum = pgEnum('billing_interval', ['monthly', 'yearly']);
 export const choreStatusEnum = pgEnum('chore_status', ['available', 'submitted', 'approved']);
 export const rewardTypeEnum = pgEnum('reward_type', ['privilege', 'experience', 'donation', 'money']);
+export const rewardCategoryEnum = pgEnum('reward_category', ['privileges', 'experience', 'financial']);
+export const redemptionStatusEnum = pgEnum('redemption_status', ['pending', 'approved', 'completed', 'cancelled']);
 export const publishStatusEnum = pgEnum('publish_status', ['draft', 'published']);
+export const rankingTypeEnum = pgEnum('ranking_type', ['family', 'friends', 'powerklusjes']);
+export const rankingTierEnum = pgEnum('ranking_tier', ['diamond', 'gold', 'silver', 'bronze']);
+export const rankingCategoryEnum = pgEnum('ranking_category', ['xp', 'chores', 'powerpoints', 'streak', 'pet_care']);
 
 export const families = pgTable('families', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -115,6 +121,55 @@ export const rewards = pgTable('rewards', {
   points: integer('points').notNull().default(0),
   type: rewardTypeEnum('type').notNull().default('privilege'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// New Rewards Catalog System
+export const rewardTemplates = pgTable('reward_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  category: rewardCategoryEnum('category').notNull(),
+  defaultPoints: integer('default_points').notNull(),
+  minAge: integer('min_age').notNull().default(4),
+  emoji: varchar('emoji', { length: 10 }),
+  isActive: integer('is_active').notNull().default(1), // 1 = active, 0 = inactive
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const familyRewards = pgTable('family_rewards', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  templateId: uuid('template_id').references(() => rewardTemplates.id, { onDelete: 'set null' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  category: rewardCategoryEnum('category').notNull(),
+  points: integer('points').notNull(),
+  minAge: integer('min_age').notNull().default(4),
+  emoji: varchar('emoji', { length: 10 }),
+  estimatedCost: integer('estimated_cost'), // in cents
+  isActive: integer('is_active').notNull().default(1), // 1 = active, 0 = inactive
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const rewardRedemptions = pgTable('reward_redemptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  rewardId: uuid('reward_id')
+    .notNull()
+    .references(() => familyRewards.id, { onDelete: 'cascade' }),
+  pointsSpent: integer('points_spent').notNull(),
+  status: redemptionStatusEnum('status').notNull().default('pending'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
 });
 
 export const rewardAssignments = pgTable(
@@ -284,6 +339,14 @@ export type Reward = typeof rewards.$inferSelect;
 export type NewReward = typeof rewards.$inferInsert;
 export type PendingReward = typeof pendingRewards.$inferSelect;
 export type NewPendingReward = typeof pendingRewards.$inferInsert;
+
+// New Rewards Catalog Types
+export type RewardTemplate = typeof rewardTemplates.$inferSelect;
+export type NewRewardTemplate = typeof rewardTemplates.$inferInsert;
+export type FamilyReward = typeof familyRewards.$inferSelect;
+export type NewFamilyReward = typeof familyRewards.$inferInsert;
+export type RewardRedemption = typeof rewardRedemptions.$inferSelect;
+export type NewRewardRedemption = typeof rewardRedemptions.$inferInsert;
 export type GoodCause = typeof goodCauses.$inferSelect;
 export type NewGoodCause = typeof goodCauses.$inferInsert;
 export type BlogPost = typeof blogPosts.$inferSelect;
@@ -373,6 +436,38 @@ export const rewardsRelations = relations(rewards, ({ one, many }) => ({
   }),
   assignments: many(rewardAssignments),
   pendingRewards: many(pendingRewards),
+}));
+
+// New Rewards Catalog Relations
+export const rewardTemplatesRelations = relations(rewardTemplates, ({ many }) => ({
+  familyRewards: many(familyRewards),
+}));
+
+export const familyRewardsRelations = relations(familyRewards, ({ one, many }) => ({
+  family: one(families, {
+    fields: [familyRewards.familyId],
+    references: [families.id],
+  }),
+  template: one(rewardTemplates, {
+    fields: [familyRewards.templateId],
+    references: [rewardTemplates.id],
+  }),
+  redemptions: many(rewardRedemptions),
+}));
+
+export const rewardRedemptionsRelations = relations(rewardRedemptions, ({ one }) => ({
+  family: one(families, {
+    fields: [rewardRedemptions.familyId],
+    references: [families.id],
+  }),
+  child: one(children, {
+    fields: [rewardRedemptions.childId],
+    references: [children.id],
+  }),
+  reward: one(familyRewards, {
+    fields: [rewardRedemptions.rewardId],
+    references: [familyRewards.id],
+  }),
 }));
 
 export const pendingRewardsRelations = relations(pendingRewards, ({ one }) => ({
@@ -724,3 +819,505 @@ export const pointsTransactionsRelations = relations(pointsTransactions, ({ one 
     references: [rewards.id],
   }),
 }));
+
+// New Gamification Tables
+export const petSpeciesEnum = pgEnum('pet_species', ['dragon', 'unicorn', 'phoenix', 'wolf', 'cat']);
+export const petEmotionEnum = pgEnum('pet_emotion', ['happy', 'sleepy', 'proud', 'bored', 'hungry', 'excited']);
+export const achievementCategoryEnum = pgEnum('achievement_category', ['quests', 'social', 'collection', 'pet', 'special']);
+export const stickerRarityEnum = pgEnum('sticker_rarity', ['common', 'rare', 'epic', 'legendary']);
+
+export const virtualPets = pgTable('virtual_pets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 50 }).notNull(),
+  species: petSpeciesEnum('species').notNull(),
+  level: integer('level').notNull().default(1),
+  xp: integer('xp').notNull().default(0),
+  xpToNextLevel: integer('xp_to_next_level').notNull().default(100),
+  hunger: integer('hunger').notNull().default(100),
+  happiness: integer('happiness').notNull().default(100),
+  emotion: petEmotionEnum('emotion').notNull().default('happy'),
+  evolutionStage: integer('evolution_stage').notNull().default(1),
+  lastFed: timestamp('last_fed', { withTimezone: true }),
+  lastInteraction: timestamp('last_interaction', { withTimezone: true }).defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const petEvolutionStages = pgTable('pet_evolution_stages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  species: petSpeciesEnum('species').notNull(),
+  stage: integer('stage').notNull(),
+  levelRequirement: integer('level_requirement').notNull(),
+  spriteUrl: varchar('sprite_url', { length: 255 }),
+  unlockedItems: text('unlocked_items').array(),
+  specialAbilities: text('special_abilities').array(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const stickerCollections = pgTable('sticker_collections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  stickerId: varchar('sticker_id', { length: 50 }).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  rarity: stickerRarityEnum('rarity').notNull().default('common'),
+  category: varchar('category', { length: 50 }).notNull(),
+  imageUrl: varchar('image_url', { length: 255 }),
+  isGlitter: integer('is_glitter').notNull().default(0),
+  unlockedAt: timestamp('unlocked_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const achievements = pgTable('achievements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  achievementId: varchar('achievement_id', { length: 50 }).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  description: text('description'),
+  category: achievementCategoryEnum('category').notNull(),
+  icon: varchar('icon', { length: 50 }),
+  xpReward: integer('xp_reward').notNull().default(0),
+  unlockedAt: timestamp('unlocked_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const familyLeaderboards = pgTable('family_leaderboards', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  weekStart: date('week_start').notNull(),
+  weekEnd: date('week_end').notNull(),
+  category: varchar('category', { length: 50 }).notNull(),
+  rankings: text('rankings').notNull(), // JSON string
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const dailySpins = pgTable('daily_spins', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  lastSpinDate: date('last_spin_date').notNull(),
+  spinsAvailable: integer('spins_available').notNull().default(1),
+  totalSpins: integer('total_spins').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const familyFeed = pgTable('family_feed', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id').references(() => children.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 50 }).notNull(),
+  message: text('message').notNull(),
+  data: text('data'), // JSON string
+  reactions: text('reactions').default('[]'), // JSON array
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Gamification Types
+export type VirtualPet = typeof virtualPets.$inferSelect;
+export type NewVirtualPet = typeof virtualPets.$inferInsert;
+export type PetEvolutionStage = typeof petEvolutionStages.$inferSelect;
+export type NewPetEvolutionStage = typeof petEvolutionStages.$inferInsert;
+export type StickerCollection = typeof stickerCollections.$inferSelect;
+export type NewStickerCollection = typeof stickerCollections.$inferInsert;
+export type Achievement = typeof achievements.$inferSelect;
+export type NewAchievement = typeof achievements.$inferInsert;
+export type FamilyLeaderboard = typeof familyLeaderboards.$inferSelect;
+export type NewFamilyLeaderboard = typeof familyLeaderboards.$inferInsert;
+export type DailySpin = typeof dailySpins.$inferSelect;
+export type NewDailySpin = typeof dailySpins.$inferInsert;
+export type FamilyFeedItem = typeof familyFeed.$inferSelect;
+export type NewFamilyFeedItem = typeof familyFeed.$inferInsert;
+
+// Ranking System Types
+export type RankSnapshot = typeof rankSnapshots.$inferSelect;
+export type NewRankSnapshot = typeof rankSnapshots.$inferInsert;
+export type FriendConnection = typeof friendConnections.$inferSelect;
+export type NewFriendConnection = typeof friendConnections.$inferInsert;
+export type RankingSetting = typeof rankingSettings.$inferSelect;
+export type NewRankingSetting = typeof rankingSettings.$inferInsert;
+export type WeeklyChampion = typeof weeklyChampions.$inferSelect;
+export type NewWeeklyChampion = typeof weeklyChampions.$inferInsert;
+
+// ===== RANKING SYSTEM TABLES =====
+
+export const rankSnapshots = pgTable('rank_snapshots', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  rankingType: rankingTypeEnum('ranking_type').notNull(),
+  category: rankingCategoryEnum('ranking_category').notNull(),
+  weekStart: date('week_start').notNull(),
+  weekEnd: date('week_end').notNull(),
+  score: integer('score').notNull().default(0),
+  rank: integer('rank'),
+  tier: rankingTierEnum('tier'),
+  title: varchar('title', { length: 100 }),
+  isWeeklyChampion: integer('is_weekly_champion').notNull().default(0), // 1 = true, 0 = false
+  streakDays: integer('streak_days').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const friendConnections = pgTable('friend_connections', {
+  id: uuid('id').defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  friendChildId: uuid('friend_child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  friendCode: varchar('friend_code', { length: 16 }).notNull().unique(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, accepted, blocked
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+}, (table) => ({
+  uniqueFriendship: primaryKey({ columns: [table.childId, table.friendChildId] }),
+}));
+
+export const rankingSettings = pgTable('ranking_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  rankingsEnabled: integer('rankings_enabled').notNull().default(1), // 1 = enabled, 0 = disabled
+  familyRankingEnabled: integer('family_ranking_enabled').notNull().default(1),
+  friendsRankingEnabled: integer('friends_ranking_enabled').notNull().default(0),
+  powerRankingEnabled: integer('power_ranking_enabled').notNull().default(1),
+  showPositions: integer('show_positions').notNull().default(1), // 1 = show ranks, 0 = show percentages only
+  showNegativeChanges: integer('show_negative_changes').notNull().default(0), // 1 = show drops, 0 = hide drops
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const weeklyChampions = pgTable('weekly_champions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  rankingType: rankingTypeEnum('ranking_type').notNull(),
+  category: rankingCategoryEnum('ranking_category').notNull(),
+  weekStart: date('week_start').notNull(),
+  weekEnd: date('week_end').notNull(),
+  score: integer('score').notNull(),
+  rewards: text('rewards'), // JSON string of rewards given
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ===== POWERKLUSJES (External Chore Requests) TABLES =====
+
+// Trusted Contacts (external people who can offer chores)
+export const trustedContacts = pgTable('trusted_contacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  parentFamilyId: uuid('parent_family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }),
+  phone: varchar('phone', { length: 20 }),
+  avatarUrl: text('avatar_url'),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, verified, blocked
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Trusted Contact Verifications (for security tracking)
+export const trustedContactVerifications = pgTable('trusted_contact_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  contactId: uuid('contact_id')
+    .notNull()
+    .references(() => trustedContacts.id, { onDelete: 'cascade' }),
+  verificationCode: varchar('verification_code', { length: 10 }).notNull(),
+  verificationMethod: varchar('verification_method', { length: 20 }).notNull(), // email, sms, manual
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// External Chore Requests (offers from trusted contacts)
+export const externalChoreRequests = pgTable('external_chore_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id').references(() => trustedContacts.id, { onDelete: 'set null' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  offeredAmountCents: integer('offered_amount_cents').notNull(), // in euro cents
+  currency: varchar('currency', { length: 3 }).notNull().default('EUR'),
+  paymentMode: varchar('payment_mode', { length: 20 }).notNull().default('manual'), // manual, in_app
+  status: varchar('status', { length: 30 }).notNull().default('awaiting_parent'), // awaiting_parent, approved, rejected, in_progress, completed
+  createdBy: varchar('created_by', { length: 20 }).notNull(), // 'contact' or 'child'
+  evidenceUrl: text('evidence_url'), // photo/video proof
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Parent Approvals (audit trail for parent decisions)
+export const parentApprovals = pgTable('parent_approvals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  externalChoreId: uuid('external_chore_id')
+    .notNull()
+    .references(() => externalChoreRequests.id, { onDelete: 'cascade' }),
+  parentFamilyId: uuid('parent_family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  decision: varchar('decision', { length: 20 }).notNull(), // approved, rejected, modified
+  originalAmountCents: integer('original_amount_cents'),
+  approvedAmountCents: integer('approved_amount_cents'),
+  notes: text('notes'),
+  approvedAt: timestamp('approved_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Wallets (for in-app payments - premium feature)
+export const wallets = pgTable('wallets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  balanceCents: integer('balance_cents').notNull().default(0),
+  currency: varchar('currency', { length: 3 }).notNull().default('EUR'),
+  isActive: integer('is_active').notNull().default(1), // 1 = active, 0 = suspended
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Wallet Transactions (complete audit trail)
+export const walletTransactions = pgTable('wallet_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  walletId: uuid('wallet_id')
+    .notNull()
+    .references(() => wallets.id, { onDelete: 'cascade' }),
+  externalChoreId: uuid('external_chore_id').references(() => externalChoreRequests.id, { onDelete: 'set null' }),
+  amountCents: integer('amount_cents').notNull(), // positive for credit, negative for debit
+  type: varchar('type', { length: 20 }).notNull(), // credit, debit, hold, release, withdrawal
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // pending, completed, failed, cancelled
+  description: varchar('description', { length: 255 }),
+  metadata: text('metadata'), // JSON string for additional data
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ===== POWERKLUSJES TYPES =====
+export type TrustedContact = typeof trustedContacts.$inferSelect;
+export type NewTrustedContact = typeof trustedContacts.$inferInsert;
+export type ExternalChoreRequest = typeof externalChoreRequests.$inferSelect;
+export type NewExternalChoreRequest = typeof externalChoreRequests.$inferInsert;
+export type ParentApproval = typeof parentApprovals.$inferSelect;
+export type NewParentApproval = typeof parentApprovals.$inferInsert;
+export type Wallet = typeof wallets.$inferSelect;
+export type NewWallet = typeof wallets.$inferInsert;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+export type NewWalletTransaction = typeof walletTransactions.$inferInsert;
+export type TrustedContactVerification = typeof trustedContactVerifications.$inferSelect;
+export type NewTrustedContactVerification = typeof trustedContactVerifications.$inferInsert;
+
+// Relations for gamification tables
+export const virtualPetsRelations = relations(virtualPets, ({ one }) => ({
+  child: one(children, {
+    fields: [virtualPets.childId],
+    references: [children.id],
+  }),
+  family: one(families, {
+    fields: [virtualPets.familyId],
+    references: [families.id],
+  }),
+}));
+
+export const petEvolutionStagesRelations = relations(petEvolutionStages, ({}) => ({}));
+
+export const stickerCollectionsRelations = relations(stickerCollections, ({ one }) => ({
+  child: one(children, {
+    fields: [stickerCollections.childId],
+    references: [children.id],
+  }),
+  family: one(families, {
+    fields: [stickerCollections.familyId],
+    references: [families.id],
+  }),
+}));
+
+export const achievementsRelations = relations(achievements, ({ one }) => ({
+  child: one(children, {
+    fields: [achievements.childId],
+    references: [children.id],
+  }),
+  family: one(families, {
+    fields: [achievements.familyId],
+    references: [families.id],
+  }),
+}));
+
+export const familyLeaderboardsRelations = relations(familyLeaderboards, ({ one }) => ({
+  family: one(families, {
+    fields: [familyLeaderboards.familyId],
+    references: [families.id],
+  }),
+}));
+
+export const dailySpinsRelations = relations(dailySpins, ({ one }) => ({
+  child: one(children, {
+    fields: [dailySpins.childId],
+    references: [children.id],
+  }),
+  family: one(families, {
+    fields: [dailySpins.familyId],
+    references: [families.id],
+  }),
+}));
+
+export const familyFeedRelations = relations(familyFeed, ({ one }) => ({
+  family: one(families, {
+    fields: [familyFeed.familyId],
+    references: [families.id],
+  }),
+  child: one(children, {
+    fields: [familyFeed.childId],
+    references: [children.id],
+  }),
+}));
+
+// Ranking System Relations
+export const rankSnapshotsRelations = relations(rankSnapshots, ({ one }) => ({
+  family: one(families, {
+    fields: [rankSnapshots.familyId],
+    references: [families.id],
+  }),
+  child: one(children, {
+    fields: [rankSnapshots.childId],
+    references: [children.id],
+  }),
+}));
+
+export const friendConnectionsRelations = relations(friendConnections, ({ one }) => ({
+  child: one(children, {
+    fields: [friendConnections.childId],
+    references: [children.id],
+    relationName: 'friendships',
+  }),
+  friendChild: one(children, {
+    fields: [friendConnections.friendChildId],
+    references: [children.id],
+    relationName: 'friendOf',
+  }),
+}));
+
+export const rankingSettingsRelations = relations(rankingSettings, ({ one }) => ({
+  family: one(families, {
+    fields: [rankingSettings.familyId],
+    references: [families.id],
+  }),
+}));
+
+export const weeklyChampionsRelations = relations(weeklyChampions, ({ one }) => ({
+  family: one(families, {
+    fields: [weeklyChampions.familyId],
+    references: [families.id],
+  }),
+  child: one(children, {
+    fields: [weeklyChampions.childId],
+    references: [children.id],
+  }),
+}));
+
+// ===== POWERKLUSJES RELATIONS =====
+
+export const trustedContactsRelations = relations(trustedContacts, ({ one, many }) => ({
+  parentFamily: one(families, {
+    fields: [trustedContacts.parentFamilyId],
+    references: [families.id],
+  }),
+  externalChoreRequests: many(externalChoreRequests),
+  verifications: many(trustedContactVerifications),
+}));
+
+export const trustedContactVerificationsRelations = relations(trustedContactVerifications, ({ one }) => ({
+  contact: one(trustedContacts, {
+    fields: [trustedContactVerifications.contactId],
+    references: [trustedContacts.id],
+  }),
+}));
+
+export const externalChoreRequestsRelations = relations(externalChoreRequests, ({ one, many }) => ({
+  child: one(children, {
+    fields: [externalChoreRequests.childId],
+    references: [children.id],
+  }),
+  family: one(families, {
+    fields: [externalChoreRequests.familyId],
+    references: [families.id],
+  }),
+  contact: one(trustedContacts, {
+    fields: [externalChoreRequests.contactId],
+    references: [trustedContacts.id],
+  }),
+  approvals: many(parentApprovals),
+  walletTransactions: many(walletTransactions),
+}));
+
+export const parentApprovalsRelations = relations(parentApprovals, ({ one }) => ({
+  externalChore: one(externalChoreRequests, {
+    fields: [parentApprovals.externalChoreId],
+    references: [externalChoreRequests.id],
+  }),
+  parentFamily: one(families, {
+    fields: [parentApprovals.parentFamilyId],
+    references: [families.id],
+  }),
+}));
+
+export const walletsRelations = relations(wallets, ({ one, many }) => ({
+  family: one(families, {
+    fields: [wallets.familyId],
+    references: [families.id],
+  }),
+  transactions: many(walletTransactions),
+}));
+
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(wallets, {
+    fields: [walletTransactions.walletId],
+    references: [wallets.id],
+  }),
+  externalChore: one(externalChoreRequests, {
+    fields: [walletTransactions.externalChoreId],
+    references: [externalChoreRequests.id],
+  }),
+}));
+
+

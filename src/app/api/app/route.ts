@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sql, eq, and } from 'drizzle-orm';
 import { db } from '@/server/db/client';
-import { children, avatarItems, avatarCustomizations } from '@/server/db/schema';
+import { children, avatarItems, avatarCustomizations, rewardTemplates } from '@/server/db/schema';
 
 import {
   authenticateFamily,
@@ -64,6 +64,7 @@ import {
 import { createSession, clearSession, getSession, requireSession } from '@/server/auth/session';
 import { checkAuthRateLimit, checkApiRateLimit } from '@/lib/rate-limit';
 import { securityMiddleware, sanitizeInput } from '@/lib/security-middleware';
+import type { ChoreStatus } from '@/lib/types';
 
 const actionSchema = z.object({
   action: z.string(),
@@ -680,7 +681,7 @@ export async function POST(request: Request) {
       }
       case 'updateChore': {
         const session = await requireSession();
-        const data: z.infer<typeof updateChoreSchema> = updateChoreSchema.parse(payload);
+        const data = updateChoreSchema.parse(payload);
         const existing = await getChoreById(session.familyId, data.choreId);
         if (!existing) {
           return errorResponse('Klusje niet gevonden.', 404);
@@ -688,14 +689,14 @@ export async function POST(request: Request) {
         await saveChore({
           familyId: session.familyId,
           choreId: data.choreId,
-          name: data.name ?? existing.name,
-          points: data.points ?? existing.points,
-          assignedTo: data.assignedTo ?? existing.assignments.map((assignment) => assignment.childId),
-          status: data.status ?? existing.status,
-          submittedBy: data.submittedBy ?? existing.submittedByChildId,
+          name: (data.name as string) ?? existing.name,
+          points: (data.points as number) ?? existing.points,
+          assignedTo: (data.assignedTo as string[]) ?? existing.assignments.map((assignment) => assignment.childId),
+          status: (data.status as ChoreStatus) ?? existing.status,
+          submittedBy: (data.submittedBy as string | null) ?? existing.submittedByChildId,
           submittedAt: data.submittedBy ? new Date() : existing.submittedAt,
-          emotion: data.emotion ?? existing.emotion,
-          photoUrl: data.photoUrl ?? existing.photoUrl,
+          emotion: (data.emotion as string | null) ?? existing.emotion,
+          photoUrl: (data.photoUrl as string | null) ?? existing.photoUrl,
         });
         return respondWithFamily(session.familyId);
       }
@@ -1120,6 +1121,564 @@ export async function POST(request: Request) {
           console.error('Error creating points transactions table:', error);
           return NextResponse.json({ error: 'Failed to create table' }, { status: 500 });
         }
+      }
+      case 'createRewardsCatalogTables': {
+        try {
+          // Create enums (ignore if they already exist)
+          try {
+            await db.execute(sql`CREATE TYPE reward_category AS ENUM ('privileges', 'experience', 'financial')`);
+          } catch (error) {
+            // Type might already exist, continue
+          }
+
+          try {
+            await db.execute(sql`CREATE TYPE redemption_status AS ENUM ('pending', 'approved', 'completed', 'cancelled')`);
+          } catch (error) {
+            // Type might already exist, continue
+          }
+
+          // Create reward templates table
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS reward_templates (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              name varchar(255) NOT NULL,
+              description text NOT NULL,
+              category reward_category NOT NULL,
+              default_points integer NOT NULL,
+              min_age integer NOT NULL DEFAULT 4,
+              emoji varchar(10),
+              is_active integer NOT NULL DEFAULT 1,
+              created_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Create family rewards table
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS family_rewards (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              template_id uuid REFERENCES reward_templates(id) ON DELETE SET NULL,
+              name varchar(255) NOT NULL,
+              description text NOT NULL,
+              category reward_category NOT NULL,
+              points integer NOT NULL,
+              min_age integer NOT NULL DEFAULT 4,
+              emoji varchar(10),
+              estimated_cost integer, -- in cents
+              is_active integer NOT NULL DEFAULT 1,
+              created_at timestamp with time zone DEFAULT now(),
+              updated_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Create reward redemptions table
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS reward_redemptions (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+              reward_id uuid NOT NULL REFERENCES family_rewards(id) ON DELETE CASCADE,
+              points_spent integer NOT NULL,
+              status redemption_status NOT NULL DEFAULT 'pending',
+              notes text,
+              created_at timestamp with time zone DEFAULT now(),
+              completed_at timestamp with time zone
+            );
+          `);
+
+          // Create indexes
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_family_rewards_family_id ON family_rewards(family_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_family_rewards_category ON family_rewards(category)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_family_rewards_active ON family_rewards(is_active)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_reward_redemptions_family_id ON reward_redemptions(family_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_reward_redemptions_child_id ON reward_redemptions(child_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_reward_redemptions_status ON reward_redemptions(status)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_reward_templates_category ON reward_templates(category)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_reward_templates_active ON reward_templates(is_active)`);
+
+          return NextResponse.json({ success: true, message: 'Rewards catalog tables created' });
+        } catch (error) {
+          console.error('Error creating rewards catalog tables:', error);
+          return NextResponse.json({ error: 'Failed to create tables' }, { status: 500 });
+        }
+      }
+      case 'seedRewardTemplates': {
+        try {
+          const rewardTemplatesData = [
+            // Privileges & Autonomie
+            {
+              name: 'Pizzadag Kiezer 🍕',
+              description: 'Kiest wat er op een bepaalde avond gegeten wordt (uit 3 ouder-goedgekeurde opties).',
+              category: 'privileges' as const,
+              defaultPoints: 5,
+              minAge: 6,
+              emoji: '🍕',
+            },
+            {
+              name: 'Uitzendtijd Manager',
+              description: 'Bepaalt de film of het TV-programma dat de familie samen kijkt.',
+              category: 'privileges' as const,
+              defaultPoints: 8,
+              minAge: 8,
+              emoji: '📺',
+            },
+            {
+              name: 'Slaaptijd Uisteller',
+              description: 'Mag 15 minuten later naar bed op een doordeweekse avond.',
+              category: 'privileges' as const,
+              defaultPoints: 10,
+              minAge: 8,
+              emoji: '🕐',
+            },
+            {
+              name: 'Geen Groenten Vrijstelling',
+              description: 'Krijgt vrijstelling van het eten van één soort groente bij één maaltijd.',
+              category: 'privileges' as const,
+              defaultPoints: 3,
+              minAge: 6,
+              emoji: '🥦',
+            },
+            {
+              name: '1-op-1 Tijd Kaart',
+              description: 'Een half uur ononderbroken speeltijd/leestijd met de ouder.',
+              category: 'privileges' as const,
+              defaultPoints: 12,
+              minAge: 4,
+              emoji: '👨‍👩‍👧',
+            },
+            {
+              name: 'Joker Klus Pas',
+              description: 'Mag één keer een toegewezen klusje overslaan of ruilen met een gezinslid.',
+              category: 'privileges' as const,
+              defaultPoints: 25,
+              minAge: 10,
+              emoji: '🃏',
+            },
+
+            // Tijd & Ervaring
+            {
+              name: 'Vriendjeslogeerpartij',
+              description: 'Een overnachting van een vriend(in) plannen in het weekend.',
+              category: 'experience' as const,
+              defaultPoints: 50,
+              minAge: 8,
+              emoji: '🏠',
+            },
+            {
+              name: 'Activiteit naar Keuze',
+              description: 'Een bezoek aan de bioscoop, binnenspeeltuin of zwembad.',
+              category: 'experience' as const,
+              defaultPoints: 40,
+              minAge: 6,
+              emoji: '🎢',
+            },
+            {
+              name: 'Gezins Date Night',
+              description: 'Kiest een gezinsuitje (bijvoorbeeld een picknick of fietstocht) die de ouders organiseren.',
+              category: 'experience' as const,
+              defaultPoints: 35,
+              minAge: 4,
+              emoji: '👨‍👩‍👧‍👦',
+            },
+            {
+              name: 'Bak- of Kooksessie',
+              description: 'Samen met een ouder een specifiek recept bakken of koken (met ingrediënten betaald door ouder).',
+              category: 'experience' as const,
+              defaultPoints: 15,
+              minAge: 6,
+              emoji: '👩‍🍳',
+            },
+            {
+              name: 'Mini-Kamer Herinrichting',
+              description: 'Krijgt hulp van een ouder om de slaapkamer op een kleine manier te veranderen (bijv. meubels verplaatsen, nieuwe poster).',
+              category: 'experience' as const,
+              defaultPoints: 30,
+              minAge: 10,
+              emoji: '🛋️',
+            },
+
+            // Fysiek & Financieel
+            {
+              name: 'Cash-out Zakgeld 💰',
+              description: 'Inwisselen van gespaarde punten voor een afgesproken geldbedrag.',
+              category: 'financial' as const,
+              defaultPoints: 100,
+              minAge: 10,
+              emoji: '💰',
+            },
+            {
+              name: 'Nieuw Speelgoed Fonds',
+              description: 'Een bijdrage in het spaarpotje voor een groot, specifiek item (bijv. videogame, fiets).',
+              category: 'financial' as const,
+              defaultPoints: 200,
+              minAge: 8,
+              emoji: '🎮',
+            },
+            {
+              name: 'Boek/Tijdschrift naar Keuze',
+              description: 'De aankoop van een nieuw boek of tijdschrift.',
+              category: 'financial' as const,
+              defaultPoints: 20,
+              minAge: 4,
+              emoji: '📚',
+            },
+            {
+              name: 'Goede Doelen Donatie 🌍',
+              description: 'De gespaarde punten doneren aan een vooraf geselecteerd goed doel (ouder matcht het bedrag).',
+              category: 'financial' as const,
+              defaultPoints: 50,
+              minAge: 8,
+              emoji: '🌍',
+            },
+            {
+              name: 'Kleine Verrassing',
+              description: 'Een kleinigheidje uit de winkel (tot €5) uitkiezen bij de volgende boodschappen.',
+              category: 'financial' as const,
+              defaultPoints: 15,
+              minAge: 4,
+              emoji: '🎁',
+            },
+          ];
+
+          // Clear existing templates
+          await db.delete(rewardTemplates);
+
+          // Insert new templates
+          await db.insert(rewardTemplates).values(rewardTemplatesData);
+
+          return NextResponse.json({ success: true, message: `Seeded ${rewardTemplatesData.length} reward templates` });
+        } catch (error) {
+          console.error('Error seeding reward templates:', error);
+          return NextResponse.json({ error: 'Failed to seed templates' }, { status: 500 });
+        }
+      }
+      case 'createGamificationTables': {
+        try {
+          // Create enums for gamification
+          try {
+            await db.execute(sql`CREATE TYPE pet_species AS ENUM ('dragon', 'unicorn', 'phoenix', 'wolf', 'cat')`);
+          } catch (error) {
+            // Type might already exist
+          }
+
+          try {
+            await db.execute(sql`CREATE TYPE pet_emotion AS ENUM ('happy', 'sleepy', 'proud', 'bored', 'hungry', 'excited')`);
+          } catch (error) {
+            // Type might already exist
+          }
+
+          try {
+            await db.execute(sql`CREATE TYPE achievement_category AS ENUM ('quests', 'social', 'collection', 'pet', 'special')`);
+          } catch (error) {
+            // Type might already exist
+          }
+
+          try {
+            await db.execute(sql`CREATE TYPE sticker_rarity AS ENUM ('common', 'rare', 'epic', 'legendary')`);
+          } catch (error) {
+            // Type might already exist
+          }
+
+          // Virtual Pets System
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS virtual_pets (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              name varchar(50) NOT NULL,
+              species pet_species NOT NULL,
+              level integer NOT NULL DEFAULT 1,
+              xp integer NOT NULL DEFAULT 0,
+              xp_to_next_level integer NOT NULL DEFAULT 100,
+              hunger integer NOT NULL DEFAULT 100 CHECK (hunger >= 0 AND hunger <= 100),
+              happiness integer NOT NULL DEFAULT 100 CHECK (happiness >= 0 AND happiness <= 100),
+              emotion pet_emotion NOT NULL DEFAULT 'happy',
+              evolution_stage integer NOT NULL DEFAULT 1,
+              last_fed timestamp with time zone,
+              last_interaction timestamp with time zone DEFAULT now(),
+              created_at timestamp with time zone DEFAULT now(),
+              updated_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Pet Evolution Stages
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS pet_evolution_stages (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              species pet_species NOT NULL,
+              stage integer NOT NULL,
+              level_requirement integer NOT NULL,
+              sprite_url varchar(255),
+              unlocked_items text[], -- JSON array of unlocked item IDs
+              special_abilities text[], -- JSON array of abilities
+              created_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Sticker Collection System
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS sticker_collections (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              sticker_id varchar(50) NOT NULL,
+              name varchar(100) NOT NULL,
+              rarity sticker_rarity NOT NULL DEFAULT 'common',
+              category varchar(50) NOT NULL,
+              image_url varchar(255),
+              is_glitter boolean NOT NULL DEFAULT false,
+              unlocked_at timestamp with time zone DEFAULT now(),
+              created_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Achievement System
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS achievements (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              achievement_id varchar(50) NOT NULL,
+              name varchar(100) NOT NULL,
+              description text,
+              category achievement_category NOT NULL,
+              icon varchar(50),
+              xp_reward integer NOT NULL DEFAULT 0,
+              unlocked_at timestamp with time zone DEFAULT now(),
+              created_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Family Leaderboard
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS family_leaderboards (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              week_start date NOT NULL,
+              week_end date NOT NULL,
+              category varchar(50) NOT NULL, -- 'koning_van_het_huis', 'superhelper', etc.
+              rankings jsonb NOT NULL, -- {childId: score} pairs
+              created_at timestamp with time zone DEFAULT now(),
+              updated_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Daily Spin System
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS daily_spins (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              child_id uuid NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              last_spin_date date NOT NULL,
+              spins_available integer NOT NULL DEFAULT 1,
+              total_spins integer NOT NULL DEFAULT 0,
+              created_at timestamp with time zone DEFAULT now(),
+              updated_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Family Feed
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS family_feed (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              family_id uuid NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+              child_id uuid REFERENCES children(id) ON DELETE CASCADE,
+              type varchar(50) NOT NULL, -- 'quest_completed', 'level_up', 'badge_earned', etc.
+              message text NOT NULL,
+              data jsonb, -- Additional data for the feed item
+              reactions jsonb DEFAULT '[]', -- Array of {childId, emoji} objects
+              created_at timestamp with time zone DEFAULT now()
+            );
+          `);
+
+          // Indexes for performance
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_virtual_pets_child_id ON virtual_pets(child_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_sticker_collections_child_id ON sticker_collections(child_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_achievements_child_id ON achievements(child_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_family_feed_family_id ON family_feed(family_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_family_feed_created_at ON family_feed(created_at DESC)`);
+
+          return NextResponse.json({ success: true, message: 'Gamification tables created successfully' });
+        } catch (error) {
+          console.error('Error creating gamification tables:', error);
+          return NextResponse.json({ error: 'Failed to create gamification tables' }, { status: 500 });
+        }
+      }
+      case 'createTeamChore': {
+        const session = await requireSession();
+        const data = z.object({
+          name: z.string().min(1),
+          description: z.string().min(1),
+          totalPoints: z.number().int().positive(),
+          participatingChildren: z.array(z.string()).min(1),
+        }).parse(payload);
+
+        // Verify all participating children belong to the family
+        const family = await loadFamilyWithRelations(session.familyId);
+        if (!family) {
+          return errorResponse('Gezin niet gevonden.', 404);
+        }
+
+        const familyChildIds = family.children.map(child => child.id);
+        const invalidChildren = data.participatingChildren.filter(childId => !familyChildIds.includes(childId));
+
+        if (invalidChildren.length > 0) {
+          return errorResponse('Sommige kinderen behoren niet tot dit gezin.', 400);
+        }
+
+        // Create the team chore
+        const [teamChore] = await db
+          .insert(teamChores)
+          .values({
+            familyId: session.familyId,
+            name: data.name,
+            description: data.description,
+            totalPoints: data.totalPoints,
+            participatingChildren: data.participatingChildren,
+          })
+          .returning();
+
+        return respondWithFamily(session.familyId);
+      }
+      case 'updateTeamChore': {
+        const session = await requireSession();
+        const data = z.object({
+          teamChoreId: z.string(),
+          name: z.string().min(1),
+          description: z.string().min(1),
+          totalPoints: z.number().int().positive(),
+          participatingChildren: z.array(z.string()).min(1),
+        }).parse(payload);
+
+        // Verify the team chore belongs to the family
+        const [existing] = await db
+          .select()
+          .from(teamChores)
+          .where(and(
+            eq(teamChores.id, data.teamChoreId),
+            eq(teamChores.familyId, session.familyId)
+          ))
+          .limit(1);
+
+        if (!existing) {
+          return errorResponse('Team klusje niet gevonden.', 404);
+        }
+
+        // Verify all participating children belong to the family
+        const family = await loadFamilyWithRelations(session.familyId);
+        if (!family) {
+          return errorResponse('Gezin niet gevonden.', 404);
+        }
+
+        const familyChildIds = family.children.map(child => child.id);
+        const invalidChildren = data.participatingChildren.filter(childId => !familyChildIds.includes(childId));
+
+        if (invalidChildren.length > 0) {
+          return errorResponse('Sommige kinderen behoren niet tot dit gezin.', 400);
+        }
+
+        // Update the team chore
+        await db
+          .update(teamChores)
+          .set({
+            name: data.name,
+            description: data.description,
+            totalPoints: data.totalPoints,
+            participatingChildren: data.participatingChildren,
+          })
+          .where(eq(teamChores.id, data.teamChoreId));
+
+        return respondWithFamily(session.familyId);
+      }
+      case 'deleteTeamChore': {
+        const session = await requireSession();
+        const data = z.object({ teamChoreId: z.string() }).parse(payload);
+
+        // Verify the team chore belongs to the family
+        const [existing] = await db
+          .select()
+          .from(teamChores)
+          .where(and(
+            eq(teamChores.id, data.teamChoreId),
+            eq(teamChores.familyId, session.familyId)
+          ))
+          .limit(1);
+
+        if (!existing) {
+          return errorResponse('Team klusje niet gevonden.', 404);
+        }
+
+        // Delete the team chore
+        await db.delete(teamChores).where(eq(teamChores.id, data.teamChoreId));
+
+        return respondWithFamily(session.familyId);
+      }
+      case 'completeTeamChore': {
+        const session = await requireSession();
+        const data = z.object({ teamChoreId: z.string() }).parse(payload);
+
+        // Verify the team chore belongs to the family and is not completed
+        const [existing] = await db
+          .select()
+          .from(teamChores)
+          .where(and(
+            eq(teamChores.id, data.teamChoreId),
+            eq(teamChores.familyId, session.familyId),
+            isNull(teamChores.completedAt)
+          ))
+          .limit(1);
+
+        if (!existing) {
+          return errorResponse('Team klusje niet gevonden of al voltooid.', 404);
+        }
+
+        // Calculate points per child
+        const pointsPerChild = Math.floor(existing.totalPoints / existing.participatingChildren.length);
+
+        // Award points to each participating child
+        for (const childId of existing.participatingChildren) {
+          await updateChildPoints(childId, pointsPerChild, `Team klusje "${existing.name}" voltooid`);
+        }
+
+        // Mark team chore as completed
+        await db
+          .update(teamChores)
+          .set({
+            progress: 100,
+            completedAt: new Date(),
+          })
+          .where(eq(teamChores.id, data.teamChoreId));
+
+        return respondWithFamily(session.familyId);
+      }
+      case 'updateTeamChoreProgress': {
+        const session = await requireSession();
+        const data = z.object({
+          teamChoreId: z.string(),
+          progress: z.number().int().min(0).max(100),
+        }).parse(payload);
+
+        // Verify the team chore belongs to the family
+        const [existing] = await db
+          .select()
+          .from(teamChores)
+          .where(and(
+            eq(teamChores.id, data.teamChoreId),
+            eq(teamChores.familyId, session.familyId)
+          ))
+          .limit(1);
+
+        if (!existing) {
+          return errorResponse('Team klusje niet gevonden.', 404);
+        }
+
+        // Update progress
+        await db
+          .update(teamChores)
+          .set({ progress: data.progress })
+          .where(eq(teamChores.id, data.teamChoreId));
+
+        return respondWithFamily(session.familyId);
       }
       case 'unlockAvatarItem': {
         const session = await requireSession();
