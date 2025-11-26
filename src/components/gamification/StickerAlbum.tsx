@@ -81,6 +81,8 @@ export default function StickerAlbum({ childId, className }: StickerAlbumProps) 
       if (response.ok) {
         const data = await response.json();
         setStickers(data.stickers || []);
+      } else {
+        console.error('Failed to load stickers:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error loading stickers:', error);
@@ -134,6 +136,7 @@ export default function StickerAlbum({ childId, className }: StickerAlbumProps) 
 
       } else {
         const error = await response.json();
+        console.error('Failed to open pack:', error);
         alert(error.error || 'Er ging iets mis bij het openen van het pakket.');
       }
     } catch (error) {
