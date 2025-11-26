@@ -29,6 +29,7 @@ export function SavingsPot({
       return () => clearTimeout(timer);
     } else {
       setFillHeight(percentage);
+      return undefined;
     }
   }, [percentage, animated]);
 

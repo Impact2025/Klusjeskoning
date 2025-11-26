@@ -44,6 +44,7 @@ export function Confetti({
 
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [trigger, isActive, particleCount, spread, origin, duration]);
 
   return null; // This component doesn't render anything visible

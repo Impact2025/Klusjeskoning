@@ -80,6 +80,7 @@ export default function ChampionCelebration({
 
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
