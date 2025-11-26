@@ -16,7 +16,7 @@ import BlogPostModal from '../models/BlogPostModal';
 import ReviewModal from '../models/ReviewModal';
 import BlogGeneratorModal from '../models/BlogGeneratorModal';
 
-const StatCard = ({ title, value, icon }) => (
+const StatCard = ({ title, value, icon }: { title: string; value: number; icon: React.ReactNode }) => (
     <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -103,7 +103,7 @@ export default function AdminDashboard() {
   const activeCause = goodCauses?.find(c => c.startDate <= now && c.endDate >= now);
   const upcomingCauses = goodCauses?.filter(c => c.startDate > now);
 
-  const CauseItem = ({ cause, colorClass, onEdit }) => (
+  const CauseItem = ({ cause, colorClass, onEdit }: { cause: GoodCause; colorClass: string; onEdit: (cause: GoodCause) => void }) => (
     <div className={`p-3 bg-${colorClass}-50 border-l-4 border-${colorClass}-500 rounded flex justify-between items-start`}>
         <div>
             <p className="font-bold">{cause.name}</p>
