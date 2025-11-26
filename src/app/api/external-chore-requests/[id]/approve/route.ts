@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/server/db/client';
 import { externalChoreRequests, parentApprovals, wallets, walletTransactions } from '@/server/db/schema';
@@ -13,8 +13,8 @@ const approveSchema = z.object({
 });
 
 export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Security middleware check
   const securityCheck = await securityMiddleware(request, {
@@ -42,7 +42,8 @@ export async function POST(
 
   try {
     const session = await requireSession();
-    const requestId = params.id;
+    const resolvedParams = await params;
+    const requestId = resolvedParams.id;
     const body = await request.json();
     const data = approveSchema.parse(body);
 

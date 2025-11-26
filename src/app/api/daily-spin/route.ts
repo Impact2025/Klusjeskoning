@@ -30,12 +30,6 @@ export async function POST(request: NextRequest) {
     const todayUTC = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const todayString = todayUTC.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-    // Log timezone info for debugging (can be removed in production)
-    console.log('Daily spin initiated:', {
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      todayString,
-      childId
-    });
 
     // Check if child has spins available
     let dailySpinRecord = await db
@@ -273,13 +267,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('DAILY_SPIN_DEBUG: Daily spin error:', error);
-    const errorDetails = error instanceof Error ? {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    } : { error: String(error) };
-    console.error('DAILY_SPIN_DEBUG: Error details:', errorDetails);
+    console.error('Daily spin error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

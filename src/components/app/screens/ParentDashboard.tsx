@@ -43,7 +43,7 @@ import EditTeamChoreModal from '../models/EditTeamChoreModal';
 import ComplimentCards from '../../gamification/ComplimentCards';
 
 export default function ParentDashboard() {
-  const { family, logout, approveChore, deleteItem } = useApp();
+  const { family, logout, approveChore, deleteItem, user } = useApp();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<Chore[]>([]);
   const [emptySavings, setEmptySavings] = useState<Child[]>([]);
@@ -176,7 +176,8 @@ export default function ParentDashboard() {
     }
   };
 
-  if (!family) return null;
+  // Enhanced authentication check - ensure both family and user exist
+  if (!family || !user) return null;
 
   const totalPending = pendingApprovals.length + emptySavings.length;
 

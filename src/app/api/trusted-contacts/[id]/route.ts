@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/server/db/client';
 import { trustedContacts } from '@/server/db/schema';
@@ -16,8 +16,8 @@ const updateContactSchema = z.object({
 });
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Security middleware check
   const securityCheck = await securityMiddleware(request, {
@@ -45,7 +45,8 @@ export async function GET(
 
   try {
     const session = await requireSession();
-    const contactId = params.id;
+    const resolvedParams = await params;
+    const contactId = resolvedParams.id;
 
     // Get specific trusted contact for this family
     const [contact] = await db
@@ -70,8 +71,8 @@ export async function GET(
 }
 
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Security middleware check
   const securityCheck = await securityMiddleware(request, {
@@ -99,7 +100,8 @@ export async function PATCH(
 
   try {
     const session = await requireSession();
-    const contactId = params.id;
+    const resolvedParams = await params;
+    const contactId = resolvedParams.id;
     const body = await request.json();
     const data = updateContactSchema.parse(body);
 
@@ -176,8 +178,8 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Security middleware check
   const securityCheck = await securityMiddleware(request, {
@@ -205,7 +207,8 @@ export async function DELETE(
 
   try {
     const session = await requireSession();
-    const contactId = params.id;
+    const resolvedParams = await params;
+    const contactId = resolvedParams.id;
 
     // Check if contact exists and belongs to this family
     const [existingContact] = await db

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/server/db/client';
 import { children, families } from '@/server/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -6,8 +6,8 @@ import { checkApiRateLimit } from '@/lib/rate-limit';
 import { securityMiddleware } from '@/lib/security-middleware';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { childId: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ childId: string }> }
 ) {
   // Security middleware check - this is a public endpoint
   const securityCheck = await securityMiddleware(request, {
@@ -34,7 +34,8 @@ export async function GET(
   }
 
   try {
-    const childId = params.childId;
+    const resolvedParams = await params;
+    const childId = resolvedParams.childId;
 
     // Get child info - only basic public information
     const [child] = await db

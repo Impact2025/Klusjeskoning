@@ -275,6 +275,7 @@ export default function ChildDashboard() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [user, addCompliment]);
 
+  // Enhanced authentication check - ensure both user and family exist
   if (!user || !family) return null;
 
   // Memoize expensive calculations to prevent re-renders

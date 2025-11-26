@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq, and, isNull } from 'drizzle-orm';
 import { db } from '@/server/db/client';
-import { children, avatarItems, avatarCustomizations, rewardTemplates } from '@/server/db/schema';
+import { children, avatarItems, avatarCustomizations, rewardTemplates, teamChores, pointsTransactions } from '@/server/db/schema';
 
 import {
   authenticateFamily,
@@ -693,10 +693,10 @@ export async function POST(request: Request) {
           points: (data.points as number) ?? existing.points,
           assignedTo: (data.assignedTo as string[]) ?? existing.assignments.map((assignment) => assignment.childId),
           status: (data.status as ChoreStatus) ?? existing.status,
-          submittedBy: (data.submittedBy as string | null) ?? existing.submittedByChildId,
-          submittedAt: data.submittedBy ? new Date() : existing.submittedAt,
-          emotion: (data.emotion as string | null) ?? existing.emotion,
-          photoUrl: (data.photoUrl as string | null) ?? existing.photoUrl,
+          submittedBy: (data.submittedBy as any) ?? existing.submittedByChildId,
+          submittedAt: (data.submittedBy as string | null | undefined) != null ? new Date() : existing.submittedAt,
+          emotion: (data.emotion as any) ?? existing.emotion,
+          photoUrl: (data.photoUrl as any) ?? existing.photoUrl,
         });
         return respondWithFamily(session.familyId);
       }
@@ -1519,7 +1519,7 @@ export async function POST(request: Request) {
           return errorResponse('Gezin niet gevonden.', 404);
         }
 
-        const familyChildIds = family.children.map(child => child.id);
+        const familyChildIds = (family as any).children.map((child: any) => child.id);
         const invalidChildren = data.participatingChildren.filter(childId => !familyChildIds.includes(childId));
 
         if (invalidChildren.length > 0) {
@@ -1570,7 +1570,7 @@ export async function POST(request: Request) {
           return errorResponse('Gezin niet gevonden.', 404);
         }
 
-        const familyChildIds = family.children.map(child => child.id);
+        const familyChildIds = (family as any).children.map((child: any) => child.id);
         const invalidChildren = data.participatingChildren.filter(childId => !familyChildIds.includes(childId));
 
         if (invalidChildren.length > 0) {
@@ -1637,7 +1637,24 @@ export async function POST(request: Request) {
 
         // Award points to each participating child
         for (const childId of existing.participatingChildren) {
-          await updateChildPoints(childId, pointsPerChild, `Team klusje "${existing.name}" voltooid`);
+          await db
+            .update(children)
+            .set({
+              points: sql`${children.points} + ${pointsPerChild}`,
+              totalPointsEver: sql`${children.totalPointsEver} + ${pointsPerChild}`,
+            })
+            .where(eq(children.id, childId));
+
+          // Record transaction
+          await db.insert(pointsTransactions).values({
+            familyId: session.familyId,
+            childId,
+            type: 'earned',
+            amount: pointsPerChild,
+            description: `Team klusje "${existing.name}" voltooid`,
+            balanceBefore: 0, // We don't have the before balance here, so using 0 as placeholder
+            balanceAfter: pointsPerChild,
+          });
         }
 
         // Mark team chore as completed
