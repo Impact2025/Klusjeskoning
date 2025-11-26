@@ -694,7 +694,7 @@ export async function POST(request: Request) {
           assignedTo: (data.assignedTo as string[]) ?? existing.assignments.map((assignment) => assignment.childId),
           status: (data.status as ChoreStatus) ?? existing.status,
           submittedBy: (data.submittedBy as any) ?? existing.submittedByChildId,
-          submittedAt: (data.submittedBy as string | null | undefined) != null ? new Date() : existing.submittedAt,
+          submittedAt: (data.submittedBy as string | null | undefined) != null ? new Date() : (existing.submittedAt as any),
           emotion: (data.emotion as any) ?? existing.emotion,
           photoUrl: (data.photoUrl as any) ?? existing.photoUrl,
         });
