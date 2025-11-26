@@ -691,7 +691,7 @@ export async function POST(request: Request) {
           choreId: data.choreId,
           name: (data.name as string) ?? existing.name,
           points: (data.points as number) ?? existing.points,
-          assignedTo: (data.assignedTo as string[]) ?? existing.assignments.map((assignment) => assignment.childId),
+          assignedTo: (data.assignedTo as string[]) ?? (existing.assignments as any[]).map((assignment) => assignment.childId),
           status: (data.status as ChoreStatus) ?? existing.status,
           submittedBy: (data.submittedBy as any) ?? existing.submittedByChildId,
           submittedAt: (data.submittedBy as string | null | undefined) != null ? new Date() : (existing.submittedAt as any),
@@ -806,7 +806,7 @@ export async function POST(request: Request) {
           name: data.name ?? existing.name,
           points: data.points ?? existing.points,
           type: data.type ?? existing.type,
-          assignedTo: data.assignedTo ?? existing.assignments.map((assignment) => assignment.childId),
+          assignedTo: data.assignedTo ?? (existing.assignments as any[]).map((assignment) => assignment.childId),
         });
         return respondWithFamily(session.familyId);
       }

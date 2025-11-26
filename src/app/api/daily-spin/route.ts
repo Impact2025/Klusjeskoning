@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Apply the reward with improved transaction handling
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx: typeof db) => {
       try {
         // Decrement spins available
         const spinUpdateResult = await tx
