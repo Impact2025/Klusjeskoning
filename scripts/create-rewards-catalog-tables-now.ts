@@ -5,6 +5,11 @@ async function createRewardsCatalogTables() {
   try {
     console.log('Creating rewards catalog tables...');
 
+    if (!db) {
+      console.error('Database connection not available. Make sure DATABASE_URL is set.');
+      process.exit(1);
+    }
+
     // Create enums
     await db.execute(sql`
       CREATE TYPE IF NOT EXISTS reward_category AS ENUM ('privileges', 'experience', 'financial');

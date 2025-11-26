@@ -141,6 +141,11 @@ async function seedRewardTemplates() {
   try {
     console.log('🌱 Seeding reward templates...');
 
+    if (!db) {
+      console.error('Database connection not available. Make sure DATABASE_URL is set.');
+      process.exit(1);
+    }
+
     // Clear existing templates
     await db.delete(rewardTemplates);
 

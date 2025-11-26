@@ -5,6 +5,11 @@ async function createPointsTransactionsTable() {
   try {
     console.log('Creating points_transactions table...');
 
+    if (!db) {
+      console.error('Database connection not available. Make sure DATABASE_URL is set.');
+      process.exit(1);
+    }
+
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS points_transactions (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -5,6 +5,11 @@ async function createCouponTables() {
   try {
     console.log('Creating coupon tables...');
 
+    if (!db) {
+      console.error('Database connection not available. Make sure DATABASE_URL is set.');
+      process.exit(1);
+    }
+
     // Create discount_type enum if it doesn't exist
     await db.execute(sql`
       DO $$ BEGIN

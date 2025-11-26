@@ -4,6 +4,11 @@ import { db } from '../src/server/db/client';
 async function resetDatabase() {
   console.log('🗑️  Resetting database...');
 
+  if (!db) {
+    console.error('Database connection not available. Make sure DATABASE_URL is set.');
+    process.exit(1);
+  }
+
   try {
     // Drop all tables in reverse dependency order
     const dropTables = [

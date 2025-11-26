@@ -5,9 +5,16 @@ import { sql } from 'drizzle-orm';
 async function createVerificationCodesTable() {
   console.log('Creating verification_codes table...');
 
+  if (!db) {
+    console.error('Database connection not available. Make sure DATABASE_URL is set.');
+    process.exit(1);
+  }
+
+  const dbClient = db; // Type assertion after null check
+
   try {
     // Create the table
-    await db.execute(sql`
+    await dbClient.execute(sql`
       CREATE TABLE IF NOT EXISTS verification_codes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(255) NOT NULL,
@@ -20,15 +27,15 @@ async function createVerificationCodesTable() {
     `);
 
     // Create indexes for better performance
-    await db.execute(sql`
+    await dbClient.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_verification_codes_email ON verification_codes(email);
     `);
 
-    await db.execute(sql`
+    await dbClient.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_verification_codes_code ON verification_codes(code);
     `);
 
-    await db.execute(sql`
+    await dbClient.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_verification_codes_expires_at ON verification_codes(expires_at);
     `);
 

@@ -5,6 +5,11 @@ async function runSQL() {
   try {
     console.log('Adding child_id column to sessions table...');
 
+    if (!db) {
+      console.error('Database connection not available. Make sure DATABASE_URL is set.');
+      process.exit(1);
+    }
+
     await db.execute(sql`
       ALTER TABLE sessions ADD COLUMN IF NOT EXISTS child_id uuid REFERENCES children(id) ON DELETE CASCADE;
     `);

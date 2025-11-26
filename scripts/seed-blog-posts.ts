@@ -60,7 +60,12 @@ const sampleBlogPosts = [
 async function seedBlogPosts() {
   try {
     console.log('🌱 Seeding blog posts...');
-    
+
+    if (!db) {
+      console.error('Database connection not available. Make sure DATABASE_URL is set.');
+      process.exit(1);
+    }
+
     for (const post of sampleBlogPosts) {
       await db.insert(blogPosts).values({
         ...post,
