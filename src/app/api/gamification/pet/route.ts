@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
         childId,
         type: 'pet_interaction',
         message: feedMessage,
-        data: { action, petName: pet.name },
+        data: JSON.stringify({ action, petName: pet.name }),
       });
     }
 
