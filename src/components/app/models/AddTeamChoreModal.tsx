@@ -22,7 +22,7 @@ interface AddTeamChoreModalProps {
 }
 
 export default function AddTeamChoreModal({ isOpen, setIsOpen }: AddTeamChoreModalProps) {
-  const { family, handleAction } = useApp();
+  const { family } = useApp();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [totalPoints, setTotalPoints] = useState(0);
@@ -39,12 +39,15 @@ export default function AddTeamChoreModal({ isOpen, setIsOpen }: AddTeamChoreMod
 
     setIsSubmitting(true);
     try {
-      await handleAction('createTeamChore', {
+      // TODO: Implement team chore creation when handleAction is added to AppContext
+      console.log('Team chore creation not yet implemented:', {
         name: name.trim(),
         description: description.trim(),
         totalPoints,
         participatingChildren: selectedChildren,
       });
+
+      alert('Team klusje functionaliteit wordt binnenkort toegevoegd!');
 
       // Reset form
       setName('');

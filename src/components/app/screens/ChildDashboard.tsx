@@ -705,13 +705,16 @@ export default function ChildDashboard() {
             {isGoldenPet && <span className="ml-2 text-yellow-500 animate-pulse">👑 Kampioen!</span>}
           </DialogTitle>
           {virtualPet && (
-            <VirtualPet
-              pet={virtualPet}
-              onFeed={handlePetFeed}
-              onPlay={handlePetPlay}
-              onRename={handlePetRename}
-              isGolden={isGoldenPet}
-            />
+            <div className="p-6">
+              {/* TODO: Create VirtualPet component */}
+              <p className="text-center text-gray-600">
+                Virtual pet details voor {virtualPet.name} worden binnenkort toegevoegd!
+              </p>
+              <div className="mt-4 flex gap-2 justify-center">
+                <Button onClick={() => handlePetFeed()}>Voer {virtualPet.name}</Button>
+                <Button onClick={() => handlePetPlay()}>Speel met {virtualPet.name}</Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

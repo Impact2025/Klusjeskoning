@@ -8,7 +8,7 @@ type ChildSelectorProps = {
   children: Child[];
   selectedChildren: string[];
   setSelectedChildren: (ids: string[]) => void;
-  isEveryone,
+  isEveryone: boolean;
   setIsEveryone: (isEveryone: boolean) => void;
 };
 

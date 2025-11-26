@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
 import {
   CheckCircle,
   Clock,
@@ -146,7 +147,9 @@ export default function ParentDashboard() {
 
   const handleDeleteTeamChore = async (teamChoreId: string, teamChoreName: string) => {
     if (window.confirm(`Weet je zeker dat je "${teamChoreName}" wilt verwijderen? Alle voortgang gaat verloren.`)) {
-      await handleAction('deleteTeamChore', { teamChoreId });
+      // TODO: Implement team chore deletion when handleAction is added to AppContext
+      console.log('Team chore deletion not yet implemented:', teamChoreId);
+      alert('Team klusje verwijderen functionaliteit wordt binnenkort toegevoegd!');
     }
   };
 

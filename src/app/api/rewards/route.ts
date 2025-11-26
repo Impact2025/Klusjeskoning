@@ -3,7 +3,6 @@ import { db } from '@/server/db/client';
 import { rewardTemplates, familyRewards, rewardRedemptions } from '@/server/db/schema';
 import { eq, and, gte } from 'drizzle-orm';
 import { getSession } from '@/server/auth/session';
-import { getFamilyFromSession } from '@/lib/auth';
 
 // GET /api/rewards/templates - Get all reward templates
 export async function GET(request: NextRequest) {
@@ -17,17 +16,22 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const minAge = searchParams.get('minAge');
 
-    let query = db.select().from(rewardTemplates).where(eq(rewardTemplates.isActive, 1));
+    // Build where conditions
+    const conditions = [eq(rewardTemplates.isActive, 1)];
 
     if (category) {
-      query = query.where(eq(rewardTemplates.category, category as any));
+      conditions.push(eq(rewardTemplates.category, category as any));
     }
 
     if (minAge) {
-      query = query.where(gte(rewardTemplates.minAge, parseInt(minAge)));
+      conditions.push(gte(rewardTemplates.minAge, parseInt(minAge)));
     }
 
-    const templates = await query.orderBy(rewardTemplates.category, rewardTemplates.name);
+    const templates = await db
+      .select()
+      .from(rewardTemplates)
+      .where(and(...conditions))
+      .orderBy(rewardTemplates.category, rewardTemplates.name);
 
     return NextResponse.json({ templates });
   } catch (error) {

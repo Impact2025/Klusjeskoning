@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/server/auth/session';
 import { calculateRanking, getRankingSettings, updateWeeklyRankings, processWeeklyChampions, getWeeklyChampionStatus } from '@/lib/ranking-utils';
 import type { RankingType, RankingCategory } from '@/lib/ranking-utils';
+import { db } from '@/server/db/client';
+import { children } from '@/server/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -84,10 +87,10 @@ export async function POST(request: NextRequest) {
       // Check if child belongs to family
       const child = await db
         .select()
-        .from(require('@/server/db/schema').children)
+        .from(children)
         .where(and(
-          eq(require('@/server/db/schema').children.id, childId),
-          eq(require('@/server/db/schema').children.familyId, familyId)
+          eq(children.id, childId),
+          eq(children.familyId, familyId)
         ));
 
       if (!child.length) {
