@@ -89,7 +89,7 @@ export async function POST(
 
     } else if (choreRequest.paymentMode === 'in_app') {
       // For in-app payments, release held funds to child's points
-      await db.transaction(async (tx) => {
+      await db.transaction(async (tx: typeof db) => {
         // Find the hold transaction
         const [holdTx] = await tx
           .select()

@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     // In production, this would integrate with payment providers
     // For development/demo purposes, we'll simulate instant deposits
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: typeof db) => {
       // Update wallet balance
       await tx
         .update(wallets)

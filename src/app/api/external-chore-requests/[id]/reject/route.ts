@@ -67,7 +67,7 @@ export async function POST(
     }
 
     // Start transaction for rejection
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: typeof db) => {
       // Update request status
       await tx
         .update(externalChoreRequests)

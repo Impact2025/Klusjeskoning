@@ -70,7 +70,7 @@ export async function POST(
     const approvedAmount = data.approvedAmountCents ?? choreRequest.offeredAmountCents;
 
     // Start transaction for approval
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: typeof db) => {
       // Update request status
       await tx
         .update(externalChoreRequests)
