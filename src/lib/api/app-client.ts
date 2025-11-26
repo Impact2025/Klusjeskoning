@@ -124,7 +124,7 @@ export const mapFamily = (family: SerializableFamily): Family => ({
   city: family.city,
   email: family.email,
   createdAt: toTimestamp(family.createdAt) ?? Timestamp.now(),
-  recoveryEmail: family.recoveryEmail,
+  recoveryEmail: family.recoveryEmail ?? undefined,
   children: family.children.map(mapChild),
   chores: family.chores.map(mapChore),
   rewards: family.rewards.map(mapReward),
