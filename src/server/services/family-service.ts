@@ -1651,7 +1651,7 @@ export const approveChore = async (familyId: string, choreId: string) => {
   `);
 
   // Award points and XP
-  await updateChildPoints(chore.submitted_by_child_id, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, chore.id as string);
+  await updateChildPoints(chore.submitted_by_child_id as string, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, choreId);
   // Note: XP reward is not available in current schema, so we skip it for now
   // await updateChildXp(chore.submittedByChildId, chore.xpReward || 0);
 };

@@ -289,13 +289,15 @@ export class EmailQueue {
       const jobData = await redis.get(key) as string | null;
       if (jobData) {
         const job = JSON.parse(jobData) as EmailJob;
-        const processingTime = Date.now() - new Date(job.processingStartedAt).getTime();
+        if (job.processingStartedAt) {
+          const processingTime = Date.now() - new Date(job.processingStartedAt).getTime();
 
-        if (processingTime > QUEUE_CONFIG.PROCESSING_TIMEOUT) {
-          // Job has been processing too long, move back to pending
-          await redis.del(key);
-          await this.enqueue(job);
-          cleaned++;
+          if (processingTime > QUEUE_CONFIG.PROCESSING_TIMEOUT) {
+            // Job has been processing too long, move back to pending
+            await redis.del(key);
+            await this.enqueue(job);
+            cleaned++;
+          }
         }
       }
     }

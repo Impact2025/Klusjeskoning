@@ -12,23 +12,24 @@ const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_RE
   : null;
 
 // Rate limiters for different endpoints
-export const authRateLimit = new Ratelimit({
+// Note: If redis is null, rate limiting will be disabled in development
+export const authRateLimit = redis ? new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(5, '10 m'), // 5 requests per 10 minutes for auth
   analytics: true,
-});
+}) : null;
 
-export const apiRateLimit = new Ratelimit({
+export const apiRateLimit = redis ? new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(100, '1 h'), // 100 requests per hour for general API
   analytics: true,
-});
+}) : null;
 
-export const webhookRateLimit = new Ratelimit({
+export const webhookRateLimit = redis ? new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute for webhooks
   analytics: true,
-});
+}) : null;
 
 // Helper function to get client IP
 export function getClientIP(request: Request): string {
@@ -57,7 +58,7 @@ export async function checkAuthRateLimit(request: Request, identifier?: string):
   remaining?: number;
   reset?: Date;
 }> {
-  if (!redis) return { success: true }; // No rate limiting if Redis not configured
+  if (!redis || !authRateLimit) return { success: true }; // No rate limiting if Redis not configured
 
   try {
     const ip = identifier || getClientIP(request);
@@ -83,7 +84,7 @@ export async function checkApiRateLimit(request: Request, identifier?: string): 
   remaining?: number;
   reset?: Date;
 }> {
-  if (!redis) return { success: true }; // No rate limiting if Redis not configured
+  if (!redis || !apiRateLimit) return { success: true }; // No rate limiting if Redis not configured
 
   try {
     const ip = identifier || getClientIP(request);
@@ -109,7 +110,7 @@ export async function checkWebhookRateLimit(request: Request, identifier?: strin
   remaining?: number;
   reset?: Date;
 }> {
-  if (!redis) return { success: true }; // No rate limiting if Redis not configured
+  if (!redis || !webhookRateLimit) return { success: true }; // No rate limiting if Redis not configured
 
   try {
     const ip = identifier || getClientIP(request);

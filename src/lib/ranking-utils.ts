@@ -9,10 +9,20 @@ import {
   chores,
   pointsTransactions,
   virtualPets,
-  externalChoreRequests
+  externalChoreRequests,
+  dailySpins,
+  achievements,
+  familyFeed
 } from '@/server/db/schema';
 import { eq, and, gte, lte, desc, sql, inArray } from 'drizzle-orm';
-import { startOfWeek, endOfWeek, subWeeks, addWeeks } from 'date-fns';
+import { startOfWeek, endOfWeek, subWeeks, addWeeks, format } from 'date-fns';
+
+/**
+ * Convert Date to ISO date string for database storage
+ */
+function toDateString(date: Date): string {
+  return format(date, 'yyyy-MM-dd');
+}
 
 export type RankingType = 'family' | 'friends' | 'powerklusjes';
 export type RankingCategory = 'xp' | 'chores' | 'powerpoints' | 'streak' | 'pet_care';
@@ -362,8 +372,8 @@ export async function updateWeeklyRankings(familyId: string): Promise<void> {
             eq(rankSnapshots.familyId, familyId),
             eq(rankSnapshots.rankingType, rankingType),
             eq(rankSnapshots.category, category),
-            eq(rankSnapshots.weekStart, start),
-            eq(rankSnapshots.weekEnd, end)
+            eq(rankSnapshots.weekStart, toDateString(start)),
+            eq(rankSnapshots.weekEnd, toDateString(end))
           ));
 
         // Insert new snapshots
@@ -373,8 +383,8 @@ export async function updateWeeklyRankings(familyId: string): Promise<void> {
             childId: entry.childId,
             rankingType,
             category,
-            weekStart: start,
-            weekEnd: end,
+            weekStart: toDateString(start),
+            weekEnd: toDateString(end),
             score: entry.score,
             rank: entry.rank,
             tier: entry.tier,
@@ -460,7 +470,7 @@ export async function processWeeklyChampions(familyId: string): Promise<void> {
               eq(weeklyChampions.childId, champion.childId),
               eq(weeklyChampions.rankingType, rankingType),
               eq(weeklyChampions.category, category),
-              eq(weeklyChampions.weekStart, lastWeekStart)
+              eq(weeklyChampions.weekStart, toDateString(lastWeekStart))
             ));
 
           if (existingChampion.length === 0) {
@@ -470,8 +480,8 @@ export async function processWeeklyChampions(familyId: string): Promise<void> {
               childId: champion.childId,
               rankingType,
               category,
-              weekStart: lastWeekStart,
-              weekEnd: lastWeekEnd,
+              weekStart: toDateString(lastWeekStart),
+              weekEnd: toDateString(lastWeekEnd),
               score: champion.score,
               rewards: JSON.stringify({
                 goldenCrownBadge: true,
@@ -521,7 +531,7 @@ async function awardChampionRewards(
       await db.insert(dailySpins).values({
         childId,
         familyId,
-        lastSpinDate: today,
+        lastSpinDate: toDateString(today),
         spinsAvailable: 2, // 1 regular + 1 bonus
         totalSpins: 0,
       });
@@ -605,7 +615,7 @@ export async function getWeeklyChampionStatus(childId: string, familyId: string)
     .where(and(
       eq(weeklyChampions.childId, childId),
       eq(weeklyChampions.familyId, familyId),
-      eq(weeklyChampions.weekStart, lastWeekStart)
+      eq(weeklyChampions.weekStart, toDateString(lastWeekStart))
     ));
 
   const isChampion = champions.length > 0;
