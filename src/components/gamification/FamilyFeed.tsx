@@ -90,9 +90,9 @@ export default function FamilyFeed({ className }: FamilyFeedProps) {
       const sampleFeed: FamilyFeedItem[] = [
         {
           id: '1',
-          childId: family.children[0]?.id || 'sample',
-          childName: family.children[0]?.name || 'Sample Child',
-          childAvatar: family.children[0]?.avatar || '👤',
+          childId: family?.children[0]?.id || 'sample',
+          childName: family?.children[0]?.name || 'Sample Child',
+          childAvatar: family?.children[0]?.avatar || '👤',
           type: 'chore_completed',
           message: 'heeft de keuken opgeruimd! Wat een held! 🏠✨',
           reactions: [
@@ -103,9 +103,9 @@ export default function FamilyFeed({ className }: FamilyFeedProps) {
         },
         {
           id: '2',
-          childId: family.children[1]?.id || 'sample2',
-          childName: family.children[1]?.name || 'Another Child',
-          childAvatar: family.children[1]?.avatar || '👤',
+          childId: family?.children[1]?.id || 'sample2',
+          childName: family?.children[1]?.name || 'Another Child',
+          childAvatar: family?.children[1]?.avatar || '👤',
           type: 'level_up',
           message: 'is opgegaan naar level 5! Sterrenstatus bereikt! ⭐⭐⭐⭐⭐',
           reactions: [
@@ -115,9 +115,9 @@ export default function FamilyFeed({ className }: FamilyFeedProps) {
         },
         {
           id: '3',
-          childId: family.children[0]?.id || 'sample',
-          childName: family.children[0]?.name || 'Sample Child',
-          childAvatar: family.children[0]?.avatar || '👤',
+          childId: family?.children[0]?.id || 'sample',
+          childName: family?.children[0]?.name || 'Sample Child',
+          childAvatar: family?.children[0]?.avatar || '👤',
           type: 'badge_earned',
           message: 'heeft de "Keuken Kampioen" badge verdiend! 🏆',
           reactions: [
