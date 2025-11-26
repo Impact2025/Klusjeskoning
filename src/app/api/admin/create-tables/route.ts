@@ -3,6 +3,14 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 
 export async function POST() {
+  // Check if DATABASE_URL is configured
+  if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('postgresql')) {
+    return NextResponse.json(
+      { error: 'Database not configured', details: 'DATABASE_URL environment variable is required' },
+      { status: 503 }
+    );
+  }
+
   try {
     // Create discount_type enum if it doesn't exist
     await db.execute(sql`

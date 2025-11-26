@@ -1,19 +1,39 @@
 import 'server-only';
 
-import { neon, neonConfig } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
-neonConfig.fetchConnectionCache = true;
+// Get DATABASE_URL
+const rawConnectionString = process.env.DATABASE_URL;
 
-const connectionString = process.env.DATABASE_URL;
+// Validate connection string format
+const isValidConnectionString = (str: string | undefined): str is string => {
+  if (!str || str.trim() === '') return false;
+  // Check if it starts with postgresql:// or postgres://
+  return str.startsWith('postgresql://') || str.startsWith('postgres://');
+};
 
-if (!connectionString) {
-  console.warn('DATABASE_URL is not set - database features will not be available');
+// Only initialize database connection if we have a valid DATABASE_URL
+// This prevents build errors on platforms like Vercel where DATABASE_URL might not be available during build
+let db: any;
+let DbClient: any;
+
+if (!isValidConnectionString(rawConnectionString)) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('DATABASE_URL is not configured! Database operations will fail.');
+  } else {
+    console.warn('DATABASE_URL not set - database features will not be available during build.');
+  }
+
+  // Use a mock db client for build time to prevent errors
+  db = null as any;
+  DbClient = typeof db;
+} else {
+  const sql = neon(rawConnectionString);
+  db = drizzle(sql, { schema });
+  DbClient = typeof db;
 }
 
-// Create a dummy SQL function if no connection string
-const sql = connectionString ? neon(connectionString) : (() => { throw new Error('DATABASE_URL not configured'); }) as any;
-
-export const db = drizzle(sql, { schema });
-export type DbClient = typeof db;
+export { db };
+export type { DbClient };
