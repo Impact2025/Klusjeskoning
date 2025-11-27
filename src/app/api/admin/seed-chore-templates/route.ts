@@ -8,7 +8,7 @@ import {
   addonPacks,
   addonPackChores,
 } from '@/server/db/schema';
-import seedData from '@/../klusjes_seed_data.json';
+import seedData from '@/lib/klusjes_seed_data.json';
 
 // POST /api/admin/seed-chore-templates - Seed the chore templates database
 export async function POST(request: NextRequest) {
