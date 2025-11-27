@@ -726,16 +726,28 @@ export async function POST(request: Request) {
           submittedAt: data.submittedAt ? new Date(data.submittedAt) : new Date(),
         });
 
+        // Fetch child and chore details for notification
+        const [child] = await db
+          .select({ name: children.name })
+          .from(children)
+          .where(and(eq(children.id, data.childId), eq(children.familyId, session.familyId)))
+          .limit(1);
+
+        const [chore] = await db
+          .select({ name: chores.name, points: chores.points })
+          .from(chores)
+          .where(and(eq(chores.id, data.choreId), eq(chores.familyId, session.familyId)))
+          .limit(1);
+
         // Send email notification to parent about chore submission
         await sendNotification(request, {
           type: 'chore_submitted',
           to: session.family.email,
           data: {
             parentName: session.family.familyName,
-            choreId: data.choreId,
-            childId: data.childId,
-            emotion: data.emotion,
-            submittedAt: data.submittedAt || new Date().toISOString(),
+            childName: child?.name || 'Onbekend kind',
+            choreName: chore?.name || 'Onbekend klusje',
+            points: chore?.points || 0,
           },
         });
 

@@ -25,6 +25,7 @@ import {
   appliedPenalties,
   economicConfigurations,
   economicMetrics,
+  familyFeed,
 } from '../db/schema';
 import { hashPassword, verifyPassword } from '../auth/password';
 import { PLAN_DEFINITIONS } from '@/lib/plans';
@@ -1792,6 +1793,33 @@ export const approveChore = async (familyId: string, choreId: string) => {
 
   // Award points and XP (XP is now automatically calculated in updateChildPoints)
   await updateChildPoints(chore.submitted_by_child_id as string, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, choreId);
+
+  // Create family feed item
+  try {
+    // Get child name
+    const childResult = await db.execute(sql`
+      SELECT name FROM children WHERE id = ${chore.submitted_by_child_id}
+    `);
+    const childName = childResult.rows[0]?.name as string || 'Kind';
+
+    await db.insert(familyFeed).values({
+      familyId,
+      childId: chore.submitted_by_child_id as string,
+      type: 'chore_completed',
+      message: `heeft "${chore.name}" voltooid! +${chore.points} punten 🎉`,
+      data: JSON.stringify({
+        choreId,
+        choreName: chore.name,
+        points: chore.points,
+        emoji: '✅',
+        childName,
+      }),
+      reactions: '[]',
+    });
+  } catch (feedError) {
+    // Don't fail the approval if feed creation fails
+    console.error('Error creating feed item:', feedError);
+  }
 };
 
 export const rejectChore = async (familyId: string, choreId: string) => {
@@ -1877,9 +1905,36 @@ export const updateChildPoints = async (childId: string, delta: number, descript
       console.log(`[XP_REWARD] Child ${childId} earned ${xpReward} XP. Total XP: ${child.xp} → ${newXpBalance}`);
     }
 
-    // Log level up if it occurred
+    // Log level up if it occurred and create feed item
     if (levelUpInfo.leveledUp) {
       console.log(`[LEVEL_UP] Child ${childId} leveled up from ${levelUpInfo.oldLevel} to ${levelUpInfo.newLevel}! Unlocks: ${levelUpInfo.unlocks?.join(', ') || 'none'}`);
+
+      // Create level-up feed item
+      try {
+        const childData = await db
+          .select({ name: children.name })
+          .from(children)
+          .where(eq(children.id, childId))
+          .limit(1);
+        const childName = childData[0]?.name || 'Kind';
+
+        await db.insert(familyFeed).values({
+          familyId: child.familyId,
+          childId,
+          type: 'level_up',
+          message: `is opgegaan naar level ${levelUpInfo.newLevel}! ${levelUpInfo.unlocks?.length ? `Nieuwe unlocks: ${levelUpInfo.unlocks.join(', ')}` : ''} ⭐`,
+          data: JSON.stringify({
+            oldLevel: levelUpInfo.oldLevel,
+            newLevel: levelUpInfo.newLevel,
+            unlocks: levelUpInfo.unlocks,
+            emoji: '⬆️',
+            childName,
+          }),
+          reactions: '[]',
+        });
+      } catch (feedError) {
+        console.error('Error creating level-up feed item:', feedError);
+      }
     }
   }
 };
