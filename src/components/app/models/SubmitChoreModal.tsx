@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Camera, RefreshCcw, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { QUEST_CHAIN_CHORES } from '@/lib/quest-utils';
 
 type SubmitChoreModalProps = {
     isOpen: boolean;
@@ -37,15 +36,8 @@ export default function SubmitChoreModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // First try to find in family chores, then in sample quest chores
-  let chore = family?.chores.find(c => c.id === choreId);
-  if (!chore) {
-    // Check in sample quest chores
-    const allQuestChores = Object.values(QUEST_CHAIN_CHORES).flat();
-    chore = allQuestChores.find(c => c.id === choreId);
-  }
-
-  console.log('SubmitChoreModal - choreId:', choreId, 'found chore:', chore);
+  // Find chore in family chores
+  const chore = family?.chores.find(c => c.id === choreId);
 
   const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -105,7 +97,6 @@ export default function SubmitChoreModal({
 
   if (!chore) return null;
 
-  console.log('SubmitChoreModal render - isOpen:', isOpen, 'choreId:', choreId, 'chore found:', !!chore);
   return (
     <Dialog open={isOpen} onOpenChange={handleFullClose}>
       <DialogContent className="sm:max-w-sm text-center">

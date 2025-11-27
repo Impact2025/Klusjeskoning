@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sql, eq, and, isNull } from 'drizzle-orm';
 import { db } from '@/server/db/client';
-import { children, avatarItems, avatarCustomizations, rewardTemplates, teamChores, pointsTransactions } from '@/server/db/schema';
+import { children, avatarItems, avatarCustomizations, rewardTemplates, teamChores, pointsTransactions, chores } from '@/server/db/schema';
 
 import {
   authenticateFamily,
