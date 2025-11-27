@@ -34,6 +34,11 @@ export async function GET(request: Request) {
   try {
     const session = await requireSession();
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get or create wallet for family
     let [wallet] = await db
       .select()

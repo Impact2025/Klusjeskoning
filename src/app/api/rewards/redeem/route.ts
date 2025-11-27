@@ -17,6 +17,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get the child and reward details
     const [child] = await db
       .select()
@@ -126,6 +131,11 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       whereConditions.push(eq(rewardRedemptions.status, status as any));
+    }
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
     }
 
     const redemptions = await db

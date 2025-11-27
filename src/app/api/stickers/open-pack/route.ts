@@ -149,6 +149,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid pack ID' }, { status: 400 });
     }
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Verify child belongs to family and has enough points
     const [child] = await db
       .select()

@@ -46,6 +46,11 @@ export async function POST(
     const body = await request.json();
     const data = completeSchema.parse(body);
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get the external chore request with child info
     const [choreRequest] = await db
       .select({

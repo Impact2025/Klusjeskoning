@@ -37,6 +37,11 @@ export async function GET(
     const resolvedParams = await params;
     const childId = resolvedParams.childId;
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get child info - only basic public information
     const [child] = await db
       .select({

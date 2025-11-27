@@ -12,6 +12,8 @@ const SESSION_COOKIE = 'kk_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 export const createSession = async (familyId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   const token = randomUUID();
   const expiresAt = addMilliseconds(new Date(), SESSION_TTL_MS);
 
@@ -34,6 +36,8 @@ export const createSession = async (familyId: string) => {
 };
 
 export const clearSession = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(SESSION_COOKIE);
   if (sessionCookie) {
@@ -43,6 +47,8 @@ export const clearSession = async () => {
 };
 
 export const getSession = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(SESSION_COOKIE);
   if (!sessionCookie) {

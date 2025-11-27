@@ -453,6 +453,14 @@ export async function POST(request: Request) {
     }
   }
 
+  // Check if db client is available for actions that require database access
+  if (!db) {
+    return NextResponse.json(
+      { error: 'Database niet beschikbaar', details: 'Database client is niet geïnitialiseerd' },
+      { status: 503 }
+    );
+  }
+
   try {
     switch (action) {
       case 'startRegistration': {

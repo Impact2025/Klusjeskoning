@@ -50,6 +50,11 @@ export async function GET(request: Request) {
   try {
     const session = await requireSession();
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get all trusted contacts for this family
     const contacts = await db
       .select()
@@ -94,6 +99,11 @@ export async function POST(request: Request) {
     const session = await requireSession();
     const body = await request.json();
     const data = createContactSchema.parse(body);
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
 
     // Check if contact with same email/phone already exists for this family
     if (data.email) {

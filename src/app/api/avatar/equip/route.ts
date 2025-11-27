@@ -17,6 +17,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Item ID and Child ID required' }, { status: 400 });
     }
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Check if the child owns this item
     const [existing] = await db
       .select()

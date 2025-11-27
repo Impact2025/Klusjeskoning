@@ -47,6 +47,11 @@ export async function POST(
     const body = await request.json();
     const data = approveSchema.parse(body);
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get the external chore request
     const [choreRequest] = await db
       .select()
@@ -70,7 +75,7 @@ export async function POST(
     const approvedAmount = data.approvedAmountCents ?? choreRequest.offeredAmountCents;
 
     // Start transaction for approval
-    await db.transaction(async (tx: typeof db) => {
+    await db.transaction(async (tx) => {
       // Update request status
       await tx
         .update(externalChoreRequests)

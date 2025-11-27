@@ -23,6 +23,11 @@ export async function GET(request: NextRequest) {
       whereConditions.push(eq(familyRewards.category, category as any));
     }
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     const rewards = await db
       .select()
       .from(familyRewards)
@@ -69,6 +74,11 @@ export async function POST(request: NextRequest) {
 
     if (!name || !description || !category || points === undefined) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
     }
 
     const [reward] = await db.insert(familyRewards).values({

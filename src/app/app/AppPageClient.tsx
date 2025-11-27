@@ -15,6 +15,7 @@ import ChildDashboard from '@/components/app/screens/ChildDashboard';
 import RecoverCodeScreen from '@/components/app/screens/RecoverCodeScreen';
 import QrScannerScreen from '@/components/app/screens/QrScannerScreen';
 import AdminLoginScreen from '@/components/app/screens/AdminLoginScreen';
+import TourGuide from '@/components/app/TourGuide';
 import nextDynamic from 'next/dynamic';
 import type { Screen } from '@/lib/types';
 
@@ -38,7 +39,7 @@ const AdminDashboard = nextDynamic(() => import('@/components/app/screens/AdminD
 });
 
 function AppContent() {
-  const { currentScreen, isLoading, family, addChild, addChore, addReward, setScreen } = useApp();
+  const { currentScreen, isLoading, family, addChild, addChore, addReward, setScreen, showTour, closeTour } = useApp();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -124,6 +125,7 @@ function AppContent() {
           </div>
         )}
         <div className="h-full w-full">{screens[currentScreen]}</div>
+        <TourGuide isOpen={showTour} onClose={closeTour} />
       </div>
     </div>
   );

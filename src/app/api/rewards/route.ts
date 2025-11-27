@@ -27,6 +27,11 @@ export async function GET(request: NextRequest) {
       conditions.push(gte(rewardTemplates.minAge, parseInt(minAge)));
     }
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     const templates = await db
       .select()
       .from(rewardTemplates)
@@ -55,6 +60,11 @@ export async function POST(request: NextRequest) {
 
     if (!name || !description || !category || !defaultPoints) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
     }
 
     const [template] = await db.insert(rewardTemplates).values({

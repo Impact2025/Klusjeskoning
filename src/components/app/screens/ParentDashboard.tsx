@@ -44,7 +44,7 @@ import EditTeamChoreModal from '../models/EditTeamChoreModal';
 import ComplimentCards from '../../gamification/ComplimentCards';
 
 export default function ParentDashboard() {
-  const { family, logout, approveChore, deleteItem, user } = useApp();
+  const { family, logout, approveChore, deleteItem } = useApp();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<Chore[]>([]);
   const [emptySavings, setEmptySavings] = useState<Child[]>([]);
@@ -179,8 +179,11 @@ export default function ParentDashboard() {
     }
   };
 
-  // Enhanced authentication check - ensure both family and user exist
-  if (!family || !user) return null;
+  // Enhanced authentication check - ensure family exists (user is only for child sessions)
+  if (!family) {
+    console.log('ParentDashboard: No family data available');
+    return null;
+  }
 
   const totalPending = pendingApprovals.length + emptySavings.length;
 
@@ -257,11 +260,11 @@ export default function ParentDashboard() {
               <BarChart3 className="h-5 w-5" />
               <span>Overzicht</span>
             </TabsTrigger>
-            <TabsTrigger value="children" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+            <TabsTrigger value="children" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700" data-tour="children">
               <Users className="h-5 w-5" />
               <span>Kinderen</span>
             </TabsTrigger>
-            <TabsTrigger value="chores" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+            <TabsTrigger value="chores" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700" data-tour="chores">
               <ListTodo className="h-5 w-5" />
               <span>Klusjes</span>
             </TabsTrigger>
@@ -269,7 +272,7 @@ export default function ParentDashboard() {
               <Users className="h-5 w-5" />
               <span>Team Klusjes</span>
             </TabsTrigger>
-            <TabsTrigger value="rewards" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+            <TabsTrigger value="rewards" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700" data-tour="rewards">
               <Gift className="h-5 w-5" />
               <span>Beloningen</span>
             </TabsTrigger>
@@ -277,7 +280,7 @@ export default function ParentDashboard() {
               <Heart className="h-5 w-5" />
               <span>Complimenten</span>
             </TabsTrigger>
-            <TabsTrigger value="actions" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 relative">
+            <TabsTrigger value="actions" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 relative" data-tour="actions">
               <AlertTriangle className="h-5 w-5" />
               <span>Goedkeuren</span>
               {totalPending > 0 && (
@@ -387,7 +390,7 @@ export default function ParentDashboard() {
 
             <TabsContent value="overview" className="space-y-6 mt-6">
               {/* Quick Stats Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="overview">
                 <Card className="text-center">
                   <CardContent className="pt-6">
                     <div className="text-2xl font-bold text-blue-600">{family.children.length}</div>

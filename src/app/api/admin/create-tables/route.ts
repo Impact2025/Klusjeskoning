@@ -11,6 +11,14 @@ export async function POST() {
     );
   }
 
+  // Check if db client is available
+  if (!db) {
+    return NextResponse.json(
+      { error: 'Database not initialized', details: 'Database client is not available' },
+      { status: 503 }
+    );
+  }
+
   try {
     // Create discount_type enum if it doesn't exist
     await db.execute(sql`

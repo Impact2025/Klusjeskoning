@@ -7,6 +7,11 @@ export async function POST(request: NextRequest) {
   try {
     console.log('Running migration...');
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Read the migration SQL file
     const migrationPath = path.join(process.cwd(), 'scripts', 'add-gamification-columns.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');

@@ -48,6 +48,11 @@ export async function GET(
     const resolvedParams = await params;
     const contactId = resolvedParams.id;
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get specific trusted contact for this family
     const [contact] = await db
       .select()
@@ -104,6 +109,11 @@ export async function PATCH(
     const contactId = resolvedParams.id;
     const body = await request.json();
     const data = updateContactSchema.parse(body);
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
 
     // Check if contact exists and belongs to this family
     const [existingContact] = await db
@@ -209,6 +219,11 @@ export async function DELETE(
     const session = await requireSession();
     const resolvedParams = await params;
     const contactId = resolvedParams.id;
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
 
     // Check if contact exists and belongs to this family
     const [existingContact] = await db

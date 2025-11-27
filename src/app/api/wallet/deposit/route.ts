@@ -42,6 +42,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     const data = depositSchema.parse(body);
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get or create wallet for family
     let [wallet] = await db
       .select()
@@ -64,7 +69,7 @@ export async function POST(request: Request) {
     // In production, this would integrate with payment providers
     // For development/demo purposes, we'll simulate instant deposits
 
-    await db.transaction(async (tx: typeof db) => {
+    await db.transaction(async (tx) => {
       // Update wallet balance
       await tx
         .update(wallets)

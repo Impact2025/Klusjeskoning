@@ -63,7 +63,9 @@ export function getCurrentWeekBounds(): { start: Date; end: Date } {
  * Calculate XP score for a child in a given week
  */
 export async function calculateXPScore(childId: string, weekStart: Date, weekEnd: Date): Promise<number> {
-  const result = await db
+  if (!db) throw new Error('Database not initialized');
+
+  const result = await (db as any)
     .select({
       totalXP: sql<number>`COALESCE(SUM(${pointsTransactions.amount}), 0)`,
     })
@@ -82,7 +84,9 @@ export async function calculateXPScore(childId: string, weekStart: Date, weekEnd
  * Calculate chores completed score for a child in a given week
  */
 export async function calculateChoresScore(childId: string, weekStart: Date, weekEnd: Date): Promise<number> {
-  const result = await db
+  if (!db) throw new Error('Database not initialized');
+
+  const result = await (db as any)
     .select({
       completedChores: sql<number>`COUNT(*)`,
     })
@@ -101,7 +105,9 @@ export async function calculateChoresScore(childId: string, weekStart: Date, wee
  * Calculate PowerKlusjes score for a child in a given week
  */
 export async function calculatePowerPointsScore(childId: string, weekStart: Date, weekEnd: Date): Promise<number> {
-  const result = await db
+  if (!db) throw new Error('Database not initialized');
+
+  const result = await (db as any)
     .select({
       totalPowerPoints: sql<number>`COALESCE(SUM(${externalChoreRequests.offeredAmountCents}), 0)`,
     })
@@ -120,9 +126,11 @@ export async function calculatePowerPointsScore(childId: string, weekStart: Date
  * Calculate pet care score for a child in a given week
  */
 export async function calculatePetCareScore(childId: string, weekStart: Date, weekEnd: Date): Promise<number> {
+  if (!db) throw new Error('Database not initialized');
+
   // For now, use virtual pet interactions as score
   // In future, could track feeding, playing, etc.
-  const result = await db
+  const result = await (db as any)
     .select({
       interactions: sql<number>`COUNT(*)`,
     })
@@ -140,12 +148,14 @@ export async function calculatePetCareScore(childId: string, weekStart: Date, we
  * Calculate streak score (consecutive days of activity)
  */
 export async function calculateStreakScore(childId: string): Promise<number> {
+  if (!db) throw new Error('Database not initialized');
+
   // This would need more complex logic to track consecutive days
   // For now, return a simple score based on recent activity
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
-  const result = await db
+  const result = await (db as any)
     .select({
       activeDays: sql<number>`COUNT(DISTINCT DATE(${chores.submittedAt}))`,
     })
@@ -219,16 +229,18 @@ export async function calculateRanking(
   weekStart: Date,
   weekEnd: Date
 ): Promise<RankingResult> {
+  if (!db) throw new Error('Database not initialized');
+
   let childIds: string[] = [];
 
   // Get children based on ranking type
   if (rankingType === 'family') {
-    const familyChildren = await db
+    const familyChildren = await (db as any)
       .select({ id: children.id })
       .from(children)
       .where(eq(children.familyId, familyId));
 
-    childIds = familyChildren.map(c => c.id);
+    childIds = familyChildren.map((c: any) => c.id);
   } else if (rankingType === 'friends') {
     // Get friends of all family children
     const familyChildren = await db
@@ -355,6 +367,8 @@ export async function calculateRanking(
  * Update weekly ranking snapshots
  */
 export async function updateWeeklyRankings(familyId: string): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
   const { start, end } = getCurrentWeekBounds();
 
   const rankingTypes: RankingType[] = ['family', 'friends', 'powerklusjes'];
@@ -391,7 +405,7 @@ export async function updateWeeklyRankings(familyId: string): Promise<void> {
             title: entry.title
           }));
 
-          await db.insert(rankSnapshots).values(snapshots);
+          await (db as any).insert(rankSnapshots).values(snapshots);
         }
       } catch (error) {
         console.error(`Error updating rankings for ${rankingType}/${category}:`, error);
@@ -404,6 +418,8 @@ export async function updateWeeklyRankings(familyId: string): Promise<void> {
  * Get ranking settings for a family
  */
 export async function getRankingSettings(familyId: string) {
+  if (!db) throw new Error('Database not initialized');
+
   const settings = await db
     .select()
     .from(rankingSettings)
@@ -435,6 +451,8 @@ export async function getRankingSettings(familyId: string) {
  * Update ranking settings for a family
  */
 export async function updateRankingSettings(familyId: string, updates: Partial<typeof rankingSettings.$inferInsert>) {
+  if (!db) throw new Error('Database not initialized');
+
   await db
     .update(rankingSettings)
     .set({ ...updates, updatedAt: new Date() })
@@ -445,6 +463,8 @@ export async function updateRankingSettings(familyId: string, updates: Partial<t
  * Determine and reward weekly champions
  */
 export async function processWeeklyChampions(familyId: string): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
   const { start, end } = getCurrentWeekBounds();
   const lastWeekStart = subWeeks(start, 1);
   const lastWeekEnd = subWeeks(end, 1);
@@ -475,7 +495,7 @@ export async function processWeeklyChampions(familyId: string): Promise<void> {
 
           if (existingChampion.length === 0) {
             // Create champion record
-            await db.insert(weeklyChampions).values({
+            await (db as any).insert(weeklyChampions).values({
               familyId,
               childId: champion.childId,
               rankingType,
@@ -511,6 +531,8 @@ async function awardChampionRewards(
   rankingType: RankingType,
   category: RankingCategory
 ): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
   try {
     // 1. Give extra spin (add to daily spins)
     const today = new Date();
@@ -528,7 +550,7 @@ async function awardChampionRewards(
 
     if (!spinRecord.length) {
       // Create new spin record with bonus spin
-      await db.insert(dailySpins).values({
+      await (db as any).insert(dailySpins).values({
         childId,
         familyId,
         lastSpinDate: toDateString(today),
@@ -547,7 +569,7 @@ async function awardChampionRewards(
 
     // 2. Add champion achievement/badge
     const championBadgeName = `Week Kampioen - ${category.charAt(0).toUpperCase() + category.slice(1)}`;
-    await db.insert(achievements).values({
+    await (db as any).insert(achievements).values({
       childId,
       familyId,
       achievementId: `weekly_champion_${category}_${Date.now()}`,
@@ -568,7 +590,7 @@ async function awardChampionRewards(
       .where(eq(children.id, childId));
 
     // 4. Add to family feed
-    await db.insert(familyFeed).values({
+    await (db as any).insert(familyFeed).values({
       familyId,
       childId,
       type: 'weekly_champion',
@@ -589,6 +611,8 @@ async function awardChampionRewards(
  * Get child name by ID
  */
 async function getChildName(childId: string): Promise<string> {
+  if (!db) throw new Error('Database not initialized');
+
   const child = await db
     .select({ name: children.name })
     .from(children)
@@ -607,6 +631,8 @@ export async function getWeeklyChampionStatus(childId: string, familyId: string)
   goldenPetActive: boolean;
   goldenPetExpiresAt?: Date;
 }> {
+  if (!db) throw new Error('Database not initialized');
+
   const lastWeekStart = subWeeks(getCurrentWeekBounds().start, 1);
 
   const champions = await db

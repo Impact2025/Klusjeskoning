@@ -127,6 +127,8 @@ interface AppContextType {
   reviews: Review[] | null;
   adminFamilies: AdminFamilySummary[] | null;
   financialOverview: FinancialOverview | null;
+  showTour: boolean;
+  closeTour: () => void;
   loginParent: (email: string, password: string) => Promise<void>;
   loginAdmin: (email: string, password: string) => Promise<void>;
   registerFamily: (familyName: string, city: string, email: string, password: string) => Promise<void>;
@@ -218,6 +220,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Review[] | null>(null);
   const [adminFamilies, setAdminFamilies] = useState<AdminFamilySummary[] | null>(null);
   const [financialOverview, setFinancialOverview] = useState<FinancialOverview | null>(null);
+  const [showTour, setShowTour] = useState(false);
 
   const activePlan = useMemo(() => getActivePlan(family?.subscription as SubscriptionInfo | undefined), [family?.subscription]);
   const planDefinition = PLAN_DEFINITIONS[activePlan];
@@ -227,6 +230,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (feature: PlanFeatureKey) => planHasFeature(family?.subscription as SubscriptionInfo | undefined, feature),
     [family?.subscription]
   );
+
+  // Tour logic: show only on 1st and 5th login, and only once each time
+  const shouldShowTour = useCallback((family: Family | null) => {
+    if (!family || typeof window === 'undefined') return false;
+
+    // Get login count from localStorage (we'll track this client-side)
+    const loginCount = parseInt(localStorage.getItem(`login_count_${family.id}`) || '0');
+    const lastTourLogin = parseInt(localStorage.getItem(`tour_shown_${family.id}`) || '0');
+
+    // Show tour on 1st and 5th login, but only if we haven't shown it for this login count yet
+    return (loginCount === 1 || loginCount === 5) && lastTourLogin < loginCount;
+  }, []);
+
+  const closeTour = useCallback(() => {
+    setShowTour(false);
+    // Mark that we've shown the tour for this login count
+    if (family && typeof window !== 'undefined') {
+      const loginCount = parseInt(localStorage.getItem(`login_count_${family.id}`) || '0');
+      localStorage.setItem(`tour_shown_${family.id}`, loginCount.toString());
+    }
+  }, [family]);
 
   const applyFamily = useCallback((payload: SerializableFamily | null) => {
     if (payload) {
@@ -295,6 +319,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loginParent = useCallback(async (email: string, password: string) => {
     await handleAction<{ family: SerializableFamily }>('loginParent', { email, password }, ({ family }) => {
       applyFamily(family ?? null);
+
+      // Increment login count and check if tour should be shown
+      if (family && typeof window !== 'undefined') {
+        const currentCount = parseInt(localStorage.getItem(`login_count_${family.id}`) || '0');
+        const newCount = currentCount + 1;
+        localStorage.setItem(`login_count_${family.id}`, newCount.toString());
+
+        // Check if tour should be shown (only on 1st and 5th login)
+        if (shouldShowTour({ ...family, loginCount: newCount } as any)) {
+          setShowTour(true);
+        }
+      }
+
       // Check if family needs setup wizard (no children yet)
       if (!family?.children || family.children.length === 0) {
         setScreen('familySetup');
@@ -310,7 +347,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         colors: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
       });
     });
-  }, [applyFamily, handleAction, notify]);
+  }, [applyFamily, handleAction, notify, shouldShowTour]);
 
   // Handle post-login redirects - only for actual checkout flows
   useEffect(() => {
@@ -956,6 +993,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     reviews,
     adminFamilies,
     financialOverview,
+    showTour,
+    closeTour,
     loginParent,
     loginAdmin,
     registerFamily,

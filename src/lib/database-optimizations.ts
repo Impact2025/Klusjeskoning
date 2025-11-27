@@ -22,7 +22,9 @@ import {
  * Reduces memory usage by only loading required fields
  */
 export async function loadFamilyOptimized(familyId: string, includePendingRewards = true) {
-  const family = await db.query.families.findFirst({
+  if (!db) throw new Error('Database not initialized');
+
+  const family = await (db as any).query.families.findFirst({
     where: eq(families.id, familyId),
     columns: {
       id: true,
@@ -120,8 +122,10 @@ export async function loadFamilyOptimized(familyId: string, includePendingReward
  * Eliminates multiple separate queries
  */
 export async function getOptimizedAdminStats() {
+  if (!db) throw new Error('Database not initialized');
+
   // Single query with window functions for better performance
-  const statsResult = await db.execute(sql`
+  const statsResult = await db!.execute(sql`
     SELECT
       (SELECT COUNT(*) FROM families) as total_families,
       (SELECT COUNT(*) FROM children) as total_children,
@@ -153,6 +157,8 @@ export async function getFamiliesPaginated(options: {
   sortBy?: 'createdAt' | 'familyName' | 'childrenCount';
   sortOrder?: 'asc' | 'desc';
 } = {}) {
+  if (!db) throw new Error('Database not initialized');
+
   const {
     page = 1,
     limit = 50,
@@ -182,7 +188,7 @@ export async function getFamiliesPaginated(options: {
 
   const sortDirection = sortOrder === 'asc' ? asc : desc;
 
-  const familiesResult = await db.execute(sql`
+  const familiesResult = await db!.execute(sql`
     SELECT
       f.id,
       f.family_name,
@@ -203,7 +209,7 @@ export async function getFamiliesPaginated(options: {
     LIMIT ${limit} OFFSET ${offset}
   `);
 
-  const totalCountResult = await db.execute(sql`
+  const totalCountResult = await db!.execute(sql`
     SELECT COUNT(*) as total
     FROM families f
     WHERE ${whereClause}
@@ -238,7 +244,9 @@ export async function getFamiliesPaginated(options: {
  * Optimized financial overview with single query
  */
 export async function getOptimizedFinancialOverview() {
-  const overviewResult = await db.execute(sql`
+  if (!db) throw new Error('Database not initialized');
+
+  const overviewResult = await db!.execute(sql`
     SELECT
       COUNT(CASE WHEN subscription_status = 'active' THEN 1 END) as active_subscriptions,
       COUNT(CASE WHEN subscription_status = 'active' AND subscription_interval = 'monthly' THEN 1 END) as monthly_subs,
@@ -254,7 +262,7 @@ export async function getOptimizedFinancialOverview() {
   `);
 
   // Get recent subscriptions with optimized query
-  const recentSubscriptionsResult = await db.execute(sql`
+  const recentSubscriptionsResult = await db!.execute(sql`
     SELECT
       id,
       family_name,
@@ -301,6 +309,7 @@ export async function getOptimizedFinancialOverview() {
  */
 export async function batchUpdateChildPoints(updates: Array<{ childId: string; pointsDelta: number }>) {
   if (updates.length === 0) return;
+  if (!db) throw new Error('Database not initialized');
 
   // Use a single query with CASE statements for batch updates
   const childIds = updates.map(u => u.childId);
@@ -311,7 +320,7 @@ export async function batchUpdateChildPoints(updates: Array<{ childId: string; p
     .filter(u => u.pointsDelta > 0)
     .map(u => sql`WHEN id = ${u.childId} THEN total_points_ever + ${u.pointsDelta}`);
 
-  await db.execute(sql`
+  await db!.execute(sql`
     UPDATE children
     SET
       points = CASE ${sql.join(cases, sql` `)} ELSE points END,
@@ -324,7 +333,9 @@ export async function batchUpdateChildPoints(updates: Array<{ childId: string; p
  * Database maintenance utilities
  */
 export async function cleanupExpiredSessions() {
-  const expiredCount = await db.execute(sql`
+  if (!db) throw new Error('Database not initialized');
+
+  const expiredCount = await db!.execute(sql`
     DELETE FROM sessions
     WHERE expires_at < NOW()
   `);
@@ -333,8 +344,10 @@ export async function cleanupExpiredSessions() {
 }
 
 export async function optimizeTableStatistics() {
+  if (!db) throw new Error('Database not initialized');
+
   // Analyze tables for query optimization
-  await db.execute(sql`ANALYZE families, children, chores, rewards, pending_rewards`);
+  await db!.execute(sql`ANALYZE families, children, chores, rewards, pending_rewards`);
 }
 
 /**

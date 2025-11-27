@@ -61,7 +61,12 @@ const sampleBlogPosts = [
 export async function GET() {
   try {
     console.log('🌱 Seeding blog posts...');
-    
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     for (const post of sampleBlogPosts) {
       await db.insert(blogPosts).values({
         ...post,

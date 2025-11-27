@@ -17,6 +17,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Child ID required' }, { status: 400 });
     }
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Verify child belongs to family
     const [child] = await db
       .select()

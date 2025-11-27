@@ -49,6 +49,11 @@ export async function GET(request: Request) {
   try {
     const session = await requireSession();
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get all external chore requests for this family
     const requests = await db
       .select({
@@ -119,6 +124,11 @@ export async function POST(request: Request) {
   try {
     const requestBody = await request.json();
     const data = createRequestSchema.parse(requestBody);
+
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
 
     // Verify child exists and get family info
     const [child] = await db

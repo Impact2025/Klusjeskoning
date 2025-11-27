@@ -34,6 +34,11 @@ export async function GET(request: NextRequest) {
 
     const { weekStart, weekEnd } = getCurrentWeek();
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get all children in the family
     const familyChildren = await db
       .select({
@@ -59,7 +64,7 @@ export async function GET(request: NextRequest) {
     const pointsLeaderboard = await Promise.all(
       familyChildren.map(async (child) => {
         // Sum points earned this week from transactions
-        const pointsResult = await db
+        const pointsResult = await db!
           .select({
             totalPoints: sql<number>`COALESCE(SUM(${pointsTransactions.amount}), 0)`,
           })
@@ -86,7 +91,7 @@ export async function GET(request: NextRequest) {
     const tasksLeaderboard = await Promise.all(
       familyChildren.map(async (child) => {
         // Count approved chore assignments this week
-        const tasksResult = await db
+        const tasksResult = await db!
           .select({
             taskCount: sql<number>`COUNT(*)`,
           })
@@ -124,7 +129,7 @@ export async function GET(request: NextRequest) {
           const endOfDay = new Date(checkDate);
           endOfDay.setHours(23, 59, 59, 999);
 
-          const activityResult = await db
+          const activityResult = await db!
             .select({
               hasActivity: sql<number>`COUNT(*) > 0`,
             })

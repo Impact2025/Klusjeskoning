@@ -46,6 +46,11 @@ export async function POST(
     const body = await request.json();
     const data = confirmPaymentSchema.parse(body);
 
+    // Check if db client is available
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 503 });
+    }
+
     // Get the external chore request with child info
     const [choreRequest] = await db
       .select({
@@ -89,7 +94,7 @@ export async function POST(
 
     } else if (choreRequest.paymentMode === 'in_app') {
       // For in-app payments, release held funds to child's points
-      await db.transaction(async (tx: typeof db) => {
+      await db.transaction(async (tx) => {
         // Find the hold transaction
         const [holdTx] = await tx
           .select()
