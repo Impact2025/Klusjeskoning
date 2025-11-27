@@ -11,7 +11,16 @@ const rawConnectionString = process.env.DATABASE_URL;
 const isValidConnectionString = (str: string | undefined): str is string => {
   if (!str || str.trim() === '') return false;
   // Check if it starts with postgresql:// or postgres://
-  return str.startsWith('postgresql://') || str.startsWith('postgres://');
+  if (!str.startsWith('postgresql://') && !str.startsWith('postgres://')) return false;
+
+  // Check if it's not a placeholder value
+  if (str.includes('your_production_db_url_here') ||
+      str.includes('your_db_url') ||
+      str.includes('username:password@host')) return false;
+
+  // Basic structure check: should have @ and / after protocol
+  const withoutProtocol = str.replace(/^postgres(ql)?:\/\//, '');
+  return withoutProtocol.includes('@') && withoutProtocol.includes('/');
 };
 
 // Only initialize database connection if we have a valid DATABASE_URL
