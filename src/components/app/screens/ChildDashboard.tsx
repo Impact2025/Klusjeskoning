@@ -672,61 +672,61 @@ export default function ChildDashboard() {
         </main>
       </ScrollArea>
       
-      {/* Professional Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 z-50 shadow-2xl">
-        <div className="flex justify-around items-center h-20 px-6 max-w-lg mx-auto">
+      {/* Professional Bottom Navigation - Mobile Optimized */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 z-50 shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="flex justify-around items-center h-16 px-2 sm:px-4 max-w-lg mx-auto">
           <Button
             variant="ghost"
-            className="flex flex-col items-center space-y-2 h-auto flex-1 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
+            className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] p-1 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 active:scale-95"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
-              <ListTodo className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+              <ListTodo className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xs font-semibold">Klusjes</span>
+            <span className="text-[10px] sm:text-xs font-semibold mt-1">Klusjes</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setRewardShopOpen(true)}
-            className="flex flex-col items-center space-y-2 h-auto flex-1 text-gray-600 hover:text-pink-600 hover:bg-pink-50 rounded-xl transition-all duration-200"
+            className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] p-1 text-gray-600 hover:text-pink-600 hover:bg-pink-50 rounded-xl transition-all duration-200 active:scale-95"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-md">
-              <Store className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-md">
+              <Store className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xs font-semibold">Winkel</span>
+            <span className="text-[10px] sm:text-xs font-semibold mt-1">Winkel</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setIsPowerKlusjesOpen(true)}
-            className="flex flex-col items-center space-y-2 h-auto flex-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl transition-all duration-200"
+            className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl transition-all duration-200 active:scale-95"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
-              <Share2 className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
+              <Share2 className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xs font-semibold">Power</span>
+            <span className="text-[10px] sm:text-xs font-semibold mt-1">Power</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setIsGamesMenuOpen(true)}
-            className="flex flex-col items-center space-y-2 h-auto flex-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-all duration-200"
+            className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-all duration-200 active:scale-95"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-md">
-              <Gamepad2 className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-md">
+              <Gamepad2 className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xs font-semibold">Spelletjes</span>
+            <span className="text-[10px] sm:text-xs font-semibold mt-1">Spelletjes</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setLevelsModalOpen(true)}
-            className="flex flex-col items-center space-y-2 h-auto flex-1 text-gray-600 hover:text-yellow-600 hover:bg-yellow-50 rounded-xl transition-all duration-200"
+            className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] p-1 text-gray-600 hover:text-yellow-600 hover:bg-yellow-50 rounded-xl transition-all duration-200 active:scale-95"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center shadow-md">
-              <Trophy className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center shadow-md">
+              <Trophy className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xs font-semibold">Prestaties</span>
+            <span className="text-[10px] sm:text-xs font-semibold mt-1">Prestaties</span>
           </Button>
         </div>
       </nav>
@@ -744,9 +744,9 @@ export default function ChildDashboard() {
       <LevelsModal isOpen={isLevelsModalOpen} setIsOpen={setLevelsModalOpen} />
       <ChildOnboardingModal isOpen={isOnboardingOpen} setIsOpen={setIsOnboardingOpen} />
 
-      {/* Game Modals */}
+      {/* Game Modals - Mobile Optimized */}
       <Dialog open={isSpinWheelOpen} onOpenChange={setIsSpinWheelOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogTitle>Dagelijkse Spin</DialogTitle>
           <SpinWheel
             spinsAvailable={spinsAvailable}
@@ -756,35 +756,35 @@ export default function ChildDashboard() {
       </Dialog>
 
       <Dialog open={isStickerAlbumOpen} onOpenChange={setIsStickerAlbumOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogTitle>Sticker Album</DialogTitle>
           <StickerAlbum childId={user!.id} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={isFamilyFeedOpen} onOpenChange={setIsFamilyFeedOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogTitle>Familie Feed</DialogTitle>
           <FamilyFeed />
         </DialogContent>
       </Dialog>
 
       <Dialog open={isSeasonalEventsOpen} onOpenChange={setIsSeasonalEventsOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogTitle>Seizoens Events</DialogTitle>
           <SeasonalEvents />
         </DialogContent>
       </Dialog>
 
       <Dialog open={isVirtualRoomOpen} onOpenChange={setIsVirtualRoomOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogTitle>Virtuele Kamer</DialogTitle>
           <VirtualRoom />
         </DialogContent>
       </Dialog>
 
       <Dialog open={isAIPersonaOpen} onOpenChange={setIsAIPersonaOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogTitle>AI Helper</DialogTitle>
           <AIPersona />
         </DialogContent>
@@ -792,7 +792,7 @@ export default function ChildDashboard() {
 
       {/* PowerKlusjes Modal */}
       <Dialog open={isPowerKlusjesOpen} onOpenChange={setIsPowerKlusjesOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogTitle className="flex items-center">
             <Share2 className="w-6 h-6 mr-2 text-green-600" />
             PowerKlusjes Uitnodiging
@@ -809,21 +809,21 @@ export default function ChildDashboard() {
 
       {/* Virtual Pet Modal */}
       <Dialog open={isVirtualPetOpen} onOpenChange={setIsVirtualPetOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogTitle className="flex items-center">
             <span className="mr-2">🐾</span>
             {virtualPet?.name}
             {isGoldenPet && <span className="ml-2 text-yellow-500 animate-pulse">👑 Kampioen!</span>}
           </DialogTitle>
           {virtualPet && (
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* TODO: Create VirtualPet component */}
               <p className="text-center text-gray-600">
                 Virtual pet details voor {virtualPet.name} worden binnenkort toegevoegd!
               </p>
-              <div className="mt-4 flex gap-2 justify-center">
-                <Button onClick={() => handlePetFeed()}>Voer {virtualPet.name}</Button>
-                <Button onClick={() => handlePetPlay()}>Speel met {virtualPet.name}</Button>
+              <div className="mt-4 flex flex-col sm:flex-row gap-2 justify-center">
+                <Button onClick={() => handlePetFeed()} className="min-h-[44px]">Voer {virtualPet.name}</Button>
+                <Button onClick={() => handlePetPlay()} className="min-h-[44px]">Speel met {virtualPet.name}</Button>
               </div>
             </div>
           )}
@@ -841,9 +841,9 @@ export default function ChildDashboard() {
         />
       )}
 
-      {/* Games Menu Modal */}
+      {/* Games Menu Modal - Mobile Optimized */}
       <Dialog open={isGamesMenuOpen} onOpenChange={setIsGamesMenuOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <Gamepad2 className="w-6 h-6 mr-2 text-purple-600" />
@@ -851,117 +851,117 @@ export default function ChildDashboard() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <Button
               variant="outline"
-              className="w-full justify-start h-auto p-4"
+              className="w-full justify-start h-auto min-h-[56px] p-3 sm:p-4 active:scale-[0.98] transition-transform"
               onClick={() => {
                 setIsGamesMenuOpen(false);
                 setIsStickerAlbumOpen(true);
               }}
             >
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-500 rounded-lg flex items-center justify-center text-white mr-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-pink-400 to-purple-500 rounded-lg flex items-center justify-center text-white mr-3 flex-shrink-0">
                   🎟️
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold">Sticker Album</div>
-                  <div className="text-sm text-gray-600">Verzamel en ruil stickers</div>
+                  <div className="font-semibold text-sm sm:text-base">Sticker Album</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Verzamel en ruil stickers</div>
                 </div>
               </div>
             </Button>
 
             <Button
               variant="outline"
-              className="w-full justify-start h-auto p-4"
+              className="w-full justify-start h-auto min-h-[56px] p-3 sm:p-4 active:scale-[0.98] transition-transform"
               onClick={() => {
                 setIsGamesMenuOpen(false);
                 setIsFamilyFeedOpen(true);
               }}
             >
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-lg flex items-center justify-center text-white mr-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-lg flex items-center justify-center text-white mr-3 flex-shrink-0">
                   📱
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold">Familie Feed</div>
-                  <div className="text-sm text-gray-600">Zie wat iedereen doet</div>
+                  <div className="font-semibold text-sm sm:text-base">Familie Feed</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Zie wat iedereen doet</div>
                 </div>
               </div>
             </Button>
 
             <Button
               variant="outline"
-              className="w-full justify-start h-auto p-4"
+              className="w-full justify-start h-auto min-h-[56px] p-3 sm:p-4 active:scale-[0.98] transition-transform"
               onClick={() => {
                 setIsGamesMenuOpen(false);
                 setIsSeasonalEventsOpen(true);
               }}
             >
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center text-white mr-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center text-white mr-3 flex-shrink-0">
                   🎄
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold">Seizoens Events</div>
-                  <div className="text-sm text-gray-600">Speciale feestdagen</div>
+                  <div className="font-semibold text-sm sm:text-base">Seizoens Events</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Speciale feestdagen</div>
                 </div>
               </div>
             </Button>
 
             <Button
               variant="outline"
-              className="w-full justify-start h-auto p-4"
+              className="w-full justify-start h-auto min-h-[56px] p-3 sm:p-4 active:scale-[0.98] transition-transform"
               onClick={() => {
                 setIsGamesMenuOpen(false);
                 setIsVirtualRoomOpen(true);
               }}
             >
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center text-white mr-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center text-white mr-3 flex-shrink-0">
                   🏠
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold">Virtuele Kamer</div>
-                  <div className="text-sm text-gray-600">Ontwerp je eigen ruimte</div>
+                  <div className="font-semibold text-sm sm:text-base">Virtuele Kamer</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Ontwerp je eigen ruimte</div>
                 </div>
               </div>
             </Button>
 
             <Button
               variant="outline"
-              className="w-full justify-start h-auto p-4"
+              className="w-full justify-start h-auto min-h-[56px] p-3 sm:p-4 active:scale-[0.98] transition-transform"
               onClick={() => {
                 setIsGamesMenuOpen(false);
                 setIsFamilyRankingOpen(true);
               }}
             >
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center text-white mr-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center text-white mr-3 flex-shrink-0">
                   🏆
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold">Ranglijst</div>
-                  <div className="text-sm text-gray-600">Zie hoe je scoort</div>
+                  <div className="font-semibold text-sm sm:text-base">Ranglijst</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Zie hoe je scoort</div>
                 </div>
               </div>
             </Button>
 
             <Button
               variant="outline"
-              className="w-full justify-start h-auto p-4"
+              className="w-full justify-start h-auto min-h-[56px] p-3 sm:p-4 active:scale-[0.98] transition-transform"
               onClick={() => {
                 setIsGamesMenuOpen(false);
                 setIsAIPersonaOpen(true);
               }}
             >
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center text-white mr-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center text-white mr-3 flex-shrink-0">
                   🤖
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold">AI Helper</div>
-                  <div className="text-sm text-gray-600">Krijg hulp en tips</div>
+                  <div className="font-semibold text-sm sm:text-base">AI Helper</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Krijg hulp en tips</div>
                 </div>
               </div>
             </Button>

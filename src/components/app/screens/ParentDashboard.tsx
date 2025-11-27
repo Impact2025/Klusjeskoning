@@ -243,7 +243,7 @@ export default function ParentDashboard() {
       </header>
 
       {/* Mobile Header - Clean and Professional */}
-      <header className="md:hidden p-4 flex justify-between items-center bg-white shadow-sm border-b">
+      <header className="md:hidden px-4 pb-4 flex justify-between items-center bg-white shadow-sm border-b" style={{ paddingTop: 'max(env(safe-area-inset-top), 1rem)' }}>
         <div>
           <h1 className="text-xl font-bold text-gray-800">
             {activeTab === 'overview' && 'Overzicht'}
@@ -317,78 +317,78 @@ export default function ParentDashboard() {
         <main className="p-6 pb-24 md:pb-6 max-w-7xl mx-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
-            {/* Mobile Bottom Navigation - Minimalist & Professional */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 md:hidden z-50 shadow-2xl">
-              <div className="flex justify-around items-center h-16 px-2 max-w-lg mx-auto">
+            {/* Mobile Bottom Navigation - Optimized for Touch */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 md:hidden z-50 shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+              <div className="flex justify-around items-center h-14 px-1 max-w-lg mx-auto">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
+                  className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] p-1 rounded-lg transition-all duration-200 active:scale-95 ${
                     activeTab === 'overview'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <BarChart3 className="h-5 w-5" />
-                  <span className="text-xs font-medium">Overzicht</span>
+                  <span className="text-[10px] font-medium mt-0.5">Overzicht</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('children')}
-                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
+                  className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] p-1 rounded-lg transition-all duration-200 active:scale-95 ${
                     activeTab === 'children'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <Users className="h-5 w-5" />
-                  <span className="text-xs font-medium">Kinderen</span>
+                  <span className="text-[10px] font-medium mt-0.5">Kinderen</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('chores')}
-                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
+                  className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] p-1 rounded-lg transition-all duration-200 active:scale-95 ${
                     activeTab === 'chores'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <ListTodo className="h-5 w-5" />
-                  <span className="text-xs font-medium">Klusjes</span>
+                  <span className="text-[10px] font-medium mt-0.5">Klusjes</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('rewards')}
-                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
+                  className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] p-1 rounded-lg transition-all duration-200 active:scale-95 ${
                     activeTab === 'rewards'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <Gift className="h-5 w-5" />
-                  <span className="text-xs font-medium">Beloningen</span>
+                  <span className="text-[10px] font-medium mt-0.5">Beloningen</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('compliments')}
-                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
+                  className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] p-1 rounded-lg transition-all duration-200 active:scale-95 ${
                     activeTab === 'compliments'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <Heart className="h-5 w-5" />
-                  <span className="text-xs font-medium">Complimenten</span>
+                  <span className="text-[10px] font-medium mt-0.5">Complimenten</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('actions')}
-                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 relative ${
+                  className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] p-1 rounded-lg transition-all duration-200 active:scale-95 relative ${
                     activeTab === 'actions'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <AlertTriangle className="h-5 w-5" />
-                  <span className="text-xs font-medium">Goedkeuren</span>
+                  <span className="text-[10px] font-medium mt-0.5">Actie</span>
                   {totalPending > 0 && (
                     <Badge
                       variant="destructive"
-                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-xs flex items-center justify-center font-bold"
+                      className="absolute -top-0.5 right-0 h-4 min-w-[16px] rounded-full px-1 text-[10px] flex items-center justify-center font-bold"
                     >
                       {totalPending}
                     </Badge>
@@ -525,12 +525,12 @@ export default function ParentDashboard() {
                 </Button>
               </div>
 
-              {/* Professional Children Table */}
+              {/* Professional Children List - Mobile Cards / Desktop Table */}
               {family.children.length > 0 ? (
                 <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60 overflow-hidden">
                   <CardContent className="p-0">
-                    {/* Table Header */}
-                    <div className="bg-gray-50/80 border-b border-gray-200/60 px-6 py-4">
+                    {/* Desktop Table Header - Hidden on Mobile */}
+                    <div className="hidden md:block bg-gray-50/80 border-b border-gray-200/60 px-6 py-4">
                       <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
                         <div className="col-span-4">Kind</div>
                         <div className="col-span-2 text-center">Level</div>
@@ -540,11 +540,71 @@ export default function ParentDashboard() {
                       </div>
                     </div>
 
-                    {/* Table Rows */}
+                    {/* Children List */}
                     <div className="divide-y divide-gray-100">
                       {family.children.map((child, index) => (
-                        <div key={child.id} className={`px-6 py-5 hover:bg-gray-50/50 transition-colors ${index % 2 === 0 ? 'bg-white/30' : 'bg-gray-50/30'}`}>
-                          <div className="grid grid-cols-12 gap-4 items-center">
+                        <div key={child.id} className={`p-4 md:px-6 md:py-5 hover:bg-gray-50/50 transition-colors ${index % 2 === 0 ? 'bg-white/30' : 'bg-gray-50/30'}`}>
+                          {/* Mobile Card Layout */}
+                          <div className="md:hidden space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-12 w-12 ring-2 ring-blue-100">
+                                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-lg">
+                                    {child.avatar || child.name[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-bold text-gray-900">{child.name}</p>
+                                  <p className="text-sm text-gray-600">{child.totalXpEver} XP</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white font-bold text-xs">
+                                    {Math.floor((child.totalXpEver || 0) / 100) + 1}
+                                  </span>
+                                </div>
+                                <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-bold">
+                                  {child.points}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <code className="bg-gray-100 text-gray-800 px-3 py-1 rounded text-sm font-mono font-bold">
+                                PIN: {child.pin}
+                              </code>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditChild(child)}
+                                  className="h-10 w-10 p-0 border-gray-300 hover:bg-gray-100 active:scale-95"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleStartOnboarding(child)}
+                                  className="h-10 px-3 bg-purple-600 hover:bg-purple-700 text-xs font-medium active:scale-95"
+                                >
+                                  <Zap className="h-4 w-4 mr-1" />
+                                  Setup
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteChild(child.id, child.name)}
+                                  className="h-10 w-10 p-0 border-red-300 text-red-600 hover:bg-red-50 active:scale-95"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Desktop Table Layout */}
+                          <div className="hidden md:grid grid-cols-12 gap-4 items-center">
                             {/* Child Info */}
                             <div className="col-span-4 flex items-center gap-4">
                               <Avatar className="h-12 w-12 ring-2 ring-blue-100">
@@ -587,26 +647,26 @@ export default function ParentDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditChild(child)}
-                                className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100 hover:border-gray-400 transition-colors"
+                                className="h-9 w-9 p-0 border-gray-300 hover:bg-gray-100 hover:border-gray-400 transition-colors"
                               >
-                                <Edit className="h-3 w-3" />
+                                <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="default"
                                 size="sm"
                                 onClick={() => handleStartOnboarding(child)}
-                                className="h-8 px-3 bg-purple-600 hover:bg-purple-700 text-xs font-medium"
+                                className="h-9 px-3 bg-purple-600 hover:bg-purple-700 text-xs font-medium"
                               >
-                                <Zap className="h-3 w-3 mr-1" />
+                                <Zap className="h-4 w-4 mr-1" />
                                 Setup
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteChild(child.id, child.name)}
-                                className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors"
+                                className="h-9 w-9 p-0 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
