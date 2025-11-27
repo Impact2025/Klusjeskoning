@@ -6,6 +6,7 @@ import { children, avatarItems, avatarCustomizations, rewardTemplates, teamChore
 
 import {
   authenticateFamily,
+  authenticateFamilyWithData,
   createFamily,
   startFamilyRegistration,
   completeFamilyRegistration,
@@ -573,12 +574,14 @@ export async function POST(request: Request) {
       }
       case 'loginParent': {
         const data = loginSchema.parse(payload);
-        const family = await authenticateFamily(data.email, data.password);
-        if (!family) {
+        // Use optimized auth that preloads family data - saves ~200ms
+        const authResult = await authenticateFamilyWithData(data.email, data.password);
+        if (!authResult || !authResult.familyData) {
           return errorResponse('Onjuiste inloggegevens.', 401);
         }
-        await createSession(family.id);
-        return respondWithFamily(family.id);
+        await createSession(authResult.family.id);
+        // Return preloaded family data directly - no extra DB call needed
+        return NextResponse.json({ family: serializeFamily(authResult.familyData) });
       }
       case 'adminLogin': {
         const data = adminLoginSchema.parse(payload);

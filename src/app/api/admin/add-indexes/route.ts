@@ -6,21 +6,21 @@ import { requireSession } from '@/server/auth/session';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@klusjeskoning.nl';
 
 const indexes = [
-  // Families
+  // Families - critical for login performance
   { name: 'idx_families_email', sql: 'CREATE INDEX IF NOT EXISTS idx_families_email ON families(email)' },
   { name: 'idx_families_family_code', sql: 'CREATE INDEX IF NOT EXISTS idx_families_family_code ON families(family_code)' },
 
-  // Children
+  // Children - critical for family data loading
   { name: 'idx_children_family_id', sql: 'CREATE INDEX IF NOT EXISTS idx_children_family_id ON children(family_id)' },
   { name: 'idx_children_family_pin', sql: 'CREATE INDEX IF NOT EXISTS idx_children_family_pin ON children(family_id, pin)' },
 
-  // Chores
+  // Chores - heavy queries during dashboard load
   { name: 'idx_chores_family_id', sql: 'CREATE INDEX IF NOT EXISTS idx_chores_family_id ON chores(family_id)' },
   { name: 'idx_chores_status', sql: 'CREATE INDEX IF NOT EXISTS idx_chores_status ON chores(status)' },
   { name: 'idx_chores_family_status', sql: 'CREATE INDEX IF NOT EXISTS idx_chores_family_status ON chores(family_id, status)' },
   { name: 'idx_chores_submitted_by', sql: 'CREATE INDEX IF NOT EXISTS idx_chores_submitted_by ON chores(submitted_by_child_id) WHERE submitted_by_child_id IS NOT NULL' },
 
-  // Chore Assignments
+  // Chore Assignments - JOINs are expensive without indexes
   { name: 'idx_chore_assignments_chore_id', sql: 'CREATE INDEX IF NOT EXISTS idx_chore_assignments_chore_id ON chore_assignments(chore_id)' },
   { name: 'idx_chore_assignments_child_id', sql: 'CREATE INDEX IF NOT EXISTS idx_chore_assignments_child_id ON chore_assignments(child_id)' },
 
@@ -36,10 +36,24 @@ const indexes = [
   { name: 'idx_pending_rewards_family_id', sql: 'CREATE INDEX IF NOT EXISTS idx_pending_rewards_family_id ON pending_rewards(family_id)' },
   { name: 'idx_pending_rewards_child_id', sql: 'CREATE INDEX IF NOT EXISTS idx_pending_rewards_child_id ON pending_rewards(child_id)' },
 
-  // Sessions
+  // Sessions - critical for every authenticated request
   { name: 'idx_sessions_token', sql: 'CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)' },
   { name: 'idx_sessions_expires_at', sql: 'CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)' },
   { name: 'idx_sessions_family_id', sql: 'CREATE INDEX IF NOT EXISTS idx_sessions_family_id ON sessions(family_id)' },
+
+  // Team Chores - NEW
+  { name: 'idx_team_chores_family_id', sql: 'CREATE INDEX IF NOT EXISTS idx_team_chores_family_id ON team_chores(family_id)' },
+
+  // Points Transactions - for history queries
+  { name: 'idx_points_transactions_child_id', sql: 'CREATE INDEX IF NOT EXISTS idx_points_transactions_child_id ON points_transactions(child_id)' },
+  { name: 'idx_points_transactions_created', sql: 'CREATE INDEX IF NOT EXISTS idx_points_transactions_created ON points_transactions(created_at DESC)' },
+
+  // Avatar customizations
+  { name: 'idx_avatar_customizations_child_id', sql: 'CREATE INDEX IF NOT EXISTS idx_avatar_customizations_child_id ON avatar_customizations(child_id)' },
+
+  // PowerKlusjes requests
+  { name: 'idx_external_chore_requests_family', sql: 'CREATE INDEX IF NOT EXISTS idx_external_chore_requests_family ON external_chore_requests(family_id)' },
+  { name: 'idx_external_chore_requests_child', sql: 'CREATE INDEX IF NOT EXISTS idx_external_chore_requests_child ON external_chore_requests(child_id)' },
 ];
 
 export async function POST() {

@@ -253,6 +253,182 @@ export const authenticateFamily = async (email: string, password: string) => {
   return family;
 };
 
+/**
+ * Optimized authentication that also preloads family data
+ * Reduces login time by eliminating separate loadFamilyWithRelations call
+ */
+export const authenticateFamilyWithData = async (email: string, password: string) => {
+  if (!db) throw new Error('Database not initialized');
+
+  // Step 1: Get family and verify password
+  const family = await db.query.families.findFirst({ where: eq(families.email, email) });
+  if (!family) {
+    return null;
+  }
+
+  const isValid = await verifyPassword(password, family.passwordHash);
+  if (!isValid) {
+    return null;
+  }
+
+  // Step 2: Check cache first (may have been loaded recently)
+  const cachedFamily = await FamilyCache.get(family.id);
+  if (cachedFamily) {
+    return { family, familyData: cachedFamily };
+  }
+
+  // Step 3: Load family data in parallel (same as loadFamilyWithRelations but reuses family object)
+  const familyData = await loadFamilyDataOptimized(family.id, family);
+
+  return { family, familyData };
+};
+
+/**
+ * Internal helper to load family data with optional pre-fetched family record
+ */
+const loadFamilyDataOptimized = async (familyId: string, familyRecord?: any) => {
+  if (!db) throw new Error('Database not initialized');
+
+  // Use provided family record or fetch it
+  let family = familyRecord;
+  if (!family) {
+    const familyResult = await db.execute(sql`
+      SELECT
+        f.id, f.family_code, f.family_name, f.city, f.email, f.created_at,
+        f.recovery_email, f.subscription_plan, f.subscription_status,
+        f.subscription_interval, f.subscription_renewal_date,
+        f.subscription_last_payment_at, f.subscription_order_id
+      FROM families f
+      WHERE f.id = ${familyId}
+    `);
+    if (familyResult.rows.length === 0) return null;
+    family = familyResult.rows[0];
+  }
+
+  // Execute all queries in parallel - SINGLE database roundtrip with Promise.all
+  const [
+    childrenResult,
+    choresResult,
+    rewardsResult,
+    pendingRewardsResult,
+    teamChoresResult
+  ] = await Promise.all([
+    db.execute(sql`
+      SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
+      FROM children WHERE family_id = ${familyId}
+    `),
+    db.execute(sql`
+      SELECT c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
+        c.submitted_at, c.emotion, c.photo_url, c.created_at,
+        ca.child_id as assigned_child_id, ca.assigned_at
+      FROM chores c
+      LEFT JOIN chore_assignments ca ON c.id = ca.chore_id
+      WHERE c.family_id = ${familyId}
+    `),
+    db.execute(sql`
+      SELECT r.id, r.family_id, r.name, r.points, r.type, r.created_at,
+        ra.child_id as assigned_child_id, ra.assigned_at
+      FROM rewards r
+      LEFT JOIN reward_assignments ra ON r.id = ra.reward_id
+      WHERE r.family_id = ${familyId}
+    `),
+    db.execute(sql`
+      SELECT pr.id, pr.family_id, pr.child_id, pr.reward_id, pr.points, pr.redeemed_at,
+        c.name as child_name, r.name as reward_name
+      FROM pending_rewards pr
+      LEFT JOIN children c ON pr.child_id = c.id
+      LEFT JOIN rewards r ON pr.reward_id = r.id
+      WHERE pr.family_id = ${familyId}
+    `),
+    db.execute(sql`
+      SELECT id, family_id, name, description, participating_children, total_points, progress, completed_at, created_at
+      FROM team_chores WHERE family_id = ${familyId} ORDER BY created_at DESC
+    `)
+  ]);
+
+  // Build family data object
+  const familyData = {
+    id: family.id ?? family.familyId,
+    familyCode: family.family_code ?? family.familyCode,
+    familyName: family.family_name ?? family.familyName,
+    city: family.city,
+    email: family.email,
+    createdAt: family.created_at ?? family.createdAt,
+    recoveryEmail: family.recovery_email ?? family.recoveryEmail,
+    subscriptionPlan: family.subscription_plan ?? family.subscriptionPlan,
+    subscriptionStatus: family.subscription_status ?? family.subscriptionStatus,
+    subscriptionInterval: family.subscription_interval ?? family.subscriptionInterval,
+    subscriptionRenewalDate: family.subscription_renewal_date ?? family.subscriptionRenewalDate,
+    subscriptionLastPaymentAt: family.subscription_last_payment_at ?? family.subscriptionLastPaymentAt,
+    subscriptionOrderId: family.subscription_order_id ?? family.subscriptionOrderId,
+    children: childrenResult.rows.map((child: any) => ({
+      id: child.id,
+      familyId: child.family_id,
+      name: child.name,
+      pin: child.pin,
+      points: Number(child.points),
+      totalPointsEver: Number(child.total_points_ever),
+      avatar: child.avatar,
+      createdAt: child.created_at,
+    })),
+    chores: Object.values(
+      choresResult.rows.reduce((acc: any, row: any) => {
+        if (!acc[row.id]) {
+          acc[row.id] = {
+            id: row.id, familyId: row.family_id, name: row.name,
+            points: Number(row.points), status: row.status,
+            submittedByChildId: row.submitted_by_child_id,
+            submittedAt: row.submitted_at, emotion: row.emotion,
+            photoUrl: row.photo_url, createdAt: row.created_at,
+            assignments: [],
+          };
+        }
+        if (row.assigned_child_id) {
+          acc[row.id].assignments.push({
+            chore_id: row.id, child_id: row.assigned_child_id, assigned_at: row.assigned_at,
+          });
+        }
+        return acc;
+      }, {})
+    ),
+    rewards: Object.values(
+      rewardsResult.rows.reduce((acc: any, row: any) => {
+        if (!acc[row.id]) {
+          acc[row.id] = {
+            id: row.id, familyId: row.family_id, name: row.name,
+            points: Number(row.points), type: row.type, createdAt: row.created_at,
+            assignments: [],
+          };
+        }
+        if (row.assigned_child_id) {
+          acc[row.id].assignments.push({
+            reward_id: row.id, child_id: row.assigned_child_id, assigned_at: row.assigned_at,
+          });
+        }
+        return acc;
+      }, {})
+    ),
+    pendingRewards: pendingRewardsResult.rows.map((pending: any) => ({
+      id: pending.id, familyId: pending.family_id, childId: pending.child_id,
+      rewardId: pending.reward_id, points: Number(pending.points),
+      redeemedAt: pending.redeemed_at,
+      child: { name: pending.child_name },
+      reward: { name: pending.reward_name },
+    })),
+    teamChores: teamChoresResult.rows.map((tc: any) => ({
+      id: tc.id, familyId: tc.family_id, name: tc.name, description: tc.description,
+      participatingChildren: tc.participating_children || [],
+      totalPoints: Number(tc.total_points), progress: Number(tc.progress),
+      completedAt: tc.completed_at, createdAt: tc.created_at,
+    })),
+  };
+
+  // Cache the result
+  await FamilyCache.set(familyId, familyData);
+
+  return familyData;
+};
+
 export const getFamilyByEmail = async (email: string) => {
   if (!db) throw new Error('Database not initialized');
 
