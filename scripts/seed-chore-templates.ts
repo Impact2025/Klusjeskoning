@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '../src/server/db/schema';
-import seedData from '../klusjes_seed_data.json';
+import seedData from '../src/lib/klusjes_seed_data.json';
 
 // Direct database connection for scripts (bypasses server-only)
 const connectionString = process.env.DATABASE_URL;
