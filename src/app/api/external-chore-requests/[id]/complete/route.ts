@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/server/db/client';
-import { externalChoreRequests, children } from '@/server/db/schema';
+import { externalChoreRequests, children, trustedContacts, families } from '@/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireSession } from '@/server/auth/session';
 import { checkApiRateLimit } from '@/lib/rate-limit';
 import { securityMiddleware } from '@/lib/security-middleware';
+import { sendEmail } from '@/lib/email/sendgrid';
 
 const completeSchema = z.object({
   evidenceUrl: z.string().url(), // Photo/video proof URL
@@ -51,20 +52,26 @@ export async function POST(
       return NextResponse.json({ error: 'Database not available' }, { status: 503 });
     }
 
-    // Get the external chore request with child info
+    // Get the external chore request with child and contact info
     const [choreRequest] = await db
       .select({
         id: externalChoreRequests.id,
         childId: externalChoreRequests.childId,
         familyId: externalChoreRequests.familyId,
+        contactId: externalChoreRequests.contactId,
         status: externalChoreRequests.status,
         offeredAmountCents: externalChoreRequests.offeredAmountCents,
         paymentMode: externalChoreRequests.paymentMode,
         title: externalChoreRequests.title,
         childName: children.name,
+        contactName: trustedContacts.name,
+        contactEmail: trustedContacts.email,
+        familyEmail: families.email,
       })
       .from(externalChoreRequests)
       .leftJoin(children, eq(externalChoreRequests.childId, children.id))
+      .leftJoin(trustedContacts, eq(externalChoreRequests.contactId, trustedContacts.id))
+      .leftJoin(families, eq(externalChoreRequests.familyId, families.id))
       .where(and(
         eq(externalChoreRequests.id, requestId),
         eq(externalChoreRequests.familyId, session.familyId)
@@ -95,14 +102,49 @@ export async function POST(
     // For manual payments, just mark as completed
     // For in-app payments, the funds are already held and will be released when parent confirms payment
 
-    // TODO: Send notification to parent about completion
-    // TODO: Send notification to contact about completion
+    // Send notification to parent about completion
+    if (choreRequest.familyEmail) {
+      try {
+        await sendEmail({
+          to: choreRequest.familyEmail,
+          type: 'superklusje_completed',
+          data: {
+            childName: choreRequest.childName || 'Het kind',
+            title: choreRequest.title,
+            amountEuros: choreRequest.offeredAmountCents / 100,
+            contactName: choreRequest.contactName || 'De contactpersoon',
+          },
+        });
+        console.log('[external-chore-requests] Completion email sent to parent:', choreRequest.familyEmail);
+      } catch (emailError) {
+        console.error('[external-chore-requests] Failed to send completion email to parent:', emailError);
+      }
+    }
+
+    // Send notification to contact about completion
+    if (choreRequest.contactEmail) {
+      try {
+        await sendEmail({
+          to: choreRequest.contactEmail,
+          type: 'superklusje_completed',
+          data: {
+            childName: choreRequest.childName || 'Het kind',
+            title: choreRequest.title,
+            amountEuros: choreRequest.offeredAmountCents / 100,
+            contactName: choreRequest.contactName || 'De contactpersoon',
+          },
+        });
+        console.log('[external-chore-requests] Completion email sent to contact:', choreRequest.contactEmail);
+      } catch (emailError) {
+        console.error('[external-chore-requests] Failed to send completion email to contact:', emailError);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       message: choreRequest.paymentMode === 'manual'
-        ? 'Klus voltooid! Wacht op bevestiging van betaling door de contactpersoon.'
-        : 'Klus voltooid! De ouders kunnen nu de betaling bevestigen.',
+        ? 'Klus voltooid! De contactpersoon en ouders krijgen een e-mail.'
+        : 'Klus voltooid! De ouders krijgen een e-mail en kunnen de betaling bevestigen.',
     });
 
   } catch (error) {

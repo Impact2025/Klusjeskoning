@@ -64,33 +64,48 @@ interface TourGuideProps {
 }
 
 export default function TourGuide({ isOpen, onClose }: TourGuideProps) {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
+   const [currentStep, setCurrentStep] = useState(0);
+   const [isVisible, setIsVisible] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentStep(0);
-      setIsVisible(true);
-    } else {
-      setIsVisible(false);
-    }
-  }, [isOpen]);
+   useEffect(() => {
+     if (isOpen) {
+       setCurrentStep(0);
+       setIsVisible(true);
+       // Prevent body scrolling when tour is active
+       document.body.style.overflow = 'hidden';
+     } else {
+       setIsVisible(false);
+       document.body.style.overflow = 'unset';
+     }
 
-  useEffect(() => {
-    if (!isVisible) return;
+     // Cleanup on unmount
+     return () => {
+       document.body.style.overflow = 'unset';
+     };
+   }, [isOpen]);
 
-    const step = TOUR_STEPS[currentStep];
-    if (!step) return;
+   useEffect(() => {
+     if (!isVisible) return;
 
-    // Scroll target into view
-    const targetElement = document.querySelector(step.target);
-    if (targetElement) {
-      targetElement.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
-    }
-  }, [currentStep, isVisible]);
+     const step = TOUR_STEPS[currentStep];
+     if (!step || step.target === 'body') return;
+
+     // Gentle scroll to target element without jumping
+     const targetElement = document.querySelector(step.target);
+     if (targetElement) {
+       const elementTop = targetElement.getBoundingClientRect().top;
+       const windowHeight = window.innerHeight;
+
+       // Only scroll if element is not already reasonably visible
+       if (elementTop < 100 || elementTop > windowHeight - 200) {
+         targetElement.scrollIntoView({
+           behavior: 'smooth',
+           block: 'center',
+           inline: 'nearest'
+         });
+       }
+     }
+   }, [currentStep, isVisible]);
 
   if (!isVisible) return null;
 
@@ -116,26 +131,21 @@ export default function TourGuide({ isOpen, onClose }: TourGuideProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
+    <div className="fixed inset-0 z-[10000] pointer-events-none">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 pointer-events-auto" onClick={handleSkip} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
+        onClick={handleSkip}
+        aria-label="Sluit rondleiding"
+      />
 
-      {/* Highlight overlay */}
-      {step.target !== 'body' && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="relative w-full h-full">
-            {/* We'll add spotlight effect here if needed */}
-          </div>
-        </div>
-      )}
-
-      {/* Tour Card */}
-      <div className="absolute z-10 pointer-events-auto">
-        <Card className="w-80 shadow-2xl border-2 border-primary">
+      {/* Tour Card - Centered and stable */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-primary pointer-events-auto animate-in fade-in-0 zoom-in-95 duration-300">
           <CardContent className="p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
                   <Play className="w-4 h-4 text-white" />
                 </div>
                 <span className="text-sm font-medium text-gray-500">
@@ -145,20 +155,27 @@ export default function TourGuide({ isOpen, onClose }: TourGuideProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleSkip}
-                className="h-8 w-8 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSkip();
+                }}
+                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 flex-shrink-0"
+                aria-label="Sluit rondleiding"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
-            <h3 className="text-lg font-bold mb-2">{step.title}</h3>
-            <p className="text-gray-600 mb-6">{step.description}</p>
+            <h3 className="text-lg font-bold mb-2 pr-8">{step.title}</h3>
+            <p className="text-gray-600 mb-6 leading-relaxed">{step.description}</p>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <Button
                 variant="outline"
-                onClick={handlePrevious}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrevious();
+                }}
                 disabled={currentStep === 0}
                 className="flex items-center gap-2"
               >
@@ -167,10 +184,23 @@ export default function TourGuide({ isOpen, onClose }: TourGuideProps) {
               </Button>
 
               <div className="flex gap-2">
-                <Button variant="ghost" onClick={handleSkip}>
+                <Button
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSkip();
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
                   Overslaan
                 </Button>
-                <Button onClick={handleNext} className="flex items-center gap-2">
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNext();
+                  }}
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+                >
                   {currentStep === TOUR_STEPS.length - 1 ? 'Voltooien' : 'Volgende'}
                   <ChevronRight className="h-4 w-4" />
                 </Button>

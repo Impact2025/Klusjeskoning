@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import { requireSession } from '@/server/auth/session';
 import { checkApiRateLimit } from '@/lib/rate-limit';
 import { securityMiddleware } from '@/lib/security-middleware';
+import { sendEmail } from '@/lib/email/sendgrid';
 
 const createRequestSchema = z.object({
   childId: z.string().uuid(),
@@ -200,14 +201,53 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    // TODO: Send notification to parent about new request
-    // This would be implemented with the notification system
+    // Send notification email to parent about new request
+    if (child.familyEmail) {
+      try {
+        await sendEmail({
+          to: child.familyEmail,
+          type: 'superklusje_new_request',
+          data: {
+            childName: child.name,
+            title: data.title,
+            description: data.description,
+            amountEuros: data.offeredAmountCents / 100,
+            contactName: data.contact.name,
+          },
+        });
+        console.log('[external-chore-requests] Email sent to parent:', child.familyEmail);
+      } catch (emailError) {
+        console.error('[external-chore-requests] Failed to send email to parent:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    // Also send confirmation email to contact if they provided an email
+    if (data.contact.email) {
+      try {
+        await sendEmail({
+          to: data.contact.email,
+          type: 'superklusje_new_request',
+          data: {
+            childName: child.name,
+            title: data.title,
+            description: data.description,
+            amountEuros: data.offeredAmountCents / 100,
+            contactName: data.contact.name,
+          },
+        });
+        console.log('[external-chore-requests] Confirmation email sent to contact:', data.contact.email);
+      } catch (emailError) {
+        console.error('[external-chore-requests] Failed to send confirmation email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
 
     return NextResponse.json({
       request: {
         id: choreRequest.id,
         status: choreRequest.status,
-        message: 'Verzoek verzonden! De ouders krijgen een melding om dit te bekijken.'
+        message: 'Verzoek verzonden! De ouders krijgen een e-mail en kunnen dit bekijken in de app.'
       }
     }, { status: 201 });
 

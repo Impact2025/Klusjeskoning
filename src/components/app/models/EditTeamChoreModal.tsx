@@ -25,7 +25,7 @@ interface EditTeamChoreModalProps {
 }
 
 export default function EditTeamChoreModal({ isOpen, setIsOpen, teamChore }: EditTeamChoreModalProps) {
-  const { family } = useApp();
+  const { family, updateTeamChore } = useApp();
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -56,17 +56,11 @@ export default function EditTeamChoreModal({ isOpen, setIsOpen, teamChore }: Edi
 
     setIsSubmitting(true);
     try {
-      await callAppApi('updateTeamChore', {
-        teamChoreId: teamChore.id,
+      await updateTeamChore(teamChore.id, {
         name: name.trim(),
         description: description.trim(),
         totalPoints,
         participatingChildren: selectedChildren,
-      });
-
-      toast({
-        title: 'Succes',
-        description: 'Team klusje is bijgewerkt.',
       });
 
       setIsOpen(false);

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/server/db/client';
-import { externalChoreRequests, parentApprovals, wallets, walletTransactions } from '@/server/db/schema';
+import { externalChoreRequests, parentApprovals, wallets, walletTransactions, children, trustedContacts } from '@/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireSession } from '@/server/auth/session';
 import { checkApiRateLimit } from '@/lib/rate-limit';
 import { securityMiddleware } from '@/lib/security-middleware';
+import { sendEmail } from '@/lib/email/sendgrid';
 
 const rejectSchema = z.object({
   notes: z.string().max(500).optional(),
@@ -69,6 +70,26 @@ export async function POST(
       return NextResponse.json({
         error: 'Dit verzoek is al behandeld.'
       }, { status: 400 });
+    }
+
+    // Get child and contact info for emails
+    const [child] = await db
+      .select({ name: children.name })
+      .from(children)
+      .where(eq(children.id, choreRequest.childId))
+      .limit(1);
+
+    let contact = null;
+    if (choreRequest.contactId) {
+      const [contactData] = await db
+        .select({
+          name: trustedContacts.name,
+          email: trustedContacts.email,
+        })
+        .from(trustedContacts)
+        .where(eq(trustedContacts.id, choreRequest.contactId))
+        .limit(1);
+      contact = contactData;
     }
 
     // Start transaction for rejection
@@ -137,12 +158,29 @@ export async function POST(
       }
     });
 
-    // TODO: Send notification to child about rejection
-    // TODO: Send notification to contact about rejection
+    // Send notification to contact about rejection
+    if (contact?.email) {
+      try {
+        await sendEmail({
+          to: contact.email,
+          type: 'superklusje_rejected',
+          data: {
+            childName: child?.name || 'Het kind',
+            title: choreRequest.title,
+            contactName: contact.name,
+            reason: data.notes,
+          },
+        });
+        console.log('[external-chore-requests] Rejection email sent to contact:', contact.email);
+      } catch (emailError) {
+        console.error('[external-chore-requests] Failed to send rejection email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Verzoek afgewezen.',
+      message: 'Verzoek afgewezen. Het contact krijgt een e-mail.',
     });
 
   } catch (error) {

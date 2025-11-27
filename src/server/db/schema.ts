@@ -8,10 +8,19 @@ import {
   pgEnum,
   primaryKey,
   date,
+  boolean,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const planTierEnum = pgEnum('plan_tier', ['starter', 'premium']);
+
+// Chore Templates System Enums
+export const choreFrequencyEnum = pgEnum('chore_frequency', ['daily', 'weekly', 'monthly']);
+export const choreDifficultyEnum = pgEnum('chore_difficulty', ['easy', 'medium', 'hard']);
+export const starterPackDifficultyEnum = pgEnum('starter_pack_difficulty', ['minimal', 'easy', 'medium', 'hard']);
+export const suggestionTriggerEnum = pgEnum('suggestion_trigger', ['streak', 'completion_rate', 'age_milestone', 'time_based', 'manual', 'ai_recommended']);
+export const suggestionStatusEnum = pgEnum('suggestion_status', ['pending', 'accepted', 'dismissed', 'snoozed', 'expired']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['inactive', 'active', 'past_due', 'canceled']);
 export const billingIntervalEnum = pgEnum('billing_interval', ['monthly', 'yearly']);
 export const choreStatusEnum = pgEnum('chore_status', ['available', 'submitted', 'approved']);
@@ -38,6 +47,11 @@ export const families = pgTable('families', {
   subscriptionRenewalDate: timestamp('subscription_renewal_date', { withTimezone: true }),
   subscriptionLastPaymentAt: timestamp('subscription_last_payment_at', { withTimezone: true }),
   subscriptionOrderId: varchar('subscription_order_id', { length: 255 }),
+  // Chore Templates System fields
+  hasGarden: boolean('has_garden').default(false),
+  hasPets: boolean('has_pets').default(false),
+  onboardingCompleted: boolean('onboarding_completed').default(false),
+  onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
 });
 
 export const children = pgTable('children', {
@@ -53,6 +67,12 @@ export const children = pgTable('children', {
   totalXpEver: integer('total_xp_ever').notNull().default(0),
   avatar: varchar('avatar', { length: 255 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  // Chore Templates System fields
+  birthdate: date('birthdate'),
+  kitchenAccess: boolean('kitchen_access').default(false),
+  starterPackId: varchar('starter_pack_id', { length: 100 }),
+  childOnboardingCompleted: boolean('child_onboarding_completed').default(false),
+  childOnboardingCompletedAt: timestamp('child_onboarding_completed_at', { withTimezone: true }),
 });
 
 export const recurrenceTypeEnum = pgEnum('recurrence_type', ['none', 'daily', 'weekly', 'custom']);
@@ -1147,6 +1167,14 @@ export type NewWalletTransaction = typeof walletTransactions.$inferInsert;
 export type TrustedContactVerification = typeof trustedContactVerifications.$inferSelect;
 export type NewTrustedContactVerification = typeof trustedContactVerifications.$inferInsert;
 
+// Penalty & Economic System Types
+export type PenaltyConfiguration = typeof penaltyConfigurations.$inferSelect;
+export type NewPenaltyConfiguration = typeof penaltyConfigurations.$inferInsert;
+export type AppliedPenalty = typeof appliedPenalties.$inferSelect;
+export type NewAppliedPenalty = typeof appliedPenalties.$inferInsert;
+export type EconomicConfiguration = typeof economicConfigurations.$inferSelect;
+export type NewEconomicConfiguration = typeof economicConfigurations.$inferInsert;
+
 // Relations for gamification tables
 export const virtualPetsRelations = relations(virtualPets, ({ one }) => ({
   child: one(children, {
@@ -1255,6 +1283,298 @@ export const weeklyChampionsRelations = relations(weeklyChampions, ({ one }) => 
   }),
 }));
 
+// ===== PENALTY & ECONOMIC SYSTEM TABLES =====
+
+// Penalty Configurations
+export const penaltyConfigurations = pgTable('penalty_configurations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  // Penalty rules configuration (JSON)
+  rules: text('rules').notNull(), // JSON string of PenaltyConfig
+  // Global settings
+  maxPenaltyPercent: integer('max_penalty_percent').notNull().default(25),
+  penaltyTimeoutHours: integer('penalty_timeout_hours').notNull().default(24),
+  allowAppeals: integer('allow_appeals').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Applied Penalties
+export const appliedPenalties = pgTable('applied_penalties', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  choreId: uuid('chore_id')
+    .notNull()
+    .references(() => chores.id, { onDelete: 'cascade' }),
+  penaltyType: varchar('penalty_type', { length: 50 }).notNull(),
+  originalPoints: integer('original_points').notNull(),
+  penaltyPoints: integer('penalty_points').notNull(),
+  recoveryOption: varchar('recovery_option', { length: 50 }),
+  appliedAt: timestamp('applied_at', { withTimezone: true }).defaultNow().notNull(),
+  recoveredAt: timestamp('recovered_at', { withTimezone: true }),
+  notes: text('notes'),
+});
+
+// Economic Configurations
+export const economicConfigurations = pgTable('economic_configurations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  // Dynamic pricing settings
+  inflationThreshold: integer('inflation_threshold').notNull().default(500),
+  maxInflationCorrection: integer('max_inflation_correction').notNull().default(150), // 1.5 = 150%
+  correctionStep: integer('correction_step').notNull().default(10), // 0.1 = 10%
+  stabilizationPeriodDays: integer('stabilization_period_days').notNull().default(7),
+  // Point sinks configuration (JSON)
+  pointSinks: text('point_sinks').notNull(), // JSON string of PointSink[]
+  // External chore rates
+  euroToPoints: integer('euro_to_points').notNull().default(100),
+  pointsToEuro: integer('points_to_euro').notNull().default(150),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Economic Metrics (for monitoring)
+export const economicMetrics = pgTable('economic_metrics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  weekStart: date('week_start').notNull(),
+  weekEnd: date('week_end').notNull(),
+  averagePointsBalance: integer('average_points_balance').notNull(),
+  totalPointsInCirculation: integer('total_points_in_circulation').notNull(),
+  pointsEarnedThisWeek: integer('points_earned_this_week').notNull(),
+  pointsSpentThisWeek: integer('points_spent_this_week').notNull(),
+  inflationRate: integer('inflation_rate').notNull(), // percentage * 100
+  rewardRedemptionRate: integer('reward_redemption_rate').notNull(), // percentage * 100
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Economic Metrics Types (must be after table definition)
+export type EconomicMetric = typeof economicMetrics.$inferSelect;
+export type NewEconomicMetric = typeof economicMetrics.$inferInsert;
+
+// ===== CHORE TEMPLATES SYSTEM TABLES =====
+
+// Chore Categories
+export const choreCategories = pgTable('chore_categories', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  icon: varchar('icon', { length: 10 }).notNull(),
+  color: varchar('color', { length: 7 }).notNull().default('#6366F1'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Chore Templates
+export const choreTemplates = pgTable('chore_templates', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  description: text('description'),
+  categoryId: varchar('category_id', { length: 50 }).notNull().references(() => choreCategories.id),
+  frequency: choreFrequencyEnum('frequency').notNull(),
+  // Rewards
+  basePoints: integer('base_points').notNull().default(10),
+  baseXp: integer('base_xp').notNull().default(4),
+  // Age limits
+  minAge: integer('min_age').notNull().default(3),
+  maxAge: integer('max_age'), // NULL = no maximum
+  // Requirements
+  requiresGarden: boolean('requires_garden').notNull().default(false),
+  requiresPet: boolean('requires_pet').notNull().default(false),
+  requiresKitchenAccess: boolean('requires_kitchen_access').notNull().default(false),
+  // Metadata
+  difficulty: choreDifficultyEnum('difficulty').notNull().default('easy'),
+  icon: varchar('icon', { length: 10 }).notNull().default('✨'),
+  estimatedMinutes: integer('estimated_minutes').notNull().default(10),
+  tips: text('tips'),
+  sortOrder: integer('sort_order').notNull().default(100),
+  // System
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Starter Packs
+export const starterPacks = pgTable('starter_packs', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  description: text('description'),
+  // Age limits
+  minAge: integer('min_age').notNull(),
+  maxAge: integer('max_age').notNull(),
+  // Metadata
+  difficultyLevel: starterPackDifficultyEnum('difficulty_level').notNull().default('easy'),
+  choreCount: integer('chore_count').notNull().default(5),
+  isDefault: boolean('is_default').notNull().default(false),
+  recommendedFor: text('recommended_for'),
+  // System
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Starter Pack <-> Chore Template link table
+export const starterPackChores = pgTable('starter_pack_chores', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  starterPackId: varchar('starter_pack_id', { length: 100 }).notNull().references(() => starterPacks.id, { onDelete: 'cascade' }),
+  choreTemplateId: varchar('chore_template_id', { length: 100 }).notNull().references(() => choreTemplates.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Add-on Packs
+export const addonPacks = pgTable('addon_packs', {
+  id: varchar('id', { length: 100 }).primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  description: text('description'),
+  // Requirements
+  minAge: integer('min_age').notNull().default(5),
+  requiresGarden: boolean('requires_garden').notNull().default(false),
+  requiresPet: boolean('requires_pet').notNull().default(false),
+  // System
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Add-on Pack <-> Chore Template link table
+export const addonPackChores = pgTable('addon_pack_chores', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  addonPackId: varchar('addon_pack_id', { length: 100 }).notNull().references(() => addonPacks.id, { onDelete: 'cascade' }),
+  choreTemplateId: varchar('chore_template_id', { length: 100 }).notNull().references(() => choreTemplates.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Chore Suggestions (Adaptive Growth)
+export const choreSuggestions = pgTable('chore_suggestions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id').notNull().references(() => children.id, { onDelete: 'cascade' }),
+  choreTemplateId: varchar('chore_template_id', { length: 100 }).notNull().references(() => choreTemplates.id, { onDelete: 'cascade' }),
+  // Trigger reason
+  triggerReason: suggestionTriggerEnum('trigger_reason').notNull(),
+  triggerData: jsonb('trigger_data'), // Extra context (e.g., which streak, percentage)
+  // Status
+  status: suggestionStatusEnum('status').notNull().default('pending'),
+  // Timing
+  suggestedAt: timestamp('suggested_at', { withTimezone: true }).defaultNow().notNull(),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+  snoozedUntil: timestamp('snoozed_until', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  // Metadata
+  priority: integer('priority').notNull().default(5), // 1-10, higher = more important
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Onboarding Events (Analytics)
+export const onboardingEvents = pgTable('onboarding_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id').references(() => children.id, { onDelete: 'set null' }),
+  eventType: varchar('event_type', { length: 50 }).notNull(),
+  eventData: jsonb('event_data'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ===== CHORE TEMPLATES SYSTEM RELATIONS =====
+
+export const choreCategoriesRelations = relations(choreCategories, ({ many }) => ({
+  templates: many(choreTemplates),
+}));
+
+export const choreTemplatesRelations = relations(choreTemplates, ({ one, many }) => ({
+  category: one(choreCategories, {
+    fields: [choreTemplates.categoryId],
+    references: [choreCategories.id],
+  }),
+  starterPackChores: many(starterPackChores),
+  addonPackChores: many(addonPackChores),
+  suggestions: many(choreSuggestions),
+}));
+
+export const starterPacksRelations = relations(starterPacks, ({ many }) => ({
+  chores: many(starterPackChores),
+}));
+
+export const starterPackChoresRelations = relations(starterPackChores, ({ one }) => ({
+  starterPack: one(starterPacks, {
+    fields: [starterPackChores.starterPackId],
+    references: [starterPacks.id],
+  }),
+  choreTemplate: one(choreTemplates, {
+    fields: [starterPackChores.choreTemplateId],
+    references: [choreTemplates.id],
+  }),
+}));
+
+export const addonPacksRelations = relations(addonPacks, ({ many }) => ({
+  chores: many(addonPackChores),
+}));
+
+export const addonPackChoresRelations = relations(addonPackChores, ({ one }) => ({
+  addonPack: one(addonPacks, {
+    fields: [addonPackChores.addonPackId],
+    references: [addonPacks.id],
+  }),
+  choreTemplate: one(choreTemplates, {
+    fields: [addonPackChores.choreTemplateId],
+    references: [choreTemplates.id],
+  }),
+}));
+
+export const choreSuggestionsRelations = relations(choreSuggestions, ({ one }) => ({
+  child: one(children, {
+    fields: [choreSuggestions.childId],
+    references: [children.id],
+  }),
+  choreTemplate: one(choreTemplates, {
+    fields: [choreSuggestions.choreTemplateId],
+    references: [choreTemplates.id],
+  }),
+}));
+
+export const onboardingEventsRelations = relations(onboardingEvents, ({ one }) => ({
+  family: one(families, {
+    fields: [onboardingEvents.familyId],
+    references: [families.id],
+  }),
+  child: one(children, {
+    fields: [onboardingEvents.childId],
+    references: [children.id],
+  }),
+}));
+
+// ===== CHORE TEMPLATES SYSTEM TYPES =====
+
+export type ChoreCategory = typeof choreCategories.$inferSelect;
+export type NewChoreCategory = typeof choreCategories.$inferInsert;
+export type ChoreTemplate = typeof choreTemplates.$inferSelect;
+export type NewChoreTemplate = typeof choreTemplates.$inferInsert;
+export type StarterPack = typeof starterPacks.$inferSelect;
+export type NewStarterPack = typeof starterPacks.$inferInsert;
+export type StarterPackChore = typeof starterPackChores.$inferSelect;
+export type NewStarterPackChore = typeof starterPackChores.$inferInsert;
+export type AddonPack = typeof addonPacks.$inferSelect;
+export type NewAddonPack = typeof addonPacks.$inferInsert;
+export type AddonPackChore = typeof addonPackChores.$inferSelect;
+export type NewAddonPackChore = typeof addonPackChores.$inferInsert;
+export type ChoreSuggestion = typeof choreSuggestions.$inferSelect;
+export type NewChoreSuggestion = typeof choreSuggestions.$inferInsert;
+export type OnboardingEvent = typeof onboardingEvents.$inferSelect;
+export type NewOnboardingEvent = typeof onboardingEvents.$inferInsert;
+
 // ===== POWERKLUSJES RELATIONS =====
 
 export const trustedContactsRelations = relations(trustedContacts, ({ one, many }) => ({
@@ -1320,4 +1640,187 @@ export const walletTransactionsRelations = relations(walletTransactions, ({ one 
   }),
 }));
 
+// ===== AI COACH SYSTEM =====
+
+// Enums for AI Coach
+export const coachMessageTypeEnum = pgEnum('coach_message_type', [
+  'greeting',           // Dagelijkse begroeting
+  'encouragement',      // Aanmoediging bij klusje voltooid
+  'milestone',          // Milestone viering (streak, level up, badge)
+  'reminder',           // Zachte herinnering
+  'tip',                // Slimme tip voor klusje
+  'motivation',         // Motivatie bij dipje
+  'explanation',        // Uitleg over gamificatie element
+  'celebration'         // Speciale viering
+]);
+
+export const coachInsightTypeEnum = pgEnum('coach_insight_type', [
+  'optimal_time',       // Beste tijd voor klusjes
+  'strength',           // Sterke punten kind
+  'attention_point',    // Aandachtspunt
+  'collaboration',      // Samenwerkingspatroon
+  'recommendation',     // Aanbeveling
+  'balance_warning',    // Balans waarschuwing
+  'weekly_summary'      // Wekelijkse samenvatting
+]);
+
+export const behaviorPatternTypeEnum = pgEnum('behavior_pattern_type', [
+  'time_preference',    // Voorkeurstijd voor klusjes
+  'task_preference',    // Voorkeur voor type taken
+  'consistency',        // Consistentie in uitvoering
+  'improvement',        // Verbetering in prestaties
+  'decline',            // Achteruitgang in prestaties
+  'collaboration',      // Samenwerkingsgedrag
+  'avoidance'           // Vermijdingsgedrag
+]);
+
+// Coach Messages - Berichten van Kobi naar kinderen
+export const coachMessages = pgTable('coach_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  messageType: coachMessageTypeEnum('message_type').notNull(),
+  content: text('content').notNull(),
+  contextData: jsonb('context_data'), // Extra context (klusje, badge, etc.)
+  isRead: boolean('is_read').default(false),
+  triggeredBy: varchar('triggered_by', { length: 100 }), // Wat triggerde dit bericht
+  aiModel: varchar('ai_model', { length: 100 }), // Welk model genereerde dit
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }), // Wanneer bericht verloopt
+});
+
+// Coach Insights - Inzichten voor ouders
+export const coachInsights = pgTable('coach_insights', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  childId: uuid('child_id')
+    .references(() => children.id, { onDelete: 'cascade' }), // Null = gezinsbreed
+  insightType: coachInsightTypeEnum('insight_type').notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  content: text('content').notNull(),
+  priority: integer('priority').notNull().default(5), // 1-10, hoger = belangrijker
+  actionable: boolean('actionable').default(false), // Heeft actie-aanbeveling
+  actionText: text('action_text'), // Concrete actie suggestie
+  dataPoints: jsonb('data_points'), // Onderliggende data voor inzicht
+  isRead: boolean('is_read').default(false),
+  isDismissed: boolean('is_dismissed').default(false),
+  aiModel: varchar('ai_model', { length: 100 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  validUntil: timestamp('valid_until', { withTimezone: true }), // Tot wanneer relevant
+});
+
+// Coach Preferences - Personalisatie-instellingen per kind
+export const coachPreferences = pgTable('coach_preferences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .unique()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  isEnabled: boolean('is_enabled').default(true),
+  greetingsEnabled: boolean('greetings_enabled').default(true),
+  remindersEnabled: boolean('reminders_enabled').default(true),
+  tipsEnabled: boolean('tips_enabled').default(true),
+  maxMessagesPerDay: integer('max_messages_per_day').default(5),
+  preferredTone: varchar('preferred_tone', { length: 50 }).default('friendly'), // friendly, enthusiastic, calm
+  reminderTime: varchar('reminder_time', { length: 5 }), // HH:MM format
+  parentNotificationsEnabled: boolean('parent_notifications_enabled').default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Behavior Patterns - Gedetecteerde gedragspatronen
+export const behaviorPatterns = pgTable('behavior_patterns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  childId: uuid('child_id')
+    .notNull()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  patternType: behaviorPatternTypeEnum('pattern_type').notNull(),
+  description: text('description').notNull(),
+  confidence: integer('confidence').notNull().default(50), // 0-100%
+  dataPoints: jsonb('data_points').notNull(), // Onderliggende data
+  detectedAt: timestamp('detected_at', { withTimezone: true }).defaultNow().notNull(),
+  lastConfirmedAt: timestamp('last_confirmed_at', { withTimezone: true }),
+  isActive: boolean('is_active').default(true),
+  usedForInsight: boolean('used_for_insight').default(false),
+});
+
+// Weekly Summaries - Wekelijkse AI-gegenereerde samenvattingen
+export const weeklySummaries = pgTable('weekly_summaries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  weekStart: date('week_start').notNull(),
+  weekEnd: date('week_end').notNull(),
+  summaryContent: text('summary_content').notNull(), // Markdown formatted
+  highlights: jsonb('highlights'), // Array van hoogtepunten
+  recommendations: jsonb('recommendations'), // Array van aanbevelingen
+  childStats: jsonb('child_stats'), // Stats per kind
+  comparisonWithPrevious: jsonb('comparison_with_previous'), // Vergelijking
+  aiModel: varchar('ai_model', { length: 100 }),
+  isRead: boolean('is_read').default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// AI Coach Relations
+export const coachMessagesRelations = relations(coachMessages, ({ one }) => ({
+  child: one(children, {
+    fields: [coachMessages.childId],
+    references: [children.id],
+  }),
+  family: one(families, {
+    fields: [coachMessages.familyId],
+    references: [families.id],
+  }),
+}));
+
+export const coachInsightsRelations = relations(coachInsights, ({ one }) => ({
+  family: one(families, {
+    fields: [coachInsights.familyId],
+    references: [families.id],
+  }),
+  child: one(children, {
+    fields: [coachInsights.childId],
+    references: [children.id],
+  }),
+}));
+
+export const coachPreferencesRelations = relations(coachPreferences, ({ one }) => ({
+  child: one(children, {
+    fields: [coachPreferences.childId],
+    references: [children.id],
+  }),
+}));
+
+export const behaviorPatternsRelations = relations(behaviorPatterns, ({ one }) => ({
+  child: one(children, {
+    fields: [behaviorPatterns.childId],
+    references: [children.id],
+  }),
+}));
+
+export const weeklySummariesRelations = relations(weeklySummaries, ({ one }) => ({
+  family: one(families, {
+    fields: [weeklySummaries.familyId],
+    references: [families.id],
+  }),
+}));
+
+// AI Coach Types
+export type CoachMessage = typeof coachMessages.$inferSelect;
+export type NewCoachMessage = typeof coachMessages.$inferInsert;
+export type CoachInsight = typeof coachInsights.$inferSelect;
+export type NewCoachInsight = typeof coachInsights.$inferInsert;
+export type CoachPreference = typeof coachPreferences.$inferSelect;
+export type NewCoachPreference = typeof coachPreferences.$inferInsert;
+export type BehaviorPattern = typeof behaviorPatterns.$inferSelect;
+export type NewBehaviorPattern = typeof behaviorPatterns.$inferInsert;
+export type WeeklySummary = typeof weeklySummaries.$inferSelect;
+export type NewWeeklySummary = typeof weeklySummaries.$inferInsert;
 

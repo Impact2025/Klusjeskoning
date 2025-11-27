@@ -24,12 +24,17 @@ export const createSession = async (familyId: string) => {
   });
 
   const cookieStore = await cookies();
+
+  // Get the cookie domain from environment or use current domain
+  const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     expires: expiresAt,
+    ...(cookieDomain && { domain: cookieDomain }),
   });
 
   return { token, expiresAt };
@@ -42,7 +47,15 @@ export const clearSession = async () => {
   const sessionCookie = cookieStore.get(SESSION_COOKIE);
   if (sessionCookie) {
     await db.delete(sessions).where(eq(sessions.token, sessionCookie.value));
-    cookieStore.set(SESSION_COOKIE, '', { expires: new Date(0), path: '/' });
+
+    // Get the cookie domain from environment or use current domain
+    const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+
+    cookieStore.set(SESSION_COOKIE, '', {
+      expires: new Date(0),
+      path: '/',
+      ...(cookieDomain && { domain: cookieDomain }),
+    });
   }
 };
 
@@ -69,7 +82,15 @@ export const getSession = async () => {
 
   if (isBefore(session.expiresAt, new Date())) {
     await db.delete(sessions).where(eq(sessions.id, session.id));
-    cookieStore.set(SESSION_COOKIE, '', { expires: new Date(0), path: '/' });
+
+    // Get the cookie domain from environment or use current domain
+    const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+
+    cookieStore.set(SESSION_COOKIE, '', {
+      expires: new Date(0),
+      path: '/',
+      ...(cookieDomain && { domain: cookieDomain }),
+    });
     return null;
   }
 

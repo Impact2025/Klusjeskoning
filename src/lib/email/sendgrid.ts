@@ -1,9 +1,28 @@
 import sgMail from '@sendgrid/mail';
-import { renderWelcomeEmail, renderAdminRegistrationNotification, renderChoreSubmissionEmail, renderRewardRedemptionEmail, renderVerificationEmail } from './templates';
+import {
+  renderWelcomeEmail,
+  renderAdminRegistrationNotification,
+  renderChoreSubmissionEmail,
+  renderRewardRedemptionEmail,
+  renderVerificationEmail,
+  renderSuperKlusjeNewRequestEmail,
+  renderSuperKlusjeApprovedEmail,
+  renderSuperKlusjeRejectedEmail,
+  renderSuperKlusjeCompletedEmail,
+} from './templates';
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
-type EmailType = 'welcome_parent' | 'chore_submitted' | 'reward_redeemed' | 'admin_new_registration' | 'verification_code';
+type EmailType =
+  | 'welcome_parent'
+  | 'chore_submitted'
+  | 'reward_redeemed'
+  | 'admin_new_registration'
+  | 'verification_code'
+  | 'superklusje_new_request'
+  | 'superklusje_approved'
+  | 'superklusje_rejected'
+  | 'superklusje_completed';
 
 interface EmailData {
   to: string;
@@ -54,6 +73,43 @@ export async function sendEmail({ to, type, data }: EmailData): Promise<{ succes
       case 'verification_code':
         emailContent = renderVerificationEmail({
           code: data.verificationCode,
+        });
+        break;
+
+      case 'superklusje_new_request':
+        emailContent = renderSuperKlusjeNewRequestEmail({
+          childName: data.childName,
+          title: data.title,
+          description: data.description,
+          amountEuros: data.amountEuros,
+          contactName: data.contactName,
+        });
+        break;
+
+      case 'superklusje_approved':
+        emailContent = renderSuperKlusjeApprovedEmail({
+          childName: data.childName,
+          title: data.title,
+          amountEuros: data.amountEuros,
+          contactName: data.contactName,
+        });
+        break;
+
+      case 'superklusje_rejected':
+        emailContent = renderSuperKlusjeRejectedEmail({
+          childName: data.childName,
+          title: data.title,
+          contactName: data.contactName,
+          reason: data.reason,
+        });
+        break;
+
+      case 'superklusje_completed':
+        emailContent = renderSuperKlusjeCompletedEmail({
+          childName: data.childName,
+          title: data.title,
+          amountEuros: data.amountEuros,
+          contactName: data.contactName,
         });
         break;
 

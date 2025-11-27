@@ -22,12 +22,13 @@ import FamilyRanking from '@/components/gamification/FamilyRanking';
 import ChampionCelebration from '@/components/gamification/ChampionCelebration';
 import type { Chore } from '@/lib/types';
 import type { VirtualPet as VirtualPetType } from '@/server/db/schema';
-import { getLevelFromXp, LEVEL_BADGES } from '@/lib/xp-utils';
-import { QUEST_CHAIN_CHORES } from '@/lib/quest-utils';
+import { getLevelFromXp, LEVEL_BADGES, calculateLevel } from '@/lib/xp-utils';
+// Quest chains removed - using actual family chores now
 import XPProgressBar from '@/components/ui/xp-progress-bar';
 import { Timestamp } from '@/lib/timestamp';
 import ComplimentNotification, { useComplimentNotifications } from '@/components/gamification/ComplimentNotification';
 import { ChildInvitation } from '@/components/powerklusjes/ChildInvitation';
+import { CoachWidget } from '@/components/coach';
 
 const levels = [
   { points: 1000, name: 'KlusjesKoning', icon: '👑' },
@@ -289,8 +290,8 @@ export default function ChildDashboard() {
     });
   }, [goodCauses]);
 
-  const currentLevel = useMemo(() =>
-    LEVEL_BADGES.find(badge => badge.level <= getLevelFromXp(user.totalXpEver || 0)) || LEVEL_BADGES[0],
+  const currentLevelInfo = useMemo(() =>
+    calculateLevel(user.totalXpEver || 0),
     [user.totalXpEver]
   );
   
@@ -338,26 +339,16 @@ export default function ChildDashboard() {
   };
 
 
-  // Get all chores from quest chains
-  const allQuestChores = useMemo(() =>
-    Object.values(QUEST_CHAIN_CHORES).flat(),
-    []
-  );
-
+  // Get available chores from family chores (created by parents)
   const availableChores = useMemo(() => {
-    return allQuestChores.filter(c => {
+    return family.chores.filter(c => {
       const isAvailable = c.status === 'available';
+      // Check if this chore is assigned to this child (or assigned to everyone if assignedTo is empty)
       const isAssigned = !c.assignedTo || c.assignedTo.length === 0 || c.assignedTo.includes(user.id);
-      const hasSubmitted = family.chores.some(familyChore =>
-        familyChore.id === c.id &&
-        familyChore.status === 'submitted' &&
-        familyChore.submittedBy === user.id
-      );
       const isOptimisticallySubmitted = optimisticallySubmittedChores.has(c.id);
-      const result = isAvailable && isAssigned && !hasSubmitted && !isOptimisticallySubmitted;
-      return result;
+      return isAvailable && isAssigned && !isOptimisticallySubmitted;
     });
-  }, [allQuestChores, family.chores, user.id, optimisticallySubmittedChores]);
+  }, [family.chores, user.id, optimisticallySubmittedChores]);
 
   const submittedChores = useMemo(() =>
     family.chores.filter(c => c.status === 'submitted' && c.submittedBy === user.id),
@@ -366,42 +357,94 @@ export default function ChildDashboard() {
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Clean Modern Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">{user.name}</h1>
-              <p className="text-sm text-gray-600">Level {getLevelFromXp(user.totalXpEver || 0)} • {currentLevel.name}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            {/* Points Display */}
-            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-2 rounded-full font-bold text-sm flex items-center">
-              <Star className="w-4 h-4 mr-1" />
-              {user.points}
-            </div>
-
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="text-gray-600 hover:text-gray-900">
-              <LogOut className="w-5 h-5" />
-            </Button>
-          </div>
+      {/* Professional Child Header */}
+      <header className="relative bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 text-white overflow-hidden" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.3),transparent_50%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.2),transparent_50%)]" />
         </div>
 
-        {/* XP Progress Bar */}
-        <div className="mt-3">
-          <XPProgressBar
-            currentXP={user.xp % 100}
-            xpToNextLevel={100}
-            level={getLevelFromXp(user.totalXpEver || 0)}
-            animated={true}
-            showSoundEffect={true}
-            className="text-xs"
-          />
+        <div className="relative px-6 pt-8 pb-6">
+          {/* Top Row - Avatar and Basic Info */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              {/* Professional Avatar */}
+              <div className="relative">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border-2 border-white/30 shadow-lg">
+                  <span className="text-2xl font-bold text-white drop-shadow-lg">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                {/* Level Badge */}
+                <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-white shadow-md">
+                  <span className="text-xs font-bold text-white">{currentLevelInfo.level}</span>
+                </div>
+              </div>
+
+              <div>
+                <h1 className="text-2xl font-bold text-white drop-shadow-sm">{user.name}</h1>
+                <p className="text-white/90 font-medium">{currentLevelInfo.title}</p>
+                <div className="flex items-center space-x-2 mt-1">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-white/80">Online</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Points & Logout */}
+            <div className="flex items-center space-x-3">
+              {/* Enhanced Points Display */}
+              <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl px-4 py-3 shadow-lg">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                    <Star className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-white">{user.points}</div>
+                    <div className="text-xs text-white/80">Punten</div>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                className="w-10 h-10 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200"
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* XP Progress Section */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <Trophy className="w-5 h-5 text-yellow-300" />
+                <span className="text-white font-semibold">Ervaringspunten</span>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-white">{user.totalXpEver || 0} XP</div>
+                <div className="text-xs text-white/80">Totaal verdiend</div>
+              </div>
+            </div>
+
+            <XPProgressBar
+              currentXP={user.xp % 100}
+              xpToNextLevel={100}
+              level={getLevelFromXp(user.totalXpEver || 0)}
+              animated={true}
+              showSoundEffect={true}
+              className="text-sm"
+            />
+
+            <div className="flex justify-between items-center mt-3 text-sm">
+              <span className="text-white/80">Level {currentLevelInfo.level}</span>
+              <span className="text-white/80">{user.xp % 100}/100 XP naar level {currentLevelInfo.level + 1}</span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -417,21 +460,32 @@ export default function ChildDashboard() {
       )}
 
       <ScrollArea className="flex-grow">
-        <main className="p-4 space-y-6 pb-24">
+        <main className="p-6 space-y-8 pb-24">
+          {/* Welcome Section */}
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold text-gray-900">Welkom terug, {user.name}! 👋</h2>
+            <p className="text-gray-600">Laten we samen klusjes klaren en punten verdienen!</p>
+          </div>
+
           {/* Primary Focus: Available Chores */}
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center">
-                <ListTodo className="w-6 h-6 mr-2 text-blue-600" />
-                Beschikbare Klusjes
-              </h2>
-              <div className="text-sm text-gray-600">
-                {availableChores.length} beschikbaar
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <ListTodo className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Nieuwe Uitdagingen</h2>
+                  <p className="text-sm text-gray-600">Klaar om te beginnen?</p>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-blue-100 to-purple-100 px-3 py-2 rounded-full">
+                <span className="text-sm font-semibold text-blue-700">{availableChores.length} beschikbaar</span>
               </div>
             </div>
 
             {availableChores.length > 0 ? (
-              <div className="grid gap-3">
+              <div className="grid gap-4">
                 {availableChores.map((chore: Chore) => (
                   <QuestCard
                     key={chore.id}
@@ -441,10 +495,19 @@ export default function ChildDashboard() {
                 ))}
               </div>
             ) : (
-              <Card className="p-8 text-center bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-dashed border-blue-200">
-                <div className="text-4xl mb-3">🎯</div>
-                <h3 className="font-semibold text-gray-900 mb-2">Geen klusjes beschikbaar</h3>
-                <p className="text-gray-600 text-sm">Nieuwe klusjes verschijnen snel!</p>
+              <Card className="p-8 text-center bg-gradient-to-br from-blue-50 via-white to-purple-50 border-2 border-dashed border-blue-200 shadow-lg">
+                <div className="space-y-4">
+                  <div className="text-6xl animate-bounce">🎯</div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Nieuwe klusjes komen eraan!</h3>
+                    <p className="text-gray-600">Houd je telefoon in de gaten voor spannende uitdagingen.</p>
+                  </div>
+                  <div className="flex justify-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                  </div>
+                </div>
               </Card>
             )}
           </div>
@@ -452,20 +515,34 @@ export default function ChildDashboard() {
           {/* Secondary: Submitted Chores */}
           {submittedChores.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Hourglass className="w-5 h-5 mr-2 text-orange-600" />
-                Wachtend op Goedkeuring
-              </h2>
-              <div className="grid gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Hourglass className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Wachtend op Goedkeuring</h2>
+                  <p className="text-sm text-gray-600">Goed gedaan! Je ouders controleren het nu.</p>
+                </div>
+              </div>
+              <div className="grid gap-4">
                 {submittedChores.map((chore: Chore) => (
-                  <Card key={chore.id} className="p-4 bg-orange-50 border-orange-200">
+                  <Card key={chore.id} className="p-5 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 shadow-md hover:shadow-lg transition-all duration-200">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{chore.name}</p>
-                        <p className="text-sm text-gray-600">Ingediend voor beoordeling</p>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center">
+                          <span className="text-white font-bold text-lg">✓</span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-lg">{chore.name}</p>
+                          <p className="text-sm text-gray-600 flex items-center">
+                            <span className="w-2 h-2 bg-orange-400 rounded-full mr-2 animate-pulse"></span>
+                            Wacht op goedkeuring van ouders
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-orange-600">
-                        <Hourglass className="w-5 h-5" />
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-orange-600">+{chore.points}</div>
+                        <div className="text-xs text-gray-500">punten</div>
                       </div>
                     </div>
                   </Card>
@@ -485,73 +562,97 @@ export default function ChildDashboard() {
             </div>
           )}
 
-          {/* Fun Elements - Keep minimal */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Daily Spin - Compact */}
-            {!isSpinLoading && spinsAvailable > 0 && (
-              <Card className="p-4 bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Dagelijkse Spin</h3>
-                    <p className="text-sm text-gray-600">{spinsAvailable} spin{spinsAvailable !== 1 ? 's' : ''} beschikbaar</p>
-                  </div>
-                  <Button
-                    onClick={() => setIsSpinWheelOpen(true)}
-                    size="sm"
-                    className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600"
-                  >
-                    Spinnen
-                  </Button>
-                </div>
-              </Card>
-            )}
+          {/* Fun Elements - Professional Design */}
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Extra Fun & Beloningen</h2>
+              <p className="text-gray-600">Verdien nog meer punten met deze leuke activiteiten!</p>
+            </div>
 
-            {/* Virtual Pet - Compact */}
-            {virtualPet && !isPetLoading && (
-              <Card
-                className={`p-4 bg-gradient-to-br from-green-50 to-blue-50 border-green-200 cursor-pointer hover:shadow-md transition-all duration-200 ${isGoldenPet ? 'ring-2 ring-yellow-400 ring-opacity-50' : ''}`}
-                onClick={() => setIsVirtualPetOpen(true)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-semibold text-gray-900">{virtualPet.name}</h3>
-                      {isGoldenPet && (
-                        <div className="text-yellow-500 animate-pulse">👑</div>
-                      )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Daily Spin - Enhanced */}
+              {!isSpinLoading && spinsAvailable > 0 && (
+                <Card className="p-6 bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 border-2 border-yellow-200 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group" onClick={() => setIsSpinWheelOpen(true)}>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-200">
+                      <span className="text-2xl">🎰</span>
                     </div>
-                    <p className="text-sm text-gray-600">Honger: {virtualPet.hunger}/100</p>
-                    {isGoldenPet && (
-                      <p className="text-xs text-yellow-600 font-medium">🎉 Kampioen Huisdier!</p>
-                    )}
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-900">Dagelijkse Spin</h3>
+                      <p className="text-sm text-gray-600 mb-2">Draai voor gratis prijzen!</p>
+                      <div className="flex items-center space-x-2">
+                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-semibold">
+                          {spinsAvailable} spin{spinsAvailable !== 1 ? 's' : ''} beschikbaar
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-yellow-600">🎁</div>
+                      <div className="text-xs text-gray-500">Gratis</div>
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePetFeed();
-                      }}
-                      size="sm"
-                      variant="outline"
-                      className="text-xs"
-                    >
-                      🥕
-                    </Button>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePetPlay();
-                      }}
-                      size="sm"
-                      variant="outline"
-                      className="text-xs"
-                    >
-                      ⚽
-                    </Button>
+                </Card>
+              )}
+
+              {/* Virtual Pet - Enhanced */}
+              {virtualPet && !isPetLoading && (
+                <Card
+                  className={`p-6 bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 border-2 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group ${isGoldenPet ? 'ring-2 ring-yellow-400 ring-opacity-75 shadow-yellow-200' : ''}`}
+                  onClick={() => setIsVirtualPetOpen(true)}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-14 h-14 bg-gradient-to-br from-green-400 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-200 ${isGoldenPet ? 'ring-2 ring-yellow-400 ring-opacity-50' : ''}`}>
+                      <span className="text-2xl">{isGoldenPet ? '👑' : '🐾'}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="text-lg font-bold text-gray-900">{virtualPet.name}</h3>
+                        {isGoldenPet && (
+                          <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-bold animate-pulse">
+                            🏆 Kampioen!
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">Jouw trouwe huisdier</p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Honger</span>
+                          <span className="font-semibold text-green-600">{virtualPet.hunger}/100</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${virtualPet.hunger}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col space-y-2">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePetFeed();
+                        }}
+                        size="sm"
+                        className="w-10 h-10 p-0 bg-green-500 hover:bg-green-600 rounded-xl shadow-md"
+                      >
+                        🥕
+                      </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePetPlay();
+                        }}
+                        size="sm"
+                        className="w-10 h-10 p-0 bg-blue-500 hover:bg-blue-600 rounded-xl shadow-md"
+                      >
+                        ⚽
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            )}
+                </Card>
+              )}
+            </div>
           </div>
 
           {/* Good Cause - Only show if active */}
@@ -571,51 +672,61 @@ export default function ChildDashboard() {
         </main>
       </ScrollArea>
       
-      {/* Clean Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 z-50">
-        <div className="flex justify-around items-center h-16 px-4 max-w-lg mx-auto">
+      {/* Professional Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 z-50 shadow-2xl">
+        <div className="flex justify-around items-center h-20 px-6 max-w-lg mx-auto">
           <Button
             variant="ghost"
-            className="flex flex-col items-center space-y-1 h-auto flex-1 text-blue-600"
+            className="flex flex-col items-center space-y-2 h-auto flex-1 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
           >
-            <ListTodo className="h-5 w-5" />
-            <span className="text-xs font-medium">Klusjes</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+              <ListTodo className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xs font-semibold">Klusjes</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setRewardShopOpen(true)}
-            className="flex flex-col items-center space-y-1 h-auto flex-1 text-gray-600 hover:text-gray-900"
+            className="flex flex-col items-center space-y-2 h-auto flex-1 text-gray-600 hover:text-pink-600 hover:bg-pink-50 rounded-xl transition-all duration-200"
           >
-            <Store className="h-5 w-5" />
-            <span className="text-xs font-medium">Winkel</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-md">
+              <Store className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xs font-semibold">Winkel</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setIsPowerKlusjesOpen(true)}
-            className="flex flex-col items-center space-y-1 h-auto flex-1 text-green-600 hover:text-green-700"
+            className="flex flex-col items-center space-y-2 h-auto flex-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl transition-all duration-200"
           >
-            <Share2 className="h-5 w-5" />
-            <span className="text-xs font-medium">PowerKlusjes</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
+              <Share2 className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xs font-semibold">Power</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setIsGamesMenuOpen(true)}
-            className="flex flex-col items-center space-y-1 h-auto flex-1 text-purple-600 hover:text-purple-700"
+            className="flex flex-col items-center space-y-2 h-auto flex-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-all duration-200"
           >
-            <Gamepad2 className="h-5 w-5" />
-            <span className="text-xs font-medium">Spelletjes</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-md">
+              <Gamepad2 className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xs font-semibold">Spelletjes</span>
           </Button>
 
           <Button
             variant="ghost"
             onClick={() => setLevelsModalOpen(true)}
-            className="flex flex-col items-center space-y-1 h-auto flex-1 text-gray-600 hover:text-gray-900"
+            className="flex flex-col items-center space-y-2 h-auto flex-1 text-gray-600 hover:text-yellow-600 hover:bg-yellow-50 rounded-xl transition-all duration-200"
           >
-            <Trophy className="h-5 w-5" />
-            <span className="text-xs font-medium">Prestaties</span>
+            <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center shadow-md">
+              <Trophy className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-xs font-semibold">Prestaties</span>
           </Button>
         </div>
       </nav>
@@ -857,6 +968,14 @@ export default function ChildDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Kobi AI Coach Widget */}
+      {user && (
+        <CoachWidget
+          childId={user.id}
+          childName={user.name}
+        />
+      )}
     </div>
   );
 }

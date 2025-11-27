@@ -10,23 +10,23 @@ import { Sparkles } from 'lucide-react';
 
 const slides = [
   {
-    label: 'Stap 1 • Ouders',
-    title: 'Deel jullie gezinscode meteen',
-    description: 'Log in op het ouderdashboard en geef de unieke code door – klaar om samen te starten.',
+    label: 'Stap 1 • Maak je Gezin',
+    title: 'Stap 1: Maak je Gezin in 60 Seconden',
+    description: 'Je vult je e-mail in, kiest je gezinsnaam ("Het Koninkrijk van de Smits"), en je ontvangt meteen een **unieke gezinscode** (bijv. "SMITS-2024").\n\nJe geeft deze code aan je kinderen. Klaar.\n\n*Tijd: 60 seconden. Aandacht nodig: Minimaal.*',
     image: '/images/guides/schermafbeelding-195004.png',
     accent: 'bg-primary/10 text-primary',
   },
   {
-    label: 'Stap 2 • Kids',
-    title: 'Kinderen loggen speels in',
-    description: 'Ze kiezen hun naam, tikken hun pincode en zien meteen welke ⭐ ze kunnen scoren.',
+    label: 'Stap 2 • Kinderen Avatar',
+    title: 'Stap 2: Kinderen Kiezen Hun Avatar (en Worden Boos van Opwinding)',
+    description: 'Je kind logt in met je gezinscode + hun eigen 4-cijfer pincode.\n\nMeteen zien ze:\n- Hun personaliseerbare avatar (en wat ze kunnen ontgrendelen)\n- De "Quest Board" met beschikbare klusjes\n- Hun huidigetotal punten en level\n- Hoeveel ze nog nodig hebben voor hun eerste beloning\n\nSerieus: ze vergeten hun telefoon voor deze app.\n\n*Tijd: 2 minuten. Opwindheid: 100%.*',
     image: '/images/guides/schermafbeelding-195224.png',
     accent: 'bg-amber-200 text-amber-800',
   },
   {
-    label: 'Stap 3 • Vier de beloningen',
-    title: 'Shop vol motivators & donaties',
-    description: 'Van filmavonden tot goede doelen: punten omzetten in momenten waar iedereen blij van wordt.',
+    label: 'Stap 3 • Ze Winnen',
+    title: 'Stap 3: Ze Winnen. Jij Maakt de Regel.',
+    description: 'Kind verdient 500 punten → kan inwisselen voor:\n- "Filmavond met familie" (200 punten)\n- "Extra 1 uur gamen" (150 punten)\n- "Keuze van donderdag eten" (100 punten)\n- Of doneren aan een goed doel (Red Cross, dierenasiel – jij kiest)\n\nJij bepaalt welke beloningen beschikbaar zijn.\nJij bepaalt de puntwaarde.\nJij ziet real-time wanneer ze geld gaan afhalen.\n\nIedereen wint. En dat voelt goed.\n\n*Tijd: 2 minuten per week. Impact: Oneindig.*',
     image: '/images/guides/beloningswinkel.png',
     accent: 'bg-violet-100 text-violet-800',
   },
@@ -125,11 +125,14 @@ export function HowItWorksCarousel() {
 
 const founderStorySlides = [
   {
-    title: '💡 Hoe het begon',
+    title: '# Hoe Het Begon (Een Waargebeurd Verhaal)',
     paragraphs: [
-      'Soms komen de beste ideeën gewoon aan de keukentafel. Het idee voor KlusjesKoning ontstond toen mijn zoon Alex (toen 9) vroeg: "Papa, waarom krijg ik geen punten als ik de vaatwasser uitruim?" 😄',
-      'Wat begon als een grapje, groeide uit tot een plan: een app waarin kinderen niet alleen iets verdienen, maar ook leren wat hun inzet waard is — voor zichzelf én voor anderen.',
-      'Zo werd KlusjesKoning geboren: een online hulpmiddel dat spel, opvoeding en maatschappelijke betrokkenheid samenbrengt.',
+      'Mijn zoon Alex (toen 9) vroeg me: **"Papa, waarom krijg ik geen punten als ik de vaatwasser uitruim?"**',
+      'Ik lachte. Maar toen dacht ik: *Waarom eigenlijk niet?*',
+      'Waarom is het goed genoeg dat hij punten verdient door pixels op een scherm te klikken, maar niet als hij de wasmachine aanrukt?',
+      '**Dus bouwde ik KlusjesKoning** – een app waarmee kinderen leren dat inzet *echt* iets oplevert. Voor hen zelf. En voor anderen (donaties).',
+      'Het is niet over geld. Het is over waardering. Over zien dat wat je doet *telt*.',
+      '— **Vincent van Munster**  \nOprichter van WeAreImpact',
     ],
   },
   {

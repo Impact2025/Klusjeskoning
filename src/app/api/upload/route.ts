@@ -24,6 +24,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if we're in development and Vercel Blob is not configured
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken || blobToken === 'vercel_blob_rw_placeholder_token_here') {
+      // Development fallback: return a mock URL
+      console.warn('Vercel Blob not configured, returning mock URL for development');
+      const mockUrl = `https://mock-storage.example.com/${folder}/${Date.now()}-${file.name}`;
+      return NextResponse.json({
+        url: mockUrl,
+        pathname: `/${folder}/${Date.now()}-${file.name}`,
+        isMock: true
+      });
+    }
+
     // Create a unique filename
     const filename = `${folder}/${Date.now()}-${file.name}`;
 

@@ -21,9 +21,16 @@ import {
   planTierEnum,
   subscriptionStatusEnum,
   pointsTransactions,
+  penaltyConfigurations,
+  appliedPenalties,
+  economicConfigurations,
+  economicMetrics,
 } from '../db/schema';
 import { hashPassword, verifyPassword } from '../auth/password';
 import { PLAN_DEFINITIONS } from '@/lib/plans';
+import { calculateXpReward, checkLevelUp } from '@/lib/xp-utils';
+import { PenaltyConfig, DEFAULT_PENALTY_CONFIG } from '@/lib/penalty-framework';
+import { EconomicConfig, DEFAULT_ECONOMIC_CONFIG } from '@/lib/economic-system';
 
 type SerializableDate = string | null;
 
@@ -69,6 +76,18 @@ export type SerializablePendingReward = {
   redeemedAt: SerializableDate;
 };
 
+export type SerializableTeamChore = {
+  id: string;
+  familyId: string;
+  name: string;
+  description?: string;
+  participatingChildren: string[];
+  totalPoints: number;
+  progress: number;
+  completedAt?: SerializableDate;
+  createdAt: SerializableDate;
+};
+
 export type SerializableSubscription = {
   plan: string | null;
   status: string | null;
@@ -91,6 +110,7 @@ export type SerializableFamily = {
   chores: SerializableChore[];
   rewards: SerializableReward[];
   pendingRewards: SerializablePendingReward[];
+  teamChores?: SerializableTeamChore[];
 };
 
 const toSerializableDate = (date?: Date | string | null): SerializableDate => {
@@ -264,57 +284,63 @@ export const getFamilyByCode = async (code: string) => {
 
   const family = familyResult.rows[0];
 
-  // Get children
-  const childrenResult = await db.execute(sql`
-    SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
-    FROM children
-    WHERE family_id = ${family.id}
-  `);
-
-  // Get chores - exclude problematic columns that may not exist
-  const choresResult = await db.execute(sql`
-    SELECT
-      c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
-      c.submitted_at, c.emotion, c.photo_url, c.created_at
-    FROM chores c
-    WHERE c.family_id = ${family.id}
-  `);
-
-  // Get chore assignments
-  const assignmentsResult = await db.execute(sql`
-    SELECT ca.chore_id, ca.child_id, ca.assigned_at
-    FROM chore_assignments ca
-    WHERE ca.chore_id IN (
-      SELECT id FROM chores WHERE family_id = ${family.id}
-    )
-  `);
-
-  // Get rewards
-  const rewardsResult = await db.execute(sql`
-    SELECT id, family_id, name, points, type, created_at
-    FROM rewards
-    WHERE family_id = ${family.id}
-  `);
-
-  // Get reward assignments
-  const rewardAssignmentsResult = await db.execute(sql`
-    SELECT ra.reward_id, ra.child_id, ra.assigned_at
-    FROM reward_assignments ra
-    WHERE ra.reward_id IN (
-      SELECT id FROM rewards WHERE family_id = ${family.id}
-    )
-  `);
-
-  // Get pending rewards
-  const pendingRewardsResult = await db.execute(sql`
-    SELECT
-      pr.id, pr.family_id, pr.child_id, pr.reward_id, pr.points, pr.redeemed_at,
-      c.name as child_name, r.name as reward_name
-    FROM pending_rewards pr
-    LEFT JOIN children c ON pr.child_id = c.id
-    LEFT JOIN rewards r ON pr.reward_id = r.id
-    WHERE pr.family_id = ${family.id}
-  `);
+  // Execute all queries in parallel for better performance (optimized with JOINs)
+  const [
+    childrenResult,
+    choresResult,
+    assignmentsResult,
+    rewardsResult,
+    rewardAssignmentsResult,
+    pendingRewardsResult,
+    teamChoresResult
+  ] = await Promise.all([
+    // Get children
+    db.execute(sql`
+      SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
+      FROM children
+      WHERE family_id = ${family.id}
+    `),
+    // Get chores with assignments in one query using LEFT JOIN
+    db.execute(sql`
+      SELECT
+        c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
+        c.submitted_at, c.emotion, c.photo_url, c.created_at,
+        ca.child_id as assigned_child_id, ca.assigned_at
+      FROM chores c
+      LEFT JOIN chore_assignments ca ON c.id = ca.chore_id
+      WHERE c.family_id = ${family.id}
+    `),
+    // Removed - merged with chores query above
+    Promise.resolve({ rows: [] }),
+    // Get rewards with assignments in one query using LEFT JOIN
+    db.execute(sql`
+      SELECT
+        r.id, r.family_id, r.name, r.points, r.type, r.created_at,
+        ra.child_id as assigned_child_id, ra.assigned_at
+      FROM rewards r
+      LEFT JOIN reward_assignments ra ON r.id = ra.reward_id
+      WHERE r.family_id = ${family.id}
+    `),
+    // Removed - merged with rewards query above
+    Promise.resolve({ rows: [] }),
+    // Get pending rewards
+    db.execute(sql`
+      SELECT
+        pr.id, pr.family_id, pr.child_id, pr.reward_id, pr.points, pr.redeemed_at,
+        c.name as child_name, r.name as reward_name
+      FROM pending_rewards pr
+      LEFT JOIN children c ON pr.child_id = c.id
+      LEFT JOIN rewards r ON pr.reward_id = r.id
+      WHERE pr.family_id = ${family.id}
+    `),
+    // Get team chores
+    db.execute(sql`
+      SELECT id, family_id, name, description, participating_children, total_points, progress, completed_at, created_at
+      FROM team_chores
+      WHERE family_id = ${family.id}
+      ORDER BY created_at DESC
+    `)
+  ]);
 
   // Build the family object
   return {
@@ -352,7 +378,7 @@ export const getFamilyByCode = async (code: string) => {
       emotion: chore.emotion,
       photoUrl: chore.photo_url,
       createdAt: chore.created_at,
-      assignments: assignmentsResult.rows.filter(a => a.chore_id === chore.id),
+      assignments: (assignmentsResult.rows as any[]).filter((a: any) => a.chore_id === chore.id),
     })),
     rewards: rewardsResult.rows.map(reward => ({
       id: reward.id,
@@ -361,7 +387,7 @@ export const getFamilyByCode = async (code: string) => {
       points: Number(reward.points),
       type: reward.type,
       createdAt: reward.created_at,
-      assignments: rewardAssignmentsResult.rows.filter(a => a.reward_id === reward.id),
+      assignments: (rewardAssignmentsResult.rows as any[]).filter((a: any) => a.reward_id === reward.id),
     })),
     pendingRewards: pendingRewardsResult.rows.map(pending => ({
       id: pending.id,
@@ -406,57 +432,63 @@ export const loadFamilyWithRelations = async (familyId: string) => {
 
   const family = familyResult.rows[0];
 
-  // Get children
-  const childrenResult = await db.execute(sql`
-    SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
-    FROM children
-    WHERE family_id = ${familyId}
-  `);
-
-  // Get chores - exclude problematic columns that may not exist
-  const choresResult = await db.execute(sql`
-    SELECT
-      c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
-      c.submitted_at, c.emotion, c.photo_url, c.created_at
-    FROM chores c
-    WHERE c.family_id = ${familyId}
-  `);
-
-  // Get chore assignments
-  const assignmentsResult = await db.execute(sql`
-    SELECT ca.chore_id, ca.child_id, ca.assigned_at
-    FROM chore_assignments ca
-    WHERE ca.chore_id IN (
-      SELECT id FROM chores WHERE family_id = ${familyId}
-    )
-  `);
-
-  // Get rewards
-  const rewardsResult = await db.execute(sql`
-    SELECT id, family_id, name, points, type, created_at
-    FROM rewards
-    WHERE family_id = ${familyId}
-  `);
-
-  // Get reward assignments
-  const rewardAssignmentsResult = await db.execute(sql`
-    SELECT ra.reward_id, ra.child_id, ra.assigned_at
-    FROM reward_assignments ra
-    WHERE ra.reward_id IN (
-      SELECT id FROM rewards WHERE family_id = ${familyId}
-    )
-  `);
-
-  // Get pending rewards
-  const pendingRewardsResult = await db.execute(sql`
-    SELECT
-      pr.id, pr.family_id, pr.child_id, pr.reward_id, pr.points, pr.redeemed_at,
-      c.name as child_name, r.name as reward_name
-    FROM pending_rewards pr
-    LEFT JOIN children c ON pr.child_id = c.id
-    LEFT JOIN rewards r ON pr.reward_id = r.id
-    WHERE pr.family_id = ${familyId}
-  `);
+  // Execute all queries in parallel for better performance
+  const [
+    childrenResult,
+    choresResult,
+    assignmentsResult,
+    rewardsResult,
+    rewardAssignmentsResult,
+    pendingRewardsResult,
+    teamChoresResult
+  ] = await Promise.all([
+    // Get children
+    db.execute(sql`
+      SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
+      FROM children
+      WHERE family_id = ${familyId}
+    `),
+    // Get chores with assignments in one query using LEFT JOIN
+    db.execute(sql`
+      SELECT
+        c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
+        c.submitted_at, c.emotion, c.photo_url, c.created_at,
+        ca.child_id as assigned_child_id, ca.assigned_at
+      FROM chores c
+      LEFT JOIN chore_assignments ca ON c.id = ca.chore_id
+      WHERE c.family_id = ${familyId}
+    `),
+    // Removed - merged with chores query above
+    Promise.resolve({ rows: [] }),
+    // Get rewards with assignments in one query using LEFT JOIN
+    db.execute(sql`
+      SELECT
+        r.id, r.family_id, r.name, r.points, r.type, r.created_at,
+        ra.child_id as assigned_child_id, ra.assigned_at
+      FROM rewards r
+      LEFT JOIN reward_assignments ra ON r.id = ra.reward_id
+      WHERE r.family_id = ${familyId}
+    `),
+    // Removed - merged with rewards query above
+    Promise.resolve({ rows: [] }),
+    // Get pending rewards
+    db.execute(sql`
+      SELECT
+        pr.id, pr.family_id, pr.child_id, pr.reward_id, pr.points, pr.redeemed_at,
+        c.name as child_name, r.name as reward_name
+      FROM pending_rewards pr
+      LEFT JOIN children c ON pr.child_id = c.id
+      LEFT JOIN rewards r ON pr.reward_id = r.id
+      WHERE pr.family_id = ${familyId}
+    `),
+    // Get team chores (moved into parallel execution)
+    db.execute(sql`
+      SELECT id, family_id, name, description, participating_children, total_points, progress, completed_at, created_at
+      FROM team_chores
+      WHERE family_id = ${familyId}
+      ORDER BY created_at DESC
+    `)
+  ]);
 
   // Build the family object
   const familyData = {
@@ -486,33 +518,56 @@ export const loadFamilyWithRelations = async (familyId: string) => {
       // xp: child.xp,
       // totalXpEver: child.total_xp_ever,
     })),
-    chores: choresResult.rows.map(chore => ({
-      id: chore.id,
-      familyId: chore.family_id,
-      name: chore.name,
-      points: Number(chore.points),
-      status: chore.status,
-      submittedByChildId: chore.submitted_by_child_id,
-      submittedAt: chore.submitted_at,
-      emotion: chore.emotion,
-      photoUrl: chore.photo_url,
-      createdAt: chore.created_at,
-      // Exclude gamification columns for now
-      // xpReward: Number(chore.xp_reward),
-      // questChainId: chore.quest_chain_id,
-      // isMainQuest: Boolean(chore.is_main_quest),
-      // chainOrder: chore.chain_order,
-      assignments: assignmentsResult.rows.filter(a => a.chore_id === chore.id),
-    })),
-    rewards: rewardsResult.rows.map(reward => ({
-      id: reward.id,
-      familyId: reward.family_id,
-      name: reward.name,
-      points: Number(reward.points),
-      type: reward.type,
-      createdAt: reward.created_at,
-      assignments: rewardAssignmentsResult.rows.filter(a => a.reward_id === reward.id),
-    })),
+    chores: Object.values(
+      choresResult.rows.reduce((acc, row: any) => {
+        if (!acc[row.id as string]) {
+          acc[row.id as string] = {
+            id: row.id,
+            familyId: row.family_id,
+            name: row.name,
+            points: Number(row.points),
+            status: row.status,
+            submittedByChildId: row.submitted_by_child_id,
+            submittedAt: row.submitted_at,
+            emotion: row.emotion,
+            photoUrl: row.photo_url,
+            createdAt: row.created_at,
+            assignments: [],
+          };
+        }
+        if (row.assigned_child_id) {
+          (acc[row.id as string] as any).assignments.push({
+            chore_id: row.id,
+            child_id: row.assigned_child_id,
+            assigned_at: row.assigned_at,
+          });
+        }
+        return acc;
+      }, {} as Record<string, any>)
+    ),
+    rewards: Object.values(
+      rewardsResult.rows.reduce((acc, row: any) => {
+        if (!acc[row.id as string]) {
+          acc[row.id as string] = {
+            id: row.id,
+            familyId: row.family_id,
+            name: row.name,
+            points: Number(row.points),
+            type: row.type,
+            createdAt: row.created_at,
+            assignments: [],
+          };
+        }
+        if (row.assigned_child_id) {
+          (acc[row.id as string] as any).assignments.push({
+            reward_id: row.id as string,
+            child_id: row.assigned_child_id,
+            assigned_at: row.assigned_at,
+          });
+        }
+        return acc;
+      }, {} as Record<string, any>)
+    ),
     pendingRewards: pendingRewardsResult.rows.map(pending => ({
       id: pending.id,
       familyId: pending.family_id,
@@ -529,32 +584,28 @@ export const loadFamilyWithRelations = async (familyId: string) => {
     })),
   };
 
-  // Get team chores
-  const teamChoresResult = await db.execute(sql`
-    SELECT id, family_id, name, description, participating_children, total_points, progress, completed_at, created_at
-    FROM team_chores
-    WHERE family_id = ${familyId}
-    ORDER BY created_at DESC
-  `);
+  // Add team chores to family data
+  const teamChoresData = teamChoresResult.rows.map(teamChore => ({
+    id: teamChore.id,
+    familyId: teamChore.family_id,
+    name: teamChore.name,
+    description: teamChore.description,
+    participatingChildren: teamChore.participating_children || [],
+    totalPoints: Number(teamChore.total_points),
+    progress: Number(teamChore.progress),
+    completedAt: teamChore.completed_at,
+    createdAt: teamChore.created_at,
+  }));
 
-  const teamChoresData = {
-    teamChores: teamChoresResult.rows.map(teamChore => ({
-      id: teamChore.id,
-      familyId: teamChore.family_id,
-      name: teamChore.name,
-      description: teamChore.description,
-      participatingChildren: teamChore.participating_children || [],
-      totalPoints: Number(teamChore.total_points),
-      progress: Number(teamChore.progress),
-      completedAt: teamChore.completed_at,
-      createdAt: teamChore.created_at,
-    })),
+  const completeFamilyData = {
+    ...familyData,
+    teamChores: teamChoresData,
   };
 
   // Cache the result if found
-  await FamilyCache.set(familyId, familyData);
+  await FamilyCache.set(familyId, completeFamilyData);
 
-  return { ...familyData, ...teamChoresData };
+  return completeFamilyData;
 };
 
 // ===== COUPON MANAGEMENT FUNCTIONS =====
@@ -1226,6 +1277,17 @@ export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof lo
     chores: choresData,
     rewards: rewardsData,
     pendingRewards: pendingRewardsData,
+    teamChores: (typedFamily as any).teamChores?.map((teamChore: any) => ({
+      id: teamChore.id,
+      familyId: teamChore.familyId,
+      name: teamChore.name,
+      description: teamChore.description,
+      participatingChildren: teamChore.participatingChildren || [],
+      totalPoints: teamChore.totalPoints,
+      progress: teamChore.progress,
+      completedAt: toSerializableDate(teamChore.completedAt),
+      createdAt: toSerializableDate(teamChore.createdAt),
+    })),
   };
 };
 
@@ -1728,10 +1790,8 @@ export const approveChore = async (familyId: string, choreId: string) => {
     UPDATE chores SET status = 'approved' WHERE id = ${choreId}
   `);
 
-  // Award points and XP
+  // Award points and XP (XP is now automatically calculated in updateChildPoints)
   await updateChildPoints(chore.submitted_by_child_id as string, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, choreId);
-  // Note: XP reward is not available in current schema, so we skip it for now
-  // await updateChildXp(chore.submittedByChildId, chore.xpReward || 0);
 };
 
 export const rejectChore = async (familyId: string, choreId: string) => {
@@ -1757,9 +1817,13 @@ export const clearPendingReward = async (familyId: string, pendingRewardId: stri
 export const updateChildPoints = async (childId: string, delta: number, description?: string, relatedChoreId?: string) => {
   if (!db) throw new Error('Database not initialized');
 
-  // Get current points before update
+  // Get current points and XP before update
   const [child] = await db
-    .select({ points: children.points, familyId: children.familyId })
+    .select({
+      points: children.points,
+      xp: children.xp,
+      familyId: children.familyId
+    })
     .from(children)
     .where(eq(children.id, childId))
     .limit(1);
@@ -1777,11 +1841,21 @@ export const updateChildPoints = async (childId: string, delta: number, descript
     throw new Error('INSUFFICIENT_POINTS');
   }
 
-  // Update points
+  // Calculate XP reward using the new system (only for positive transactions)
+  const xpReward = delta > 0 ? calculateXpReward(delta) : 0;
+  const newXpBalance = child.xp + xpReward;
+  const incrementXpTotalEver = Math.max(xpReward, 0);
+
+  // Check for level up
+  const levelUpInfo = checkLevelUp(child.xp, newXpBalance);
+
+  // Update points and XP
   await db.execute(sql`
     UPDATE children
     SET points = points + ${delta},
-        total_points_ever = total_points_ever + ${incrementTotalEver}
+        total_points_ever = total_points_ever + ${incrementTotalEver},
+        xp = xp + ${xpReward},
+        total_xp_ever = total_xp_ever + ${incrementXpTotalEver}
     WHERE id = ${childId}
   `);
 
@@ -1797,6 +1871,16 @@ export const updateChildPoints = async (childId: string, delta: number, descript
       balanceBefore: child.points,
       balanceAfter: newPointsBalance,
     });
+
+    // Log XP gain separately if earned
+    if (xpReward > 0) {
+      console.log(`[XP_REWARD] Child ${childId} earned ${xpReward} XP. Total XP: ${child.xp} → ${newXpBalance}`);
+    }
+
+    // Log level up if it occurred
+    if (levelUpInfo.leveledUp) {
+      console.log(`[LEVEL_UP] Child ${childId} leveled up from ${levelUpInfo.oldLevel} to ${levelUpInfo.newLevel}! Unlocks: ${levelUpInfo.unlocks?.join(', ') || 'none'}`);
+    }
   }
 };
 
@@ -2407,4 +2491,230 @@ export const cleanupExpiredVerificationCodes = async (): Promise<void> => {
   await db
     .delete(verificationCodes)
     .where(lte(verificationCodes.expiresAt, new Date()));
+};
+
+// ===== PENALTY SYSTEM FUNCTIONS =====
+
+/**
+ * Get penalty configuration for a family
+ */
+export const getPenaltyConfiguration = async (familyId: string): Promise<PenaltyConfig> => {
+  if (!db) throw new Error('Database not initialized');
+
+  const config = await db.query.penaltyConfigurations.findFirst({
+    where: eq(penaltyConfigurations.familyId, familyId),
+  });
+
+  if (!config) {
+    // Return default configuration
+    return DEFAULT_PENALTY_CONFIG;
+  }
+
+  try {
+    return {
+      ...DEFAULT_PENALTY_CONFIG,
+      rules: JSON.parse(config.rules),
+      globalSettings: {
+        maxPenaltyPercent: config.maxPenaltyPercent,
+        penaltyTimeoutHours: config.penaltyTimeoutHours,
+        allowAppeals: config.allowAppeals === 1,
+      },
+    };
+  } catch (error) {
+    console.error('Error parsing penalty configuration:', error);
+    return DEFAULT_PENALTY_CONFIG;
+  }
+};
+
+/**
+ * Update penalty configuration for a family
+ */
+export const updatePenaltyConfiguration = async (
+  familyId: string,
+  penaltyConfig: PenaltyConfig
+): Promise<void> => {
+  if (!db) throw new Error('Database not initialized');
+
+  const existing = await db.query.penaltyConfigurations.findFirst({
+    where: eq(penaltyConfigurations.familyId, familyId),
+  });
+
+  const configData = {
+    rules: JSON.stringify(penaltyConfig.rules),
+    maxPenaltyPercent: penaltyConfig.globalSettings.maxPenaltyPercent,
+    penaltyTimeoutHours: penaltyConfig.globalSettings.penaltyTimeoutHours,
+    allowAppeals: penaltyConfig.globalSettings.allowAppeals ? 1 : 0,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    await db
+      .update(penaltyConfigurations)
+      .set(configData)
+      .where(eq(penaltyConfigurations.id, existing.id));
+  } else {
+    await db.insert(penaltyConfigurations).values({
+      familyId,
+      ...configData,
+    });
+  }
+};
+
+/**
+ * Apply a penalty to a chore
+ */
+export const applyPenalty = async (params: {
+  familyId: string;
+  childId: string;
+  choreId: string;
+  penaltyType: string;
+  originalPoints: number;
+  penaltyPoints: number;
+  recoveryOption?: string;
+  notes?: string;
+}): Promise<void> => {
+  if (!db) throw new Error('Database not initialized');
+
+  await db.insert(appliedPenalties).values({
+    familyId: params.familyId,
+    childId: params.childId,
+    choreId: params.choreId,
+    penaltyType: params.penaltyType,
+    originalPoints: params.originalPoints,
+    penaltyPoints: params.penaltyPoints,
+    recoveryOption: params.recoveryOption,
+    notes: params.notes,
+  });
+};
+
+/**
+ * Get applied penalties for a family
+ */
+export const getAppliedPenalties = async (familyId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
+  return db.query.appliedPenalties.findMany({
+    where: eq(appliedPenalties.familyId, familyId),
+    orderBy: desc(appliedPenalties.appliedAt),
+  });
+};
+
+// ===== ECONOMIC SYSTEM FUNCTIONS =====
+
+/**
+ * Get economic configuration for a family
+ */
+export const getEconomicConfiguration = async (familyId: string): Promise<EconomicConfig> => {
+  if (!db) throw new Error('Database not initialized');
+
+  const config = await db.query.economicConfigurations.findFirst({
+    where: eq(economicConfigurations.familyId, familyId),
+  });
+
+  if (!config) {
+    // Return default configuration
+    return DEFAULT_ECONOMIC_CONFIG;
+  }
+
+  try {
+    return {
+      ...DEFAULT_ECONOMIC_CONFIG,
+      dynamicPricing: {
+        inflationThreshold: config.inflationThreshold,
+        maxInflationCorrection: config.maxInflationCorrection / 100, // Convert back to decimal
+        correctionStep: config.correctionStep / 100, // Convert back to decimal
+        stabilizationPeriodDays: config.stabilizationPeriodDays,
+      },
+      pointSinks: JSON.parse(config.pointSinks),
+      externalChoreRates: {
+        euroToPoints: config.euroToPoints,
+        pointsToEuro: config.pointsToEuro,
+      },
+    };
+  } catch (error) {
+    console.error('Error parsing economic configuration:', error);
+    return DEFAULT_ECONOMIC_CONFIG;
+  }
+};
+
+/**
+ * Update economic configuration for a family
+ */
+export const updateEconomicConfiguration = async (
+  familyId: string,
+  economicConfig: EconomicConfig
+): Promise<void> => {
+  if (!db) throw new Error('Database not initialized');
+
+  const existing = await db.query.economicConfigurations.findFirst({
+    where: eq(economicConfigurations.familyId, familyId),
+  });
+
+  const configData = {
+    inflationThreshold: economicConfig.dynamicPricing.inflationThreshold,
+    maxInflationCorrection: Math.round(economicConfig.dynamicPricing.maxInflationCorrection * 100),
+    correctionStep: Math.round(economicConfig.dynamicPricing.correctionStep * 100),
+    stabilizationPeriodDays: economicConfig.dynamicPricing.stabilizationPeriodDays,
+    pointSinks: JSON.stringify(economicConfig.pointSinks),
+    euroToPoints: economicConfig.externalChoreRates.euroToPoints,
+    pointsToEuro: economicConfig.externalChoreRates.pointsToEuro,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    await db
+      .update(economicConfigurations)
+      .set(configData)
+      .where(eq(economicConfigurations.id, existing.id));
+  } else {
+    await db.insert(economicConfigurations).values({
+      familyId,
+      ...configData,
+    });
+  }
+};
+
+/**
+ * Record economic metrics for monitoring
+ */
+export const recordEconomicMetrics = async (params: {
+  familyId: string;
+  weekStart: Date;
+  weekEnd: Date;
+  averagePointsBalance: number;
+  totalPointsInCirculation: number;
+  pointsEarnedThisWeek: number;
+  pointsSpentThisWeek: number;
+  inflationRate: number;
+  rewardRedemptionRate: number;
+}): Promise<void> => {
+  if (!db) throw new Error('Database not initialized');
+
+  // Convert Date objects to ISO date strings for Drizzle's date() type
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  await db.insert(economicMetrics).values({
+    familyId: params.familyId,
+    weekStart: formatDate(params.weekStart),
+    weekEnd: formatDate(params.weekEnd),
+    averagePointsBalance: params.averagePointsBalance,
+    totalPointsInCirculation: params.totalPointsInCirculation,
+    pointsEarnedThisWeek: params.pointsEarnedThisWeek,
+    pointsSpentThisWeek: params.pointsSpentThisWeek,
+    inflationRate: Math.round(params.inflationRate * 100), // Store as percentage * 100
+    rewardRedemptionRate: Math.round(params.rewardRedemptionRate * 100),
+  });
+};
+
+/**
+ * Get economic metrics history for a family
+ */
+export const getEconomicMetricsHistory = async (familyId: string, limit = 12) => {
+  if (!db) throw new Error('Database not initialized');
+
+  return db.query.economicMetrics.findMany({
+    where: eq(economicMetrics.familyId, familyId),
+    orderBy: desc(economicMetrics.weekStart),
+    limit,
+  });
 };

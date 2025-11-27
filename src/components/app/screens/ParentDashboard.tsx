@@ -30,7 +30,9 @@ import {
   RefreshCw,
   Heart,
   Star,
-  Trophy
+  Trophy,
+  Zap,
+  BookOpen
 } from 'lucide-react';
 import type { Chore, Child, Reward } from '@/lib/types';
 import AddChildModal from '../models/AddChildModal';
@@ -42,6 +44,10 @@ import EditRewardModal from '../models/EditRewardModal';
 import AddTeamChoreModal from '../models/AddTeamChoreModal';
 import EditTeamChoreModal from '../models/EditTeamChoreModal';
 import ComplimentCards from '../../gamification/ComplimentCards';
+import { OnboardingWizard } from '../../onboarding';
+import SuggestionBanner from '../../suggestions/SuggestionBanner';
+import ChoreLibrary from '../../chores/ChoreLibrary';
+import { ParentInsightsDashboard } from '../../coach';
 
 export default function ParentDashboard() {
   const { family, logout, approveChore, deleteItem } = useApp();
@@ -69,6 +75,13 @@ export default function ParentDashboard() {
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [rewardFilter, setRewardFilter] = useState<'all' | 'privileges' | 'experience' | 'financial'>('all');
+
+  // Onboarding states
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [onboardingChild, setOnboardingChild] = useState<Child | null>(null);
+
+  // Chore Library state
+  const [showChoreLibrary, setShowChoreLibrary] = useState(false);
 
   useEffect(() => {
     if (family) {
@@ -116,6 +129,17 @@ export default function ParentDashboard() {
     if (window.confirm(`Weet je zeker dat je ${childName} wilt verwijderen? Alle gegevens van dit kind gaan verloren.`)) {
       await deleteItem('children', childId);
     }
+  };
+
+  const handleStartOnboarding = (child: Child) => {
+    setOnboardingChild(child);
+    setIsOnboardingOpen(true);
+  };
+
+  const handleOnboardingComplete = () => {
+    setIsOnboardingOpen(false);
+    setOnboardingChild(null);
+    window.location.reload();
   };
 
   const handleEditChore = (chore: Chore) => {
@@ -206,13 +230,13 @@ export default function ParentDashboard() {
               ⭐ Upgrade naar Premium
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing} className="h-9 w-9 p-0 border-gray-300 hover:bg-gray-50 hover:border-gray-400">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setActiveTab('settings')} className="p-2">
-            <Settings className="h-5 w-5" />
+          <Button variant="outline" size="sm" onClick={() => setActiveTab('settings')} className="h-9 w-9 p-0 border-gray-300 hover:bg-gray-50 hover:border-gray-400">
+            <Settings className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={logout}>
+          <Button variant="ghost" size="sm" onClick={logout} className="h-9 w-9 p-0 text-gray-600 hover:text-gray-900 hover:bg-gray-50">
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
@@ -252,39 +276,35 @@ export default function ParentDashboard() {
         </div>
       </header>
 
-      {/* Desktop Navigation - Clean and Professional */}
-      <div className="hidden md:block sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+      {/* Desktop Navigation - Minimalist & Professional */}
+      <div className="hidden md:block sticky top-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7 h-14 bg-transparent">
-            <TabsTrigger value="overview" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
-              <BarChart3 className="h-5 w-5" />
+          <TabsList className="grid w-full grid-cols-6 h-12 bg-transparent p-1">
+            <TabsTrigger value="overview" className="flex flex-col items-center gap-1 py-2 px-3 text-xs font-medium transition-all duration-200 data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 rounded-md">
+              <BarChart3 className="h-4 w-4" />
               <span>Overzicht</span>
             </TabsTrigger>
-            <TabsTrigger value="children" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700" data-tour="children">
-              <Users className="h-5 w-5" />
+            <TabsTrigger value="children" className="flex flex-col items-center gap-1 py-2 px-3 text-xs font-medium transition-all duration-200 data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 rounded-md" data-tour="children">
+              <Users className="h-4 w-4" />
               <span>Kinderen</span>
             </TabsTrigger>
-            <TabsTrigger value="chores" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700" data-tour="chores">
-              <ListTodo className="h-5 w-5" />
+            <TabsTrigger value="chores" className="flex flex-col items-center gap-1 py-2 px-3 text-xs font-medium transition-all duration-200 data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 rounded-md" data-tour="chores">
+              <ListTodo className="h-4 w-4" />
               <span>Klusjes</span>
             </TabsTrigger>
-            <TabsTrigger value="team-chores" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
-              <Users className="h-5 w-5" />
-              <span>Team Klusjes</span>
-            </TabsTrigger>
-            <TabsTrigger value="rewards" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700" data-tour="rewards">
-              <Gift className="h-5 w-5" />
+            <TabsTrigger value="rewards" className="flex flex-col items-center gap-1 py-2 px-3 text-xs font-medium transition-all duration-200 data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 rounded-md" data-tour="rewards">
+              <Gift className="h-4 w-4" />
               <span>Beloningen</span>
             </TabsTrigger>
-            <TabsTrigger value="compliments" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
-              <Heart className="h-5 w-5" />
+            <TabsTrigger value="compliments" className="flex flex-col items-center gap-1 py-2 px-3 text-xs font-medium transition-all duration-200 data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 rounded-md">
+              <Heart className="h-4 w-4" />
               <span>Complimenten</span>
             </TabsTrigger>
-            <TabsTrigger value="actions" className="flex flex-col items-center gap-1 py-3 px-2 text-xs font-medium transition-all data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 relative" data-tour="actions">
-              <AlertTriangle className="h-5 w-5" />
+            <TabsTrigger value="actions" className="flex flex-col items-center gap-1 py-2 px-3 text-xs font-medium transition-all duration-200 data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 rounded-md relative" data-tour="actions">
+              <AlertTriangle className="h-4 w-4" />
               <span>Goedkeuren</span>
               {totalPending > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-xs flex items-center justify-center font-bold">
                   {totalPending}
                 </Badge>
               )}
@@ -294,92 +314,81 @@ export default function ParentDashboard() {
       </div>
 
       <ScrollArea className="flex-grow">
-        <main className="p-4 pb-20 md:pb-4">
+        <main className="p-6 pb-24 md:pb-6 max-w-7xl mx-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
-            {/* Mobile Bottom Navigation - Clean and Professional */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-50 shadow-lg">
-              <div className="grid grid-cols-7 h-16">
+            {/* Mobile Bottom Navigation - Minimalist & Professional */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 md:hidden z-50 shadow-2xl">
+              <div className="flex justify-around items-center h-16 px-2 max-w-lg mx-auto">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 transition-all duration-200 ${
+                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
                     activeTab === 'overview'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <BarChart3 className="h-4 w-4" />
+                  <BarChart3 className="h-5 w-5" />
                   <span className="text-xs font-medium">Overzicht</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('children')}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 transition-all duration-200 ${
+                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
                     activeTab === 'children'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <Users className="h-4 w-4" />
+                  <Users className="h-5 w-5" />
                   <span className="text-xs font-medium">Kinderen</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('chores')}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 transition-all duration-200 ${
+                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
                     activeTab === 'chores'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <ListTodo className="h-4 w-4" />
+                  <ListTodo className="h-5 w-5" />
                   <span className="text-xs font-medium">Klusjes</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab('team-chores')}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 transition-all duration-200 ${
-                    activeTab === 'team-chores'
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  <Users className="h-4 w-4" />
-                  <span className="text-xs font-medium">Team</span>
-                </button>
-                <button
                   onClick={() => setActiveTab('rewards')}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 transition-all duration-200 ${
+                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
                     activeTab === 'rewards'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <Gift className="h-4 w-4" />
+                  <Gift className="h-5 w-5" />
                   <span className="text-xs font-medium">Beloningen</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('compliments')}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 transition-all duration-200 ${
+                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 ${
                     activeTab === 'compliments'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <Heart className="h-4 w-4" />
+                  <Heart className="h-5 w-5" />
                   <span className="text-xs font-medium">Complimenten</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('actions')}
-                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 transition-all duration-200 relative ${
+                  className={`flex flex-col items-center space-y-1 h-auto flex-1 py-2 px-1 rounded-lg transition-all duration-200 relative ${
                     activeTab === 'actions'
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="h-5 w-5" />
                   <span className="text-xs font-medium">Goedkeuren</span>
                   {totalPending > 0 && (
                     <Badge
                       variant="destructive"
-                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-xs flex items-center justify-center"
+                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-xs flex items-center justify-center font-bold"
                     >
                       {totalPending}
                     </Badge>
@@ -388,60 +397,62 @@ export default function ParentDashboard() {
               </div>
             </div>
 
-            <TabsContent value="overview" className="space-y-6 mt-6">
+            <TabsContent value="overview" className="space-y-8 mt-8">
               {/* Quick Stats Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="overview">
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-blue-600">{family.children.length}</div>
-                    <p className="text-xs text-gray-600">Kinderen</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6" data-tour="overview">
+                <Card className="text-center bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-blue-600 mb-2">{family.children.length}</div>
+                    <p className="text-sm font-medium text-blue-800">Kinderen</p>
                   </CardContent>
                 </Card>
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-green-600">{family.chores.filter(c => c.status === 'approved').length}</div>
-                    <p className="text-xs text-gray-600">Voltooide klusjes</p>
+                <Card className="text-center bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-green-600 mb-2">{family.chores.filter(c => c.status === 'approved').length}</div>
+                    <p className="text-sm font-medium text-green-800">Voltooide klusjes</p>
                   </CardContent>
                 </Card>
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-yellow-600">{pendingApprovals.length}</div>
-                    <p className="text-xs text-gray-600">Te goedkeuren</p>
+                <Card className="text-center bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-yellow-600 mb-2">{pendingApprovals.length}</div>
+                    <p className="text-sm font-medium text-yellow-800">Te goedkeuren</p>
                   </CardContent>
                 </Card>
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-purple-600">
+                <Card className="text-center bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-purple-600 mb-2">
                       €{family.children.reduce((sum, child) => sum + child.points, 0) / 100}
                     </div>
-                    <p className="text-xs text-gray-600">Totaal verdiend</p>
+                    <p className="text-sm font-medium text-purple-800">Totaal verdiend</p>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Family Members Overview */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Users className="h-5 w-5 mr-2" />
+              <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center text-lg">
+                    <Users className="h-5 w-5 mr-2 text-gray-600" />
                     Familie Leden
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {family.children.map((child) => (
-                      <div key={child.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div key={child.id} className="flex items-center justify-between p-4 bg-white/60 rounded-lg border border-gray-100 hover:shadow-sm transition-shadow">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback>{child.avatar || child.name[0]}</AvatarFallback>
+                          <Avatar className="h-10 w-10 ring-2 ring-gray-100">
+                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                              {child.avatar || child.name[0]}
+                            </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium">{child.name}</p>
-                            <p className="text-sm text-gray-600">Level {Math.floor(child.totalXpEver / 100) + 1}</p>
+                            <p className="font-semibold text-gray-900">{child.name}</p>
+                            <p className="text-sm text-gray-600">Level {Math.floor((child.totalXpEver || 0) / 100) + 1}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-green-600">{child.points}</p>
+                          <p className="font-bold text-green-600 text-lg">{child.points}</p>
                           <p className="text-xs text-gray-500">punten</p>
                         </div>
                       </div>
@@ -450,25 +461,48 @@ export default function ParentDashboard() {
                 </CardContent>
               </Card>
 
+              {/* Smart Suggestions per Child */}
+              {family.children.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-yellow-500" />
+                    Slimme Suggesties
+                  </h3>
+                  {family.children.map((child) => (
+                    <SuggestionBanner
+                      key={`suggestion-${child.id}`}
+                      childId={child.id}
+                      childName={child.name}
+                      onAccept={() => {}}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* AI Coach Insights - Premium Feature */}
+              {family.subscription?.plan === 'premium' && (
+                <ParentInsightsDashboard />
+              )}
+
               {/* Recent Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <BarChart3 className="h-5 w-5 mr-2" />
+              <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center text-lg">
+                    <BarChart3 className="h-5 w-5 mr-2 text-gray-600" />
                     Recente Activiteit
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <div className="space-y-3">
                     {family.chores.slice(-5).reverse().map((chore) => (
-                      <div key={chore.id} className="flex items-center justify-between py-2">
+                      <div key={chore.id} className="flex items-center justify-between py-3 px-4 bg-white/40 rounded-lg border border-gray-100">
                         <div className="flex items-center gap-3">
-                          <Badge variant={chore.status === 'approved' ? 'default' : 'secondary'} className="text-xs">
-                            {chore.status === 'approved' ? '✓' : '⏳'}
+                          <Badge variant={chore.status === 'approved' ? 'default' : 'secondary'} className="text-xs px-2 py-1">
+                            {chore.status === 'approved' ? '✓ Goedgekeurd' : '⏳ Ingediend'}
                           </Badge>
-                          <span className="text-sm">{chore.name}</span>
+                          <span className="text-sm font-medium text-gray-900">{chore.name}</span>
                         </div>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-sm text-gray-600 font-medium">
                           {family.children.find(c => c.id === chore.submittedBy)?.name}
                         </span>
                       </div>
@@ -478,157 +512,229 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="children" className="space-y-6 mt-6">
-              {/* Quick Actions */}
+            <TabsContent value="children" className="space-y-8 mt-8">
+              {/* Professional Header */}
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Kinderen Beheren</h2>
-                <Button onClick={() => setIsAddChildOpen(true)}>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Familie Leden</h2>
+                  <p className="text-sm text-gray-600 mt-1">Beheer jullie kinderen en hun voortgang</p>
+                </div>
+                <Button onClick={() => setIsAddChildOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9">
                   <Plus className="h-4 w-4 mr-2" />
                   Kind Toevoegen
                 </Button>
               </div>
 
-              {/* Children Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {family.children.length > 0 ? (
-                  family.children.map((child) => (
-                    <Card key={child.id}>
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-12 w-12">
-                              <AvatarFallback className="text-lg">{child.avatar || child.name[0]}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <CardTitle className="text-lg">{child.name}</CardTitle>
-                              <p className="text-sm text-gray-600">Level {Math.floor(child.totalXpEver / 100) + 1}</p>
+              {/* Professional Children Table */}
+              {family.children.length > 0 ? (
+                <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60 overflow-hidden">
+                  <CardContent className="p-0">
+                    {/* Table Header */}
+                    <div className="bg-gray-50/80 border-b border-gray-200/60 px-6 py-4">
+                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                        <div className="col-span-4">Kind</div>
+                        <div className="col-span-2 text-center">Level</div>
+                        <div className="col-span-2 text-center">Punten</div>
+                        <div className="col-span-2 text-center">PIN Code</div>
+                        <div className="col-span-2 text-center">Acties</div>
+                      </div>
+                    </div>
+
+                    {/* Table Rows */}
+                    <div className="divide-y divide-gray-100">
+                      {family.children.map((child, index) => (
+                        <div key={child.id} className={`px-6 py-5 hover:bg-gray-50/50 transition-colors ${index % 2 === 0 ? 'bg-white/30' : 'bg-gray-50/30'}`}>
+                          <div className="grid grid-cols-12 gap-4 items-center">
+                            {/* Child Info */}
+                            <div className="col-span-4 flex items-center gap-4">
+                              <Avatar className="h-12 w-12 ring-2 ring-blue-100">
+                                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-lg">
+                                  {child.avatar || child.name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-bold text-gray-900 text-lg">{child.name}</p>
+                                <p className="text-sm text-gray-600">{child.totalXpEver} XP totaal</p>
+                              </div>
+                            </div>
+
+                            {/* Level */}
+                            <div className="col-span-2 text-center">
+                              <div className="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full">
+                                <span className="text-white font-bold text-sm">
+                                  {Math.floor((child.totalXpEver || 0) / 100) + 1}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Points */}
+                            <div className="col-span-2 text-center">
+                              <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold inline-block">
+                                {child.points}
+                              </div>
+                            </div>
+
+                            {/* PIN Code */}
+                            <div className="col-span-2 text-center">
+                              <code className="bg-gray-100 text-gray-800 px-3 py-1 rounded text-sm font-mono font-bold">
+                                {child.pin}
+                              </code>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="col-span-2 flex justify-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditChild(child)}
+                                className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100 hover:border-gray-400 transition-colors"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleStartOnboarding(child)}
+                                className="h-8 px-3 bg-purple-600 hover:bg-purple-700 text-xs font-medium"
+                              >
+                                <Zap className="h-3 w-3 mr-1" />
+                                Setup
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteChild(child.id, child.name)}
+                                className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
-                          <Badge variant="outline">{child.points} punten</Badge>
                         </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-gray-500">PIN Code</p>
-                            <p className="font-mono font-bold">{child.pin}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500">XP Totaal</p>
-                            <p className="font-bold">{child.totalXpEver}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditChild(child)}
-                            className="flex-1"
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Bewerken
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteChild(child.id, child.name)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : (
-                  <Card className="col-span-full">
-                    <CardContent className="text-center py-12">
-                      <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Nog geen kinderen toegevoegd</h3>
-                      <p className="text-gray-600 mb-4">
-                        Voeg je eerste kind toe om te beginnen met jullie beloningensysteem.
-                      </p>
-                      <Button onClick={() => setIsAddChildOpen(true)} variant="outline">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Eerste Kind Toevoegen
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                /* Empty State */
+                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                  <CardContent className="text-center py-16">
+                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Users className="h-10 w-10 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Welkom bij jullie gezin!</h3>
+                    <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                      Voeg jullie eerste kind toe om te beginnen met een georganiseerd beloningensysteem dat de hele familie motiveert.
+                    </p>
+                    <Button onClick={() => setIsAddChildOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Eerste Kind Toevoegen
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
-            <TabsContent value="chores" className="space-y-6 mt-6">
-              {/* Quick Actions */}
+            <TabsContent value="chores" className="space-y-8 mt-8">
+              {/* Professional Header */}
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Klusjes Beheren</h2>
-                <Button onClick={() => setIsAddChoreOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Klusje Toevoegen
-                </Button>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Klusjes Beheren</h2>
+                  <p className="text-sm text-gray-600 mt-1">Organiseer en beheer jullie gezinstaakjes</p>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant={showChoreLibrary ? "default" : "outline"}
+                    onClick={() => setShowChoreLibrary(!showChoreLibrary)}
+                    className={`${showChoreLibrary ? "bg-purple-600 hover:bg-purple-700" : "border-gray-300 hover:bg-gray-50 hover:border-gray-400"} text-sm font-medium px-4 py-2 h-9`}
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Bibliotheek
+                  </Button>
+                  <Button onClick={() => setIsAddChoreOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Klusje Toevoegen
+                  </Button>
+                </div>
               </div>
 
-              {/* Status Overview */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-blue-600">
+              {/* Chore Library */}
+              {showChoreLibrary && (
+                <ChoreLibrary
+                  children={family.children.map(c => ({ id: c.id, name: c.name }))}
+                  onChoreAdded={() => window.location.reload()}
+                />
+              )}
+
+              {/* Status Overview - Professional Layout */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <Card className="text-center bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-blue-600 mb-2">
                       {family.chores.filter(c => c.status === 'available').length}
                     </div>
-                    <p className="text-xs text-gray-600">Beschikbaar</p>
+                    <p className="text-sm font-medium text-blue-800">Beschikbaar</p>
                   </CardContent>
                 </Card>
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-yellow-600">
+                <Card className="text-center bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-yellow-600 mb-2">
                       {family.chores.filter(c => c.status === 'submitted').length}
                     </div>
-                    <p className="text-xs text-gray-600">Ingediend</p>
+                    <p className="text-sm font-medium text-yellow-800">Ingediend</p>
                   </CardContent>
                 </Card>
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-green-600">
+                <Card className="text-center bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-green-600 mb-2">
                       {family.chores.filter(c => c.status === 'approved').length}
                     </div>
-                    <p className="text-xs text-gray-600">Goedgekeurd</p>
+                    <p className="text-sm font-medium text-green-800">Goedgekeurd</p>
                   </CardContent>
                 </Card>
-                <Card className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-purple-600">
+                <Card className="text-center bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-purple-600 mb-2">
                       {family.chores.filter(c => (c as any).isTemplate === 1).length}
                     </div>
-                    <p className="text-xs text-gray-600">Terugkerend</p>
+                    <p className="text-sm font-medium text-purple-800">Terugkerend</p>
+                  </CardContent>
+                </Card>
+                <Card className="text-center bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="text-3xl font-bold text-indigo-600 mb-2">
+                      {family.teamChores?.length || 0}
+                    </div>
+                    <p className="text-sm font-medium text-indigo-800">Team Klusjes</p>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Recurring Chores Overview */}
               {family.chores.filter(c => (c as any).isTemplate === 1).length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <RefreshCw className="h-5 w-5 mr-2" />
+                <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center text-lg">
+                      <RefreshCw className="h-5 w-5 mr-2 text-gray-600" />
                       Terugkerende Klusjes
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
+                  <CardContent className="pt-0">
+                    <div className="space-y-4">
                       {family.chores
                         .filter(c => (c as any).isTemplate === 1)
                         .map((chore) => (
-                          <div key={chore.id} className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-purple-50 to-blue-50">
+                          <div key={chore.id} className="flex items-center justify-between p-5 bg-white/60 rounded-lg border border-gray-100 hover:shadow-sm transition-shadow">
                             <div className="flex items-center gap-4 flex-1">
-                              <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                              <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 px-3 py-1">
                                 {(chore as any).recurrenceType === 'daily' ? 'Dagelijks' :
                                  (chore as any).recurrenceType === 'weekly' ? 'Wekelijks' : 'Aangepast'}
                               </Badge>
                               <div className="flex-1">
-                                <p className="font-medium">{chore.name}</p>
-                                <p className="text-sm text-gray-600">{chore.points} punten • Template</p>
+                                <p className="font-semibold text-gray-900">{chore.name}</p>
+                                <p className="text-sm text-gray-600">{chore.points} punten • Sjabloon</p>
                                 {(chore as any).nextDueDate && (
-                                  <p className="text-xs text-purple-600">
+                                  <p className="text-sm text-purple-600 font-medium">
                                     Volgende: {new Date((chore as any).nextDueDate).toLocaleDateString('nl-NL')}
                                   </p>
                                 )}
@@ -639,16 +745,17 @@ export default function ParentDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditChore(chore)}
+                                className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100 hover:border-gray-400 transition-colors"
                               >
-                                <Edit className="h-4 w-4" />
+                                <Edit className="h-3 w-3" />
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteChore(chore.id, chore.name)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </div>
@@ -659,24 +766,24 @@ export default function ParentDashboard() {
               )}
 
               {/* Chores List */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Alle Klusjes</CardTitle>
+              <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">Individuele Klusjes</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="pt-0">
+                  <div className="space-y-4">
                     {family.chores.length > 0 ? (
                       family.chores.map((chore) => (
-                        <div key={chore.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <div key={chore.id} className="flex items-center justify-between p-5 bg-white/60 rounded-lg border border-gray-100 hover:shadow-sm transition-shadow">
                           <div className="flex items-center gap-4 flex-1">
                             <Badge
                               variant={chore.status === 'available' ? 'default' : chore.status === 'submitted' ? 'secondary' : 'outline'}
-                              className="min-w-fit"
+                              className="px-3 py-1 text-xs font-medium"
                             >
                               {chore.status === 'available' ? 'Beschikbaar' : chore.status === 'submitted' ? 'Ingediend' : 'Goedgekeurd'}
                             </Badge>
                             <div className="flex-1">
-                              <p className="font-medium">{chore.name}</p>
+                              <p className="font-semibold text-gray-900">{chore.name}</p>
                               <p className="text-sm text-gray-600">{chore.points} punten • {chore.xpReward} XP</p>
                             </div>
                           </div>
@@ -685,28 +792,31 @@ export default function ParentDashboard() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleEditChore(chore)}
+                              className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-3 w-3" />
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleDeleteChore(chore.id, chore.name)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-12">
-                        <ListTodo className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">Nog geen klusjes toegevoegd</h3>
-                        <p className="text-gray-600 mb-4">
-                          Klik op "Klusje Toevoegen" om te beginnen met jullie taakensysteem.
+                      <div className="text-center py-16">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <ListTodo className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Nog geen klusjes toegevoegd</h3>
+                        <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                          Begin met het toevoegen van jullie eerste klusjes om een georganiseerd beloningensysteem op te zetten.
                         </p>
-                        <Button onClick={() => setIsAddChoreOpen(true)} variant="outline">
+                        <Button onClick={() => setIsAddChoreOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9">
                           <Plus className="h-4 w-4 mr-2" />
                           Eerste Klusje Toevoegen
                         </Button>
@@ -715,95 +825,94 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="team-chores" className="space-y-6 mt-6">
-              {/* Quick Actions */}
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Team Klusjes Beheren</h2>
-                <Button onClick={() => setIsAddTeamChoreOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Team Klusje Toevoegen
-                </Button>
-              </div>
-
-              {/* Team Chores List */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Alle Team Klusjes</CardTitle>
+              {/* Team Chores Section */}
+              <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-gray-600" />
+                      Team Klusjes
+                    </div>
+                    <Button onClick={() => setIsAddTeamChoreOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Toevoegen
+                    </Button>
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+                <CardContent className="pt-0">
+                  <div className="space-y-6">
                     {family.teamChores && family.teamChores.length > 0 ? (
                       family.teamChores.map((teamChore) => (
-                        <div key={teamChore.id} className="border rounded-lg p-4 bg-gradient-to-r from-blue-50 to-purple-50">
-                          <div className="flex items-start justify-between mb-3">
+                        <div key={teamChore.id} className="border border-gray-100 rounded-lg p-6 bg-white/60 hover:shadow-sm transition-shadow">
+                          <div className="flex items-start justify-between mb-4">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-lg">{teamChore.name}</h3>
-                              <p className="text-sm text-gray-600 mb-2">{teamChore.description}</p>
-                              <div className="flex items-center gap-4 text-sm">
+                              <h3 className="font-bold text-lg text-gray-900 mb-2">{teamChore.name}</h3>
+                              <p className="text-gray-600 mb-4">{teamChore.description}</p>
+                              <div className="flex items-center gap-6 text-sm">
                                 <span className="flex items-center">
                                   {teamChore.completedAt ? (
-                                    <CheckCircle className="h-4 w-4 text-green-600 mr-1" />
+                                    <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
                                   ) : (
-                                    <Clock className="h-4 w-4 text-blue-600 mr-1" />
+                                    <Clock className="h-4 w-4 text-blue-600 mr-2" />
                                   )}
-                                  <span className={teamChore.completedAt ? 'text-green-600' : 'text-blue-600'}>
+                                  <span className={`font-medium ${teamChore.completedAt ? 'text-green-600' : 'text-blue-600'}`}>
                                     {teamChore.completedAt ? 'Voltooid' : 'Bezig'}
                                   </span>
                                 </span>
-                                <span className="text-yellow-600 font-medium">
+                                <span className="text-yellow-600 font-semibold">
                                   {teamChore.totalPoints} punten te verdelen
                                 </span>
                               </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 ml-4">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditTeamChore(teamChore)}
+                                className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100 hover:border-gray-400 transition-colors"
                               >
-                                <Edit className="h-4 w-4" />
+                                <Edit className="h-3 w-3" />
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteTeamChore(teamChore.id, teamChore.name)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </div>
 
-                          <div className="space-y-2 mb-3">
+                          <div className="space-y-3 mb-4">
                             <div className="flex justify-between text-sm">
-                              <span>Voortgang</span>
-                              <span>{teamChore.progress}%</span>
+                              <span className="font-medium text-gray-700">Voortgang</span>
+                              <span className="font-semibold text-gray-900">{teamChore.progress}%</span>
                             </div>
-                            <Progress value={teamChore.progress} className="h-3" />
+                            <Progress value={teamChore.progress} className="h-2" />
                           </div>
 
                           <div className="flex items-center justify-between">
                             <div className="flex items-center text-sm text-gray-600">
-                              <Users className="h-4 w-4 mr-1" />
-                              <span>{teamChore.participatingChildren.length} deelnemers</span>
+                              <Users className="h-4 w-4 mr-2" />
+                              <span className="font-medium">{teamChore.participatingChildren.length} deelnemers</span>
                             </div>
                             {!teamChore.completedAt && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                Samenwerken!
-                              </span>
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                                Samenwerken
+                              </Badge>
                             )}
                           </div>
 
                           {teamChore.participatingChildren.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <p className="text-sm font-medium mb-2">Deelnemers:</p>
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                              <p className="text-sm font-semibold text-gray-700 mb-3">Deelnemers:</p>
                               <div className="flex flex-wrap gap-2">
                                 {teamChore.participatingChildren.map((childId) => {
                                   const child = family.children.find(c => c.id === childId);
                                   return child ? (
-                                    <Badge key={childId} variant="secondary" className="text-xs">
+                                    <Badge key={childId} variant="outline" className="text-xs border-gray-300">
                                       {child.name}
                                     </Badge>
                                   ) : null;
@@ -814,13 +923,15 @@ export default function ParentDashboard() {
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-12">
-                        <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">Nog geen team klusjes toegevoegd</h3>
-                        <p className="text-gray-600 mb-4">
-                          Team klusjes moedigen samenwerking aan tussen jullie kinderen. Klik op "Team Klusje Toevoegen" om te beginnen.
+                      <div className="text-center py-16">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <Users className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Nog geen team klusjes</h3>
+                        <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                          Team klusjes bevorderen samenwerking tussen jullie kinderen en maken het leuker om samen te werken.
                         </p>
-                        <Button onClick={() => setIsAddTeamChoreOpen(true)} variant="outline">
+                        <Button onClick={() => setIsAddTeamChoreOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9">
                           <Plus className="h-4 w-4 mr-2" />
                           Eerste Team Klusje Toevoegen
                         </Button>
@@ -831,94 +942,112 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="rewards" className="space-y-6 mt-6">
-              {/* Quick Actions */}
+
+            <TabsContent value="rewards" className="space-y-8 mt-8">
+              {/* Professional Header */}
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Beloningen Beheren</h2>
-                <Button onClick={() => setIsAddRewardOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Beloning Toevoegen
-                </Button>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Beloningen Beheren</h2>
+                  <p className="text-sm text-gray-600 mt-1">Stel aantrekkelijke beloningen in voor jullie gezin</p>
+                </div>
+                <Button onClick={() => setIsAddRewardOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9">
+          <Plus className="h-4 w-4 mr-2" />
+          Beloning Toevoegen
+        </Button>
               </div>
 
-              {/* Category Filter */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Categorieën</CardTitle>
+              {/* Professional Category Filter */}
+              <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">Filter op Categorie</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <Button
                       variant={rewardFilter === 'all' ? 'default' : 'outline'}
                       onClick={() => setRewardFilter('all')}
-                      className="h-12"
+                      className={`h-14 transition-all duration-200 ${rewardFilter === 'all' ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : 'hover:bg-gray-50'}`}
                     >
-                      <Gift className="h-4 w-4 mr-2" />
-                      Alle
+                      <Gift className="h-5 w-5 mr-3" />
+                      <div className="text-left">
+                        <div className="font-semibold">Alle</div>
+                        <div className="text-xs opacity-80">Alle categorieën</div>
+                      </div>
                     </Button>
                     <Button
                       variant={rewardFilter === 'privileges' ? 'default' : 'outline'}
                       onClick={() => setRewardFilter('privileges')}
-                      className="h-12"
+                      className={`h-14 transition-all duration-200 ${rewardFilter === 'privileges' ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : 'hover:bg-gray-50'}`}
                     >
-                      <Star className="h-4 w-4 mr-2" />
-                      Privileges
+                      <Star className="h-5 w-5 mr-3" />
+                      <div className="text-left">
+                        <div className="font-semibold">Privileges</div>
+                        <div className="text-xs opacity-80">Extra rechten</div>
+                      </div>
                     </Button>
                     <Button
                       variant={rewardFilter === 'experience' ? 'default' : 'outline'}
                       onClick={() => setRewardFilter('experience')}
-                      className="h-12"
+                      className={`h-14 transition-all duration-200 ${rewardFilter === 'experience' ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : 'hover:bg-gray-50'}`}
                     >
-                      <Trophy className="h-4 w-4 mr-2" />
-                      Ervaringen
+                      <Trophy className="h-5 w-5 mr-3" />
+                      <div className="text-left">
+                        <div className="font-semibold">Ervaringen</div>
+                        <div className="text-xs opacity-80">Uitjes & activiteiten</div>
+                      </div>
                     </Button>
                     <Button
                       variant={rewardFilter === 'financial' ? 'default' : 'outline'}
                       onClick={() => setRewardFilter('financial')}
-                      className="h-12"
+                      className={`h-14 transition-all duration-200 ${rewardFilter === 'financial' ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : 'hover:bg-gray-50'}`}
                     >
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Financieel
+                      <DollarSign className="h-5 w-5 mr-3" />
+                      <div className="text-left">
+                        <div className="font-semibold">Financieel</div>
+                        <div className="text-xs opacity-80">Geld & sparen</div>
+                      </div>
                     </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Rewards List */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Alle Beloningen</CardTitle>
+              {/* Professional Rewards Grid */}
+              <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">Alle Beloningen</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   {family.rewards && family.rewards.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {family.rewards
                         .filter(reward => rewardFilter === 'all' || reward.type === rewardFilter)
                         .map((reward) => (
-                          <Card key={reward.id} className="hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="text-3xl">🎁</div>
-                                  <div>
-                                    <h3 className="font-bold">{reward.name}</h3>
-                                    <p className="text-sm text-gray-600">Type: {reward.type}</p>
+                          <Card key={reward.id} className="bg-white/80 hover:shadow-lg transition-all duration-200 border-gray-100 hover:border-gray-200">
+                            <CardContent className="p-6">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center">
+                                    <Gift className="h-6 w-6 text-blue-600" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h3 className="font-bold text-gray-900 text-lg">{reward.name}</h3>
+                                    <p className="text-sm text-gray-600 capitalize">{reward.type}</p>
                                   </div>
                                 </div>
-                                <Badge variant="outline">
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 font-bold">
                                   {reward.points} punten
                                 </Badge>
                               </div>
                               <div className="flex items-center justify-between">
                                 <Badge
                                   variant="secondary"
-                                  className={
+                                  className={`px-3 py-1 text-xs font-medium ${
                                     reward.type === 'privilege' ? 'bg-blue-100 text-blue-800' :
                                     reward.type === 'experience' ? 'bg-purple-100 text-purple-800' :
                                     reward.type === 'donation' ? 'bg-green-100 text-green-800' :
                                     reward.type === 'money' ? 'bg-yellow-100 text-yellow-800' :
                                     'bg-gray-100 text-gray-800'
-                                  }
+                                  }`}
                                 >
                                   {reward.type === 'privilege' ? 'Privileges' :
                                    reward.type === 'experience' ? 'Ervaring' :
@@ -930,16 +1059,17 @@ export default function ParentDashboard() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleEditReward(reward)}
+                                    className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100 hover:border-gray-400 transition-colors"
                                   >
-                                    <Edit className="h-4 w-4" />
+                                    <Edit className="h-3 w-3" />
                                   </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleDeleteReward(reward.id, reward.name)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
                               </div>
@@ -948,13 +1078,15 @@ export default function ParentDashboard() {
                         ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <Gift className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Nog geen beloningen toegevoegd</h3>
-                      <p className="text-gray-600 mb-4">
-                        Klik op "Beloning Toevoegen" om te beginnen met jullie beloningensysteem.
+                    <div className="text-center py-16">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Gift className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Nog geen beloningen toegevoegd</h3>
+                      <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                        Stel aantrekkelijke beloningen in om jullie kinderen te motiveren voor hun inspanningen.
                       </p>
-                      <Button onClick={() => setIsAddRewardOpen(true)} variant="outline">
+                      <Button onClick={() => setIsAddRewardOpen(true)} className="bg-blue-600 hover:bg-blue-700">
                         <Plus className="h-4 w-4 mr-2" />
                         Eerste Beloning Toevoegen
                       </Button>
@@ -964,27 +1096,39 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="compliments" className="space-y-6 mt-6">
-              {/* Quick Actions */}
+            <TabsContent value="compliments" className="space-y-8 mt-8">
+              {/* Professional Header */}
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Complimenten Versturen</h2>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Complimenten Versturen</h2>
+                  <p className="text-sm text-gray-600 mt-1">Versterk jullie band met positieve woorden</p>
+                </div>
               </div>
 
-              {/* Stats Card */}
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-pink-600">{family.children.length}</div>
-                      <p className="text-xs text-gray-600">Kinderen</p>
+              {/* Professional Stats Card */}
+              <Card className="bg-gradient-to-br from-pink-50 to-purple-50 border-pink-200">
+                <CardContent className="pt-8 pb-6">
+                  <div className="grid grid-cols-3 gap-6 text-center">
+                    <div className="space-y-2">
+                      <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mx-auto">
+                        <Users className="h-6 w-6 text-pink-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-pink-600">{family.children.length}</div>
+                      <p className="text-sm font-medium text-pink-800">Kinderen</p>
                     </div>
-                    <div>
-                      <div className="text-2xl font-bold text-purple-600">8</div>
-                      <p className="text-xs text-gray-600">Compliment Kaarten</p>
+                    <div className="space-y-2">
+                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
+                        <Heart className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-purple-600">8</div>
+                      <p className="text-sm font-medium text-purple-800">Compliment Kaarten</p>
                     </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-600">∞</div>
-                      <p className="text-xs text-gray-600">Gratis Versturen</p>
+                    <div className="space-y-2">
+                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                        <Gift className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-green-600">∞</div>
+                      <p className="text-sm font-medium text-green-800">Gratis Versturen</p>
                     </div>
                   </div>
                 </CardContent>
@@ -994,11 +1138,14 @@ export default function ParentDashboard() {
               <ComplimentCards />
             </TabsContent>
 
-            <TabsContent value="actions" className="space-y-6 mt-6">
-              {/* Quick Actions */}
+            <TabsContent value="actions" className="space-y-8 mt-8">
+              {/* Professional Header */}
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Goedkeuringen</h2>
-                <Badge variant="outline" className={totalPending > 0 ? 'border-orange-300 text-orange-700' : 'border-green-300 text-green-700'}>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Goedkeuringen</h2>
+                  <p className="text-sm text-gray-600 mt-1">Beoordeel en keur ingediende klusjes goed</p>
+                </div>
+                <Badge variant="outline" className={`px-4 py-2 text-sm font-semibold ${totalPending > 0 ? 'border-orange-300 text-orange-700 bg-orange-50' : 'border-green-300 text-green-700 bg-green-50'}`}>
                   {totalPending > 0 ? `${totalPending} actie${totalPending !== 1 ? 's' : ''} vereist` : 'Alles up-to-date'}
                 </Badge>
               </div>
@@ -1105,49 +1252,61 @@ export default function ParentDashboard() {
               )}
             </TabsContent>
 
-            <TabsContent value="settings" className="space-y-6 mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Instellingen</CardTitle>
+            <TabsContent value="settings" className="space-y-8 mt-8">
+              {/* Professional Header */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Instellingen</h2>
+                  <p className="text-sm text-gray-600 mt-1">Beheer jullie account en voorkeuren</p>
+                </div>
+              </div>
+
+              <Card className="bg-white/50 backdrop-blur-sm border-gray-200/60">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center">
+                    <Settings className="h-5 w-5 mr-2 text-gray-600" />
+                    Account Informatie
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">
                         Familie Naam
                       </label>
-                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                        {family.familyName}
-                      </p>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <p className="text-gray-900 font-medium">{family.familyName}</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">
                         Familie Code
                       </label>
-                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded font-mono">
-                        {family.familyCode}
-                      </p>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <p className="text-gray-900 font-mono font-bold">{family.familyCode}</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        E-mail
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">
+                        E-mail Adres
                       </label>
-                      <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                        {family.email}
-                      </p>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <p className="text-gray-900">{family.email}</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">
                         Abonnement
                       </label>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={family.subscription?.plan === 'premium' ? 'default' : 'secondary'}>
+                      <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <Badge variant={family.subscription?.plan === 'premium' ? 'default' : 'secondary'} className="px-3 py-1">
                           {family.subscription?.plan === 'premium' ? 'Premium' : 'Starter'}
                         </Badge>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => window.location.href = '/app/upgrade'}
+                          className="ml-auto"
                         >
                           {family.subscription?.plan === 'premium' ? 'Beheren' : 'Upgrade'}
                         </Button>
@@ -1165,6 +1324,7 @@ export default function ParentDashboard() {
                       onClick={handleSaveAutomationSettings}
                       disabled={isSavingSettings}
                       size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-sm font-medium px-4 py-2 h-9"
                     >
                       {isSavingSettings ? 'Opslaan...' : 'Opslaan'}
                     </Button>
@@ -1260,6 +1420,19 @@ export default function ParentDashboard() {
         setIsOpen={setIsEditTeamChoreOpen}
         teamChore={selectedTeamChore!}
       />
+
+      {/* Onboarding Wizard for setting up chores */}
+      {onboardingChild && (
+        <OnboardingWizard
+          isOpen={isOnboardingOpen}
+          onClose={() => setIsOnboardingOpen(false)}
+          child={{
+            id: onboardingChild.id,
+            name: onboardingChild.name,
+          }}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
     </div>
   );
 }

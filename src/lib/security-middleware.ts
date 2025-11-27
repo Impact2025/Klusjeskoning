@@ -71,6 +71,7 @@ export function validateRequestOrigin(
         'klusjeskoningapp.nl',
         'klusjeskoning.app',
         'www.klusjeskoning.app',
+        'vercel.app', // Allow Vercel preview deployments
         'localhost',
         '127.0.0.1',
         ...allowedOrigins

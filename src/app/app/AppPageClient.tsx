@@ -43,6 +43,20 @@ function AppContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  // Add keyboard shortcut to manually trigger tour for debugging
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'T') {
+        console.log('Manual tour trigger activated');
+        localStorage.setItem('manual_tour_trigger', 'true');
+        window.location.reload(); // Reload to trigger tour logic
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleFamilySetupComplete = async (data: {
     children: { name: string; age: number }[];
     model: 'linked' | 'separate';
@@ -117,17 +131,20 @@ function AppContent() {
   };
 
   return (
-    <div className="h-screen w-screen bg-gray-200 flex items-center justify-center overscroll-y-contain">
-      <div id="app" className="h-full w-full max-w-lg mx-auto bg-card shadow-2xl relative overflow-hidden">
-        {isLoading && (
-          <div id="loading" className="absolute inset-0 bg-card/80 flex items-center justify-center z-50 backdrop-blur-sm">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          </div>
-        )}
-        <div className="h-full w-full">{screens[currentScreen]}</div>
-        <TourGuide isOpen={showTour} onClose={closeTour} />
+    <>
+      <div className="h-screen w-screen bg-gray-200 flex items-center justify-center overscroll-y-contain">
+        <div id="app" className="h-full w-full max-w-lg mx-auto bg-card shadow-2xl relative overflow-hidden">
+          {isLoading && (
+            <div id="loading" className="absolute inset-0 bg-card/80 flex items-center justify-center z-50 backdrop-blur-sm">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+          )}
+          <div className="h-full w-full">{screens[currentScreen]}</div>
+        </div>
       </div>
-    </div>
+      {/* TourGuide outside overflow-hidden container */}
+      <TourGuide isOpen={showTour} onClose={closeTour} />
+    </>
   );
 }
 

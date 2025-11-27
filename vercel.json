@@ -11,5 +11,11 @@
       "dest": "/admin$1",
       "continue": true
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/generate-suggestions",
+      "schedule": "0 8 * * *"
+    }
   ]
 }

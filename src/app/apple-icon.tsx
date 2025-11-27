@@ -7,22 +7,29 @@ export const size = {
 };
 export const contentType = 'image/png';
 
-// Apple touch icon generation
+// Apple touch icon generation using the official KlusjesKoning logo
 export default function AppleIcon() {
   return new ImageResponse(
     (
       <div
         style={{
-          fontSize: 120,
-          background: 'linear-gradient(to bottom right, #0ea5e9, #fbbf24)',
           width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          background: 'white',
         }}
       >
-        👑
+        <img
+          src="https://weareimpact.nl/LogoKlusjeskoning3.png"
+          alt="KlusjesKoning"
+          style={{
+            width: '180px',
+            height: '180px',
+            objectFit: 'contain',
+          }}
+        />
       </div>
     ),
     {

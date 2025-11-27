@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/server/db/client';
-import { externalChoreRequests, parentApprovals, wallets, walletTransactions } from '@/server/db/schema';
+import { externalChoreRequests, parentApprovals, wallets, walletTransactions, children, trustedContacts } from '@/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireSession } from '@/server/auth/session';
 import { checkApiRateLimit } from '@/lib/rate-limit';
 import { securityMiddleware } from '@/lib/security-middleware';
+import { sendEmail } from '@/lib/email/sendgrid';
 
 const approveSchema = z.object({
   approvedAmountCents: z.number().int().min(0).max(50000).optional(), // Optional adjustment
@@ -73,6 +74,26 @@ export async function POST(
     }
 
     const approvedAmount = data.approvedAmountCents ?? choreRequest.offeredAmountCents;
+
+    // Get child and contact info for emails
+    const [child] = await db
+      .select({ name: children.name })
+      .from(children)
+      .where(eq(children.id, choreRequest.childId))
+      .limit(1);
+
+    let contact = null;
+    if (choreRequest.contactId) {
+      const [contactData] = await db
+        .select({
+          name: trustedContacts.name,
+          email: trustedContacts.email,
+        })
+        .from(trustedContacts)
+        .where(eq(trustedContacts.id, choreRequest.contactId))
+        .limit(1);
+      contact = contactData;
+    }
 
     // Start transaction for approval
     await db.transaction(async (tx) => {
@@ -148,12 +169,29 @@ export async function POST(
       }
     });
 
-    // TODO: Send notification to child about approval
-    // TODO: Send notification to contact about approval
+    // Send notification to contact about approval
+    if (contact?.email) {
+      try {
+        await sendEmail({
+          to: contact.email,
+          type: 'superklusje_approved',
+          data: {
+            childName: child?.name || 'Het kind',
+            title: choreRequest.title,
+            amountEuros: approvedAmount / 100,
+            contactName: contact.name,
+          },
+        });
+        console.log('[external-chore-requests] Approval email sent to contact:', contact.email);
+      } catch (emailError) {
+        console.error('[external-chore-requests] Failed to send approval email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Verzoek goedgekeurd!',
+      message: 'Verzoek goedgekeurd! Het contact krijgt een e-mail.',
       approvedAmountCents: approvedAmount,
     });
 

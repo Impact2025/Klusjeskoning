@@ -184,6 +184,10 @@ interface AppContextType {
   extendFamilySubscription: (familyId: string, additionalMonths: number, orderId?: string) => Promise<any>;
   unlockAvatarItem: (itemId: string) => Promise<void>;
   equipAvatarItem: (itemId: string, equip: boolean) => Promise<void>;
+  addTeamChore: (name: string, description: string, totalPoints: number, participatingChildren: string[]) => Promise<void>;
+  updateTeamChore: (teamChoreId: string, updates: { name?: string; description?: string; totalPoints?: number; participatingChildren?: string[]; progress?: number }) => Promise<void>;
+  completeTeamChore: (teamChoreId: string) => Promise<void>;
+  deleteTeamChore: (teamChoreId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -231,7 +235,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [family?.subscription]
   );
 
-  // Tour logic: show only on 1st and 5th login, and only once each time
+  // Tour logic: show only on first login
   const shouldShowTour = useCallback((family: Family | null) => {
     if (!family || typeof window === 'undefined') return false;
 
@@ -239,8 +243,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const loginCount = parseInt(localStorage.getItem(`login_count_${family.id}`) || '0');
     const lastTourLogin = parseInt(localStorage.getItem(`tour_shown_${family.id}`) || '0');
 
-    // Show tour on 1st and 5th login, but only if we haven't shown it for this login count yet
-    return (loginCount === 1 || loginCount === 5) && lastTourLogin < loginCount;
+    // Show tour only on first login, and only if we haven't shown it yet
+    // TEMP: Also show tour if manually triggered with Ctrl+Shift+T
+    const manualTrigger = localStorage.getItem('manual_tour_trigger') === 'true';
+    if (manualTrigger) {
+      localStorage.removeItem('manual_tour_trigger');
+      return true;
+    }
+
+    return loginCount === 1 && lastTourLogin < loginCount;
   }, []);
 
   const closeTour = useCallback(() => {
@@ -589,6 +600,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (uploadResponse.ok) {
             const uploadData = await uploadResponse.json();
             photoUrl = uploadData.url;
+            if (uploadData.isMock) {
+              console.warn('Using mock upload URL - file not actually uploaded');
+            }
           } else {
             console.warn('Photo upload failed, continuing without photo');
           }
@@ -751,6 +765,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notify('success', equip ? 'Item aangehad!' : 'Item uitgedaan!', 'Je avatar is bijgewerkt.');
     });
   }, [applyFamily, handleAction, notify, user]);
+
+  // TeamChore functions
+  const addTeamChore = useCallback(async (name: string, description: string, totalPoints: number, participatingChildren: string[]) => {
+    await handleAction<{ family: SerializableFamily }>('createTeamChore', {
+      name,
+      description,
+      totalPoints,
+      participatingChildren
+    }, ({ family: payload }) => {
+      applyFamily(payload ?? null);
+      notify('success', 'Team Klusje Toegevoegd!', `"${name}" is toegevoegd aan de team klusjes.`);
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+    });
+  }, [applyFamily, handleAction, notify]);
+
+  const updateTeamChore = useCallback(async (teamChoreId: string, updates: { name?: string; description?: string; totalPoints?: number; participatingChildren?: string[]; progress?: number }) => {
+    // Get the current team chore to merge with updates
+    const currentTeamChore = family?.teamChores?.find(tc => tc.id === teamChoreId);
+    if (!currentTeamChore) {
+      notify('destructive', 'Fout', 'Team klusje niet gevonden.');
+      return;
+    }
+
+    await handleAction<{ family: SerializableFamily }>('updateTeamChore', {
+      teamChoreId,
+      name: updates.name ?? currentTeamChore.name,
+      description: updates.description ?? currentTeamChore.description,
+      totalPoints: updates.totalPoints ?? currentTeamChore.totalPoints,
+      participatingChildren: updates.participatingChildren ?? currentTeamChore.participatingChildren,
+    }, ({ family: payload }) => {
+      applyFamily(payload ?? null);
+      if (updates.progress !== undefined) {
+        notify('success', 'Voortgang Bijgewerkt!', `Team klusje voortgang is bijgewerkt naar ${updates.progress}%.`);
+      } else {
+        notify('success', 'Team Klusje Bijgewerkt!', 'Het team klusje is bijgewerkt.');
+      }
+    });
+  }, [applyFamily, family, handleAction, notify]);
+
+  const completeTeamChore = useCallback(async (teamChoreId: string) => {
+    await handleAction<{ family: SerializableFamily }>('completeTeamChore', {
+      teamChoreId
+    }, ({ family: payload }) => {
+      applyFamily(payload ?? null);
+      notify('success', 'Team Klusje Voltooid! 🎉', 'Punten zijn verdeeld onder alle deelnemers.');
+      confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: ['#10b981', '#3b82f6', '#f59e0b'] });
+    });
+  }, [applyFamily, handleAction, notify]);
+
+  const deleteTeamChore = useCallback(async (teamChoreId: string) => {
+    await handleAction<{ family: SerializableFamily }>('deleteTeamChore', {
+      teamChoreId
+    }, ({ family: payload }) => {
+      applyFamily(payload ?? null);
+      notify('info', 'Team Klusje Verwijderd', 'Het team klusje is verwijderd.');
+    });
+  }, [applyFamily, handleAction, notify]);
 
   const getGoodCauses = useCallback(async () => {
     await handleAction<{ goodCauses: SerializableGoodCause[] }>('getGoodCauses', undefined, ({ goodCauses: payload }) => {
@@ -1050,12 +1121,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     extendFamilySubscription,
     unlockAvatarItem,
     equipAvatarItem,
+    addTeamChore,
+    updateTeamChore,
+    completeTeamChore,
+    deleteTeamChore,
   }), [
     activePlan,
     addChild,
     addChore,
     addGoodCause,
     addReward,
+    addTeamChore,
     approveChore,
     blogPosts,
     canAccessFeature,
@@ -1109,6 +1185,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     planDefinition,
     unlockAvatarItem,
     equipAvatarItem,
+    updateTeamChore,
+    completeTeamChore,
+    deleteTeamChore,
   ]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;

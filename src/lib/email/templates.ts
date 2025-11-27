@@ -33,12 +33,53 @@ type NotificationPayload =
   | {
       type: 'admin_new_registration';
       to: string;
-      data: { 
+      data: {
         familyName: string;
         email: string;
         city: string;
         familyCode: string;
         timestamp: string;
+      };
+    }
+  | {
+      type: 'superklusje_new_request';
+      to: string;
+      data: {
+        childName: string;
+        title: string;
+        description?: string;
+        amountEuros: number;
+        contactName: string;
+      };
+    }
+  | {
+      type: 'superklusje_approved';
+      to: string;
+      data: {
+        childName: string;
+        title: string;
+        amountEuros: number;
+        contactName: string;
+      };
+    }
+  | {
+      type: 'superklusje_rejected';
+      to: string;
+      data: {
+        childName: string;
+        title: string;
+        contactName: string;
+        reason?: string;
+      };
+    }
+  | {
+      type: 'superklusje_completed';
+      to: string;
+      data: {
+        childName: string;
+        title: string;
+        amountEuros: number;
+        contactName: string;
       };
     };
 
@@ -359,6 +400,183 @@ export function renderVerificationEmail({
       href: `${APP_BASE_URL}/app`,
     },
     footerNote: 'Heb je deze email niet verwacht? Neem dan contact met ons op.',
+  });
+
+  return { subject, html };
+}
+
+// ===== SUPERKLUSJES EMAIL TEMPLATES =====
+
+export function renderSuperKlusjeNewRequestEmail({
+  childName,
+  title,
+  description,
+  amountEuros,
+  contactName,
+}: {
+  childName: string;
+  title: string;
+  description?: string;
+  amountEuros: number;
+  contactName: string;
+}): EmailPayload {
+  const subject = `Nieuw SuperKlusje verzoek voor ${childName}! 💪`;
+  const html = renderBaseEmail({
+    previewText: `${contactName} heeft een SuperKlusje aangevraagd voor ${childName}.`,
+    heading: `Nieuw SuperKlusje verzoek 💪`,
+    intro: `${contactName} heeft een SuperKlusje aangevraagd voor ${childName}. Bekijk en keur het goed in de app!`,
+    contentBlocks: [
+      {
+        title: 'Verzoek details',
+        body: [
+          `• Kind: <strong>${childName}</strong>`,
+          `• Klusje: <strong>${title}</strong>`,
+          description ? `• Omschrijving: ${description}` : '',
+          `• Beloning: <strong>€${amountEuros.toFixed(2)}</strong>`,
+          `• Van: <strong>${contactName}</strong>`,
+        ].filter(Boolean),
+      },
+      {
+        title: 'Wat nu?',
+        body: [
+          '• Bekijk het verzoek in je dashboard onder "SuperKlusjes"',
+          '• Keur het goed of wijzig de beloning als gewenst',
+          '• Of wijs het af als het niet geschikt is',
+        ],
+      },
+    ],
+    cta: {
+      label: 'Bekijk SuperKlusje verzoek',
+      href: `${APP_BASE_URL}/app`,
+    },
+    footerNote: 'SuperKlusjes helpen kinderen om ook buiten het gezin klusjes te doen en te verdienen!',
+  });
+
+  return { subject, html };
+}
+
+export function renderSuperKlusjeApprovedEmail({
+  childName,
+  title,
+  amountEuros,
+  contactName,
+}: {
+  childName: string;
+  title: string;
+  amountEuros: number;
+  contactName: string;
+}): EmailPayload {
+  const subject = `SuperKlusje goedgekeurd: ${title} 🎉`;
+  const html = renderBaseEmail({
+    previewText: `Het SuperKlusje "${title}" voor ${childName} is goedgekeurd!`,
+    heading: `SuperKlusje goedgekeurd! 🎉`,
+    intro: `Goed nieuws! Het SuperKlusje "${title}" voor ${childName} is goedgekeurd door de ouders.`,
+    contentBlocks: [
+      {
+        title: 'Goedgekeurd klusje',
+        body: [
+          `• Klusje: <strong>${title}</strong>`,
+          `• Kind: <strong>${childName}</strong>`,
+          `• Beloning: <strong>€${amountEuros.toFixed(2)}</strong>`,
+          `• Contact: <strong>${contactName}</strong>`,
+        ],
+      },
+      {
+        title: 'Volgende stappen',
+        body: [
+          `${childName} kan nu aan de slag met het klusje!`,
+          'Na voltooiing uploadt het kind een foto als bewijs.',
+          'De ouders keuren het werk goed en verwerken de betaling.',
+        ],
+      },
+    ],
+    cta: {
+      label: 'Bekijk in de app',
+      href: `${APP_BASE_URL}/app`,
+    },
+    footerNote: `Veel succes ${childName} met je SuperKlusje!`,
+  });
+
+  return { subject, html };
+}
+
+export function renderSuperKlusjeRejectedEmail({
+  childName,
+  title,
+  contactName,
+  reason,
+}: {
+  childName: string;
+  title: string;
+  contactName: string;
+  reason?: string;
+}): EmailPayload {
+  const subject = `SuperKlusje niet goedgekeurd: ${title}`;
+  const html = renderBaseEmail({
+    previewText: `Het SuperKlusje "${title}" voor ${childName} is helaas niet goedgekeurd.`,
+    heading: `SuperKlusje niet goedgekeurd`,
+    intro: `Het SuperKlusje "${title}" voor ${childName} is helaas niet goedgekeurd door de ouders.`,
+    contentBlocks: [
+      {
+        title: 'Verzoek details',
+        body: [
+          `• Klusje: <strong>${title}</strong>`,
+          `• Kind: <strong>${childName}</strong>`,
+          `• Contact: <strong>${contactName}</strong>`,
+          reason ? `• Reden: ${reason}` : '',
+        ].filter(Boolean),
+      },
+      {
+        body: [
+          'Wil je het opnieuw proberen? Neem dan contact op met de ouders om te bespreken wat wel mogelijk is.',
+        ],
+      },
+    ],
+    footerNote: 'Bedankt voor je interesse in SuperKlusjes!',
+  });
+
+  return { subject, html };
+}
+
+export function renderSuperKlusjeCompletedEmail({
+  childName,
+  title,
+  amountEuros,
+  contactName,
+}: {
+  childName: string;
+  title: string;
+  amountEuros: number;
+  contactName: string;
+}): EmailPayload {
+  const subject = `SuperKlusje voltooid: ${title} ✨`;
+  const html = renderBaseEmail({
+    previewText: `${childName} heeft het SuperKlusje "${title}" voltooid!`,
+    heading: `SuperKlusje voltooid! ✨`,
+    intro: `Geweldig! ${childName} heeft het SuperKlusje "${title}" voltooid.`,
+    contentBlocks: [
+      {
+        title: 'Voltooid klusje',
+        body: [
+          `• Klusje: <strong>${title}</strong>`,
+          `• Kind: <strong>${childName}</strong>`,
+          `• Verdiend: <strong>€${amountEuros.toFixed(2)}</strong>`,
+          `• Voor: <strong>${contactName}</strong>`,
+        ],
+      },
+      {
+        title: 'Betaling',
+        body: [
+          'Het bedrag is nu gereed voor uitbetaling aan het kind.',
+          'De ouders zullen de betaling verwerken volgens de afgesproken betalingsmethode.',
+        ],
+      },
+    ],
+    cta: {
+      label: 'Bekijk details',
+      href: `${APP_BASE_URL}/app`,
+    },
+    footerNote: `Goed gedaan ${childName}! 🎉`,
   });
 
   return { subject, html };

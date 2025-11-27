@@ -7,24 +7,29 @@ export const size = {
 };
 export const contentType = 'image/png';
 
-// Icon generation
+// Icon generation using the official KlusjesKoning logo
 export default function Icon() {
   return new ImageResponse(
     (
       <div
         style={{
-          fontSize: 24,
-          background: '#0ea5e9',
           width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'white',
-          borderRadius: '20%',
+          background: 'white',
         }}
       >
-        👑
+        <img
+          src="https://weareimpact.nl/LogoKlusjeskoning3.png"
+          alt="KlusjesKoning"
+          style={{
+            width: '32px',
+            height: '32px',
+            objectFit: 'contain',
+          }}
+        />
       </div>
     ),
     {
