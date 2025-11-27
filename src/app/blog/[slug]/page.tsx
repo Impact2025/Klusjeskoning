@@ -12,6 +12,7 @@ import { fetchBlogPostBySlug, fetchPublishedBlogPosts, calculateReadingTime, get
 import { SocialShare } from '@/components/blog/SocialShare';
 import { NewsletterSignup } from '@/components/blog/NewsletterSignup';
 import { TableOfContents } from '@/components/blog/TableOfContents';
+import SafeHtmlContent from '@/components/blog/SafeHtmlContent';
 import { Clock, ArrowLeft, Share2 } from 'lucide-react';
 
 const formatDate = (date: Date) => format(date, 'd MMM yyyy', { locale: nl });
@@ -130,7 +131,7 @@ export default async function BlogPostPage({ params }: { params: Promise<BlogPos
             )}
 
             <div className="prose prose-lg prose-slate max-w-none text-left">
-              <div dangerouslySetInnerHTML={{ __html: post.content }} />
+              <SafeHtmlContent html={post.content} />
             </div>
 
             {relatedPosts.length > 0 && (
