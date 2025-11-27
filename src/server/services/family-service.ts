@@ -109,6 +109,8 @@ const PLAN_PRICING = {
 };
 
 export const generateUniqueFamilyCode = async (): Promise<string> => {
+  if (!db) throw new Error('Database not initialized');
+
   for (let attempt = 0; attempt < DEFAULT_CODE_ATTEMPTS; attempt += 1) {
     const code = generateCode();
     const existing = await db.query.families.findFirst({ where: eq(families.familyCode, code) });
@@ -126,6 +128,8 @@ export const createFamily = async (params: {
   password: string;
   skipVerification?: boolean; // For admin use
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const existing = await db.query.families.findFirst({ where: eq(families.email, params.email) });
   if (existing) {
     throw new Error('EMAIL_IN_USE');
@@ -157,6 +161,8 @@ export const startFamilyRegistration = async (params: {
   email: string;
   password: string;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const existing = await db.query.families.findFirst({ where: eq(families.email, params.email) });
   if (existing) {
     throw new Error('EMAIL_IN_USE');
@@ -190,6 +196,8 @@ export const completeFamilyRegistration = async (params: {
   city: string;
   password: string;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Verify the code
   const isValid = await verifyCode({
     email: params.email,
@@ -211,6 +219,8 @@ export const completeFamilyRegistration = async (params: {
 };
 
 export const authenticateFamily = async (email: string, password: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   const family = await db.query.families.findFirst({ where: eq(families.email, email) });
   if (!family) {
     return null;
@@ -223,14 +233,20 @@ export const authenticateFamily = async (email: string, password: string) => {
 };
 
 export const getFamilyByEmail = async (email: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   return db.query.families.findFirst({ where: eq(families.email, email) });
 };
 
 export const getFamilyById = async (familyId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   return db.query.families.findFirst({ where: eq(families.id, familyId) });
 };
 
 export const getFamilyByCode = async (code: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Use raw SQL to avoid schema issues with missing columns
   const familyResult = await db.execute(sql`
     SELECT
@@ -365,6 +381,8 @@ export const getFamilyByCode = async (code: string) => {
 };
 
 export const loadFamilyWithRelations = async (familyId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Try to get from cache first
   const cachedFamily = await FamilyCache.get(familyId);
   if (cachedFamily) {
@@ -554,6 +572,8 @@ export const createCoupon = async (couponData: {
   validUntil?: Date;
   isActive?: boolean;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const [coupon] = await db
     .insert(coupons)
     .values({
@@ -575,6 +595,8 @@ export const createCoupon = async (couponData: {
  * Get all coupons for admin
  */
 export const getAllCoupons = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   return db.query.coupons.findMany({
     with: {
       usages: {
@@ -596,6 +618,8 @@ export const getAllCoupons = async () => {
  * Get coupon by ID
  */
 export const getCouponById = async (couponId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   return db.query.coupons.findFirst({
     where: eq(coupons.id, couponId),
     with: {
@@ -628,6 +652,8 @@ export const updateCoupon = async (
     isActive: boolean;
   }>
 ) => {
+  if (!db) throw new Error('Database not initialized');
+
   const updateData: any = { ...updates };
   if (updates.isActive !== undefined) {
     updateData.isActive = updates.isActive ? 1 : 0;
@@ -647,6 +673,8 @@ export const updateCoupon = async (
  * Delete coupon
  */
 export const deleteCoupon = async (couponId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(coupons).where(eq(coupons.id, couponId));
 };
 
@@ -654,6 +682,8 @@ export const deleteCoupon = async (couponId: string) => {
  * Validate and apply coupon
  */
 export const validateCoupon = async (code: string, familyId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   const coupon = await db.query.coupons.findFirst({
     where: and(
       eq(coupons.code, code.toUpperCase()),
@@ -703,6 +733,8 @@ export const applyCouponToOrder = async (
   orderId: string,
   originalAmount: number
 ) => {
+  if (!db) throw new Error('Database not initialized');
+
   const coupon = await db.query.coupons.findFirst({
     where: eq(coupons.id, couponId),
   });
@@ -750,6 +782,8 @@ export const applyCouponToOrder = async (
  * Get coupon usage statistics
  */
 export const getCouponStats = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const [stats] = await db
     .select({
       totalCoupons: sql<number>`count(distinct ${coupons.id})`,
@@ -787,6 +821,8 @@ export const setFamilySubscription = async (familyId: string, subscriptionData: 
   renewalDate?: Date | null;
   orderId?: string | null;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Update subscription data
   const [updatedFamily] = await db
     .update(families)
@@ -823,6 +859,8 @@ export const upgradeFamilyToPro = async (
     orderId?: string;
   } = {}
 ) => {
+  if (!db) throw new Error('Database not initialized');
+
   const {
     plan = 'premium',
     interval = 'monthly',
@@ -850,6 +888,8 @@ export const downgradeFamilyAccount = async (familyId: string, options: {
   immediate?: boolean; // Cancel immediately vs end of period
   orderId?: string;
 } = {}) => {
+  if (!db) throw new Error('Database not initialized');
+
   const { immediate = false, orderId } = options;
 
   if (immediate) {
@@ -878,6 +918,8 @@ export const extendFamilySubscription = async (
   additionalMonths: number,
   orderId?: string
 ) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Get current subscription
   const family = await db.query.families.findFirst({
     where: eq(families.id, familyId),
@@ -910,6 +952,8 @@ export const extendFamilySubscription = async (
  * Get subscription management statistics
  */
 export const getSubscriptionStats = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const [stats] = await db
     .select({
       totalFamilies: sql<number>`count(*)`,
@@ -928,6 +972,8 @@ export const getSubscriptionStats = async () => {
  * Get families with expiring subscriptions
  */
 export const getExpiringSubscriptions = async (daysAhead = 30) => {
+  if (!db) throw new Error('Database not initialized');
+
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() + daysAhead);
 
@@ -955,6 +1001,8 @@ export const bulkUpdateSubscriptions = async (operations: Array<{
   action: 'upgrade' | 'downgrade' | 'extend' | 'cancel';
   options?: any;
 }>) => {
+  if (!db) throw new Error('Database not initialized');
+
   const results = [];
 
   for (const operation of operations) {
@@ -1000,12 +1048,16 @@ export const bulkUpdateSubscriptions = async (operations: Array<{
 };
 
 export const getChildById = async (familyId: string, childId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   return db.query.children.findFirst({
     where: and(eq(children.id, childId), eq(children.familyId, familyId)),
   });
 };
 
 export const getChoreById = async (familyId: string, choreId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Use raw SQL to avoid schema issues
   const result = await db.execute(sql`
     SELECT
@@ -1042,6 +1094,8 @@ export const getChoreById = async (familyId: string, choreId: string) => {
 };
 
 export const getRewardById = async (familyId: string, rewardId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   return db.query.rewards.findFirst({
     where: and(eq(rewards.id, rewardId), eq(rewards.familyId, familyId)),
     with: {
@@ -1182,6 +1236,8 @@ export const saveChild = async (params: {
   pin: string;
   avatar: string;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   if (params.childId) {
     await db
       .update(children)
@@ -1206,6 +1262,8 @@ export const saveChild = async (params: {
 };
 
 export const removeChild = async (familyId: string, childId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(choreAssignments).where(eq(choreAssignments.childId, childId));
   await db.delete(rewardAssignments).where(eq(rewardAssignments.childId, childId));
   await db.delete(pendingRewards).where(eq(pendingRewards.childId, childId));
@@ -1236,6 +1294,8 @@ export const saveChore = async (params: {
   recurrenceType?: 'none' | 'daily' | 'weekly' | 'custom';
   recurrenceDays?: string | null;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const assignedTo = Array.from(new Set(params.assignedTo));
 
   if (params.choreId) {
@@ -1349,6 +1409,8 @@ export const saveChore = async (params: {
 };
 
 export const removeChore = async (familyId: string, choreId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(choreAssignments).where(eq(choreAssignments.choreId, choreId));
   await db.delete(chores).where(and(eq(chores.id, choreId), eq(chores.familyId, familyId)));
 };
@@ -1361,6 +1423,8 @@ export const saveReward = async (params: {
   type: typeof rewards.$inferInsert['type'];
   assignedTo: string[];
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const assignedTo = Array.from(new Set(params.assignedTo));
 
   if (params.rewardId) {
@@ -1405,6 +1469,8 @@ export const saveReward = async (params: {
 };
 
 export const removeReward = async (familyId: string, rewardId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(rewardAssignments).where(eq(rewardAssignments.rewardId, rewardId));
   await db.delete(pendingRewards).where(eq(pendingRewards.rewardId, rewardId));
   await db.delete(rewards).where(and(eq(rewards.id, rewardId), eq(rewards.familyId, familyId)));
@@ -1416,6 +1482,8 @@ export const recordPendingReward = async (params: {
   rewardId: string;
   points: number;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const [record] = await db
     .insert(pendingRewards)
     .values({
@@ -1439,6 +1507,8 @@ export const recordPointsTransaction = async (params: {
   balanceBefore: number;
   balanceAfter: number;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const [record] = await db
     .insert(pointsTransactions)
     .values({
@@ -1457,6 +1527,8 @@ export const recordPointsTransaction = async (params: {
 };
 
 export const getPointsTransactionHistory = async (familyId: string, childId?: string, limit = 50) => {
+  if (!db) throw new Error('Database not initialized');
+
   const query = db.query.pointsTransactions.findMany({
     where: and(
       eq(pointsTransactions.familyId, familyId),
@@ -1491,6 +1563,8 @@ export const redeemReward = async (params: {
   childId: string;
   rewardId: string;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Validate inputs
   if (!params.familyId || !params.childId || !params.rewardId) {
     throw new Error('INVALID_PARAMETERS');
@@ -1576,6 +1650,8 @@ export const submitChoreForApproval = async (params: {
   photoUrl?: string | null;
   submittedAt?: Date;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   // First check if the chore exists in the database using raw SQL
   // Handle both UUID and string IDs (for sample quest chores)
   let existingChoreResult;
@@ -1628,6 +1704,8 @@ export const submitChoreForApproval = async (params: {
 };
 
 export const approveChore = async (familyId: string, choreId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Get chore using raw SQL
   const choreResult = await db.execute(sql`
     SELECT id, family_id, name, points, status, submitted_by_child_id, submitted_at, emotion, photo_url, created_at
@@ -1657,6 +1735,8 @@ export const approveChore = async (familyId: string, choreId: string) => {
 };
 
 export const rejectChore = async (familyId: string, choreId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.execute(sql`
     UPDATE chores SET
       status = 'available',
@@ -1669,10 +1749,14 @@ export const rejectChore = async (familyId: string, choreId: string) => {
 };
 
 export const clearPendingReward = async (familyId: string, pendingRewardId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(pendingRewards).where(and(eq(pendingRewards.id, pendingRewardId), eq(pendingRewards.familyId, familyId)));
 };
 
 export const updateChildPoints = async (childId: string, delta: number, description?: string, relatedChoreId?: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   // Get current points before update
   const [child] = await db
     .select({ points: children.points, familyId: children.familyId })
@@ -1717,6 +1801,8 @@ export const updateChildPoints = async (childId: string, delta: number, descript
 };
 
 export const updateChildXp = async (childId: string, delta: number) => {
+  if (!db) throw new Error('Database not initialized');
+
   const incrementTotalEver = Math.max(delta, 0);
   await db.execute(sql`
     UPDATE children
@@ -1735,6 +1821,8 @@ export const updateFamilySubscription = async (params: {
   lastPaymentAt?: Date | null;
   orderId?: string | null;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db
     .update(families)
     .set({
@@ -1749,10 +1837,14 @@ export const updateFamilySubscription = async (params: {
 };
 
 export const updateRecoveryEmail = async (familyId: string, recoveryEmail: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.update(families).set({ recoveryEmail }).where(eq(families.id, familyId));
 };
 
 export const getGoodCausesList = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const causes = await db.select().from(goodCauses);
   return causes.map((cause) => ({
     id: cause.id,
@@ -1774,6 +1866,8 @@ export const upsertGoodCause = async (params: {
   endDate: Date;
   logoUrl?: string | null;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   if (params.causeId) {
     await db
       .update(goodCauses)
@@ -1804,10 +1898,14 @@ export const upsertGoodCause = async (params: {
 };
 
 export const removeGoodCause = async (causeId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(goodCauses).where(eq(goodCauses.id, causeId));
 };
 
 export const listBlogPosts = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const posts = await db
     .select()
     .from(blogPosts)
@@ -1842,6 +1940,8 @@ export const upsertBlogPost = async (params: {
   seoDescription?: string | null;
   publishedAt?: Date | null;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const payload: typeof blogPosts.$inferInsert = {
     title: params.title,
     slug: params.slug,
@@ -1872,10 +1972,14 @@ export const upsertBlogPost = async (params: {
 };
 
 export const removeBlogPost = async (postId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(blogPosts).where(eq(blogPosts.id, postId));
 };
 
 export const listReviews = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const items = await db
     .select()
     .from(reviews)
@@ -1910,6 +2014,8 @@ export const upsertReview = async (params: {
   seoDescription?: string | null;
   publishedAt?: Date | null;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const payload: typeof reviews.$inferInsert = {
     title: params.title,
     slug: params.slug,
@@ -1940,10 +2046,14 @@ export const upsertReview = async (params: {
 };
 
 export const removeReview = async (reviewId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(reviews).where(eq(reviews.id, reviewId));
 };
 
 export const getAdminStatsSummary = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   const [{ totalFamilies }] = await db
     .select({ totalFamilies: sql<number>`coalesce(count(*), 0)` })
     .from(families);
@@ -1984,6 +2094,8 @@ type FamilySummaryRecord = {
 };
 
 export const listFamiliesForAdmin = async (): Promise<FamilySummaryRecord[]> => {
+  if (!db) throw new Error('Database not initialized');
+
   // Use a more efficient query that gets children count via SQL aggregation
   const records = await db
     .select({
@@ -2034,6 +2146,8 @@ export const createFamilyAdmin = async (params: {
   password: string;
   familyCode?: string;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   const existing = await getFamilyByEmail(params.email);
   if (existing) {
     throw new Error('EMAIL_IN_USE');
@@ -2066,6 +2180,8 @@ export const updateFamilyAdmin = async (params: {
   email?: string;
   familyCode?: string;
 }) => {
+  if (!db) throw new Error('Database not initialized');
+
   if (!params.familyId) {
     throw new Error('FAMILY_ID_REQUIRED');
   }
@@ -2088,6 +2204,8 @@ export const updateFamilyAdmin = async (params: {
 };
 
 export const setFamilyPassword = async (familyId: string, password: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   const passwordHash = await hashPassword(password);
   await db
     .update(families)
@@ -2096,10 +2214,14 @@ export const setFamilyPassword = async (familyId: string, password: string) => {
 };
 
 export const deleteFamilyAdmin = async (familyId: string) => {
+  if (!db) throw new Error('Database not initialized');
+
   await db.delete(families).where(eq(families.id, familyId));
 };
 
 export const getFinancialOverview = async () => {
+  if (!db) throw new Error('Database not initialized');
+
   // Get aggregated stats using SQL for better performance
   const [statsResult] = await db
     .select({
@@ -2175,6 +2297,8 @@ export const createVerificationCode = async (params: {
   purpose: 'registration' | 'password_reset';
   expiresInMinutes?: number;
 }): Promise<string> => {
+  if (!db) throw new Error('Database not initialized');
+
   const { email, purpose, expiresInMinutes = 15 } = params;
   const code = generateVerificationCode();
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
@@ -2247,6 +2371,8 @@ export const verifyCode = async (params: {
   code: string;
   purpose: 'registration' | 'password_reset';
 }): Promise<boolean> => {
+  if (!db) throw new Error('Database not initialized');
+
   const { email, code, purpose } = params;
 
   const verificationRecord = await db.query.verificationCodes.findFirst({
@@ -2276,6 +2402,8 @@ export const verifyCode = async (params: {
  * Clean up expired verification codes (can be called periodically)
  */
 export const cleanupExpiredVerificationCodes = async (): Promise<void> => {
+  if (!db) throw new Error('Database not initialized');
+
   await db
     .delete(verificationCodes)
     .where(lte(verificationCodes.expiresAt, new Date()));

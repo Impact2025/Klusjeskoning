@@ -8,6 +8,8 @@ export class AutomationService {
    * Get automation settings for a family
    */
   static async getAutomationSettings(familyId: string) {
+    if (!db) throw new Error('Database not initialized');
+
     const settings = await db
       .select()
       .from(automationSettings)
@@ -28,6 +30,8 @@ export class AutomationService {
     approvalWindowStart?: string;
     approvalWindowEnd?: string;
   }) {
+    if (!db) throw new Error('Database not initialized');
+
     const existing = await this.getAutomationSettings(familyId);
 
     if (existing) {
@@ -64,6 +68,8 @@ export class AutomationService {
    * Process automatic payouts for families
    */
   static async processAutomaticPayouts() {
+    if (!db) throw new Error('Database not initialized');
+
     const now = Timestamp.now();
     const currentDay = now.toDate().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const currentTime = now.toDate().toTimeString().slice(0, 5); // HH:MM format
@@ -94,6 +100,8 @@ export class AutomationService {
    * Execute payout for a family
    */
   private static async executePayout(familyId: string) {
+    if (!db) throw new Error('Database not initialized');
+
     // Get all approved chores that haven't been paid out yet
     const approvedChores = await db
       .select()
@@ -133,6 +141,8 @@ export class AutomationService {
    * Send payout reminder notifications
    */
   static async sendPayoutReminders() {
+    if (!db) throw new Error('Database not initialized');
+
     const now = Timestamp.now();
     const currentDay = now.toDate().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
@@ -184,6 +194,8 @@ export class AutomationService {
    * Send batch approval notifications during approval window
    */
   static async sendBatchApprovalNotifications() {
+    if (!db) throw new Error('Database not initialized');
+
     const now = Timestamp.now();
     const currentTime = now.toDate().toTimeString().slice(0, 5);
 
@@ -228,6 +240,8 @@ export class AutomationService {
    * Process recurring chores - create new instances when due
    */
   static async processRecurringChores() {
+    if (!db) throw new Error('Database not initialized');
+
     const now = Timestamp.now();
 
     // Find template chores that are due

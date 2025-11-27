@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { neon } from '@neondatabase/serverless';
-import { drizzle, type DrizzleD1Database } from 'drizzle-orm/neon-http';
+import { drizzle, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
 // Get DATABASE_URL
@@ -16,7 +16,7 @@ const isValidConnectionString = (str: string | undefined): str is string => {
 
 // Only initialize database connection if we have a valid DATABASE_URL
 // This prevents build errors on platforms like Vercel where DATABASE_URL might not be available during build
-let db: ReturnType<typeof drizzle> | null = null;
+let db: NeonHttpDatabase<typeof schema> | null = null;
 let DbClient: any;
 
 if (!isValidConnectionString(rawConnectionString)) {
