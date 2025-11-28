@@ -1,30 +1,16 @@
 'use client';
-import Image from "next/image";
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useApp } from "../AppProvider";
 import { Button } from "@/components/ui/button";
-import { Shield, Baby, HelpCircle } from "lucide-react";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
-import ScreenWrapper from "../ScreenWrapper";
-import OnboardingModal from '../OnboardingModal';
-
-type UserType = 'child' | 'parent';
+import { Crown, Users, ArrowLeft, Sparkles } from "lucide-react";
 
 export default function LandingScreen() {
   const { setScreen } = useApp();
-  const [bgImage, setBgImage] = useState<any>(null);
   const searchParams = useSearchParams();
 
-  const logoImage = PlaceHolderImages.find(img => img.id === 'app-logo');
-  const [isModalOpen, setModalOpen] = useState(false);
-  const [modalUserType, setModalUserType] = useState<UserType>('parent');
-
   useEffect(() => {
-    // This will only run on the client, preventing a hydration mismatch
-    const landingBg = PlaceHolderImages.find(img => img.id === 'landing-background');
-    setBgImage(landingBg);
-
     // If user came here with checkout=premium, save it for after login
     const checkoutStatus = searchParams?.get('checkout');
     if (checkoutStatus === 'premium') {
@@ -33,7 +19,7 @@ export default function LandingScreen() {
       return;
     }
 
-    // If user came here with register=true, save it for after navigation and navigate to parent login
+    // If user came here with register=true, navigate to parent login
     const registerParam = searchParams?.get('register');
     if (registerParam === 'true') {
       sessionStorage.setItem('showRegister', 'true');
@@ -42,59 +28,85 @@ export default function LandingScreen() {
     }
   }, [searchParams, setScreen]);
 
-  const openModal = (userType: UserType) => {
-    setModalUserType(userType);
-    setModalOpen(true);
-  };
-
   return (
-    <ScreenWrapper className="items-center justify-center">
-      {bgImage && (
-        <Image
-          src={bgImage.imageUrl}
-          alt={bgImage.description}
-          fill
-          className="object-cover"
-          data-ai-hint={bgImage.imageHint}
-          priority
-        />
-      )}
-      <div className="relative z-10 text-center bg-card/80 p-8 rounded-2xl shadow-xl backdrop-blur-sm w-11/12 max-w-md">
-        {logoImage && (
-            <Image
-                src={logoImage.imageUrl}
-                width={250}
-                height={150}
-                alt={logoImage.description}
-                data-ai-hint={logoImage.imageHint}
-                className="mx-auto mb-4"
-            />
-        )}
-        <p className="text-muted-foreground mt-2 mb-8">De leukste manier om klusjes te doen!</p>
-        <div className="space-y-4">
+    <div className="min-h-full bg-gradient-to-br from-amber-50 via-white to-sky-50 flex flex-col">
+      {/* Mini Header */}
+      <header className="px-6 py-4 flex items-center justify-between">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="text-sm font-medium">Terug naar homepage</span>
+        </Link>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-12">
+        {/* Logo & Title */}
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/25">
+            <Crown className="h-10 w-10 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            KlusjesKoning
+          </h1>
+          <p className="text-slate-500">
+            Klusjes worden een game
+          </p>
+        </div>
+
+        {/* Login Options */}
+        <div className="w-full max-w-sm space-y-4">
           <Button
             onClick={() => setScreen('parentLogin')}
             size="lg"
-            className="w-full text-lg shadow-md transition-transform transform hover:scale-105"
+            className="w-full py-6 text-base font-medium shadow-lg shadow-primary/20"
           >
-            <Shield className="mr-2 h-6 w-6" /> Ik ben een Ouder
+            <Users className="mr-2 h-5 w-5" />
+            Inloggen als ouder
           </Button>
-           <Button variant="link" size="sm" onClick={() => openModal('parent')}>
-            <HelpCircle className="mr-2 h-4 w-4" /> Hoe werkt het voor ouders?
-          </Button>
+
           <Button
             onClick={() => setScreen('childLogin')}
             size="lg"
-            className="w-full text-lg shadow-md transition-transform transform hover:scale-105 bg-accent hover:bg-accent/90 text-accent-foreground mt-4"
+            variant="outline"
+            className="w-full py-6 text-base font-medium border-2 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800"
           >
-            <Baby className="mr-2 h-6 w-6" /> Ik ben een Kind
+            <Sparkles className="mr-2 h-5 w-5" />
+            Inloggen als kind
           </Button>
-           <Button variant="link" size="sm" className="text-yellow-700" onClick={() => openModal('child')}>
-             <HelpCircle className="mr-2 h-4 w-4" /> Hoe werkt het voor kinderen?
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-4 my-8 w-full max-w-sm">
+          <div className="flex-1 h-px bg-slate-200" />
+          <span className="text-sm text-slate-400">of</span>
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
+
+        {/* Register CTA */}
+        <div className="text-center">
+          <p className="text-slate-600 mb-3">Nog geen account?</p>
+          <Button
+            onClick={() => {
+              sessionStorage.setItem('showRegister', 'true');
+              setScreen('parentLogin');
+            }}
+            variant="ghost"
+            className="text-primary hover:text-primary/80 font-medium"
+          >
+            Gratis registreren
           </Button>
         </div>
       </div>
-      <OnboardingModal isOpen={isModalOpen} setIsOpen={setModalOpen} userType={modalUserType} />
-    </ScreenWrapper>
+
+      {/* Footer */}
+      <footer className="px-6 py-4 text-center">
+        <p className="text-xs text-slate-400">
+          © {new Date().getFullYear()} KlusjesKoning
+        </p>
+      </footer>
+    </div>
   );
 }

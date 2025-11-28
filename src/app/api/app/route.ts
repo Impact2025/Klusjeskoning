@@ -768,6 +768,18 @@ export async function POST(request: Request) {
       case 'submitChoreForApproval': {
         const session = await requireSession();
         const data = submitChoreSchema.parse(payload);
+
+        // Get child and chore details in ONE query with JOIN - saves 2 queries
+        const detailsResult = await db.execute(sql`
+          SELECT c.name as child_name, ch.name as chore_name, ch.points as chore_points
+          FROM children c
+          CROSS JOIN chores ch
+          WHERE c.id = ${data.childId} AND c.family_id = ${session.familyId}
+            AND ch.id = ${data.choreId} AND ch.family_id = ${session.familyId}
+        `);
+        const details = detailsResult.rows[0] || {};
+
+        // Submit chore (service will invalidate cache)
         await submitChoreForApprovalService({
           familyId: session.familyId,
           choreId: data.choreId,
@@ -777,30 +789,17 @@ export async function POST(request: Request) {
           submittedAt: data.submittedAt ? new Date(data.submittedAt) : new Date(),
         });
 
-        // Fetch child and chore details for notification
-        const [child] = await db
-          .select({ name: children.name })
-          .from(children)
-          .where(and(eq(children.id, data.childId), eq(children.familyId, session.familyId)))
-          .limit(1);
-
-        const [chore] = await db
-          .select({ name: chores.name, points: chores.points })
-          .from(chores)
-          .where(and(eq(chores.id, data.choreId), eq(chores.familyId, session.familyId)))
-          .limit(1);
-
-        // Send email notification to parent about chore submission
-        await sendNotification(request, {
+        // Fire-and-forget email notification - don't block response
+        sendNotification(request, {
           type: 'chore_submitted',
           to: session.family.email,
           data: {
             parentName: session.family.familyName,
-            childName: child?.name || 'Onbekend kind',
-            choreName: chore?.name || 'Onbekend klusje',
-            points: chore?.points || 0,
+            childName: (details.child_name as string) || 'Onbekend kind',
+            choreName: (details.chore_name as string) || 'Onbekend klusje',
+            points: (details.chore_points as number) || 0,
           },
-        });
+        }).catch(console.error);
 
         return respondWithFamily(session.familyId);
       }

@@ -132,10 +132,10 @@ function AppContent() {
 
   return (
     <>
-      <div className="h-screen w-screen bg-gray-200 flex items-center justify-center overscroll-y-contain">
-        <div id="app" className="h-full w-full max-w-lg mx-auto bg-card shadow-2xl relative overflow-hidden">
+      <div className="h-screen w-screen bg-slate-100 flex items-center justify-center overscroll-y-contain">
+        <div id="app" className="h-full w-full max-w-lg mx-auto bg-white shadow-2xl shadow-slate-900/10 relative overflow-hidden md:rounded-3xl md:my-4 md:h-[calc(100vh-2rem)] md:border md:border-slate-200">
           {isLoading && (
-            <div id="loading" className="absolute inset-0 bg-card/80 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div id="loading" className="absolute inset-0 bg-white/80 flex items-center justify-center z-50 backdrop-blur-sm">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
           )}

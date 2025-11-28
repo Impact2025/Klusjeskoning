@@ -235,31 +235,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [family?.subscription]
   );
 
-  // Tour logic: show only on first login
-  const shouldShowTour = useCallback((family: Family | null) => {
-    if (!family || typeof window === 'undefined') return false;
+  // Tour logic: show only on first login (never again after that)
+  const shouldShowTour = useCallback((familyId: string) => {
+    if (!familyId || typeof window === 'undefined') return false;
 
-    // Get login count from localStorage (we'll track this client-side)
-    const loginCount = parseInt(localStorage.getItem(`login_count_${family.id}`) || '0');
-    const lastTourLogin = parseInt(localStorage.getItem(`tour_shown_${family.id}`) || '0');
+    // Check if tour has ever been shown for this family
+    const tourShown = localStorage.getItem(`tour_completed_${familyId}`) === 'true';
 
-    // Show tour only on first login, and only if we haven't shown it yet
-    // TEMP: Also show tour if manually triggered with Ctrl+Shift+T
+    // Manual trigger for testing (Ctrl+Shift+T)
     const manualTrigger = localStorage.getItem('manual_tour_trigger') === 'true';
     if (manualTrigger) {
       localStorage.removeItem('manual_tour_trigger');
       return true;
     }
 
-    return loginCount === 1 && lastTourLogin < loginCount;
+    // Only show if tour has never been completed
+    return !tourShown;
   }, []);
 
   const closeTour = useCallback(() => {
     setShowTour(false);
-    // Mark that we've shown the tour for this login count
+    // Mark tour as completed so it never shows again
     if (family && typeof window !== 'undefined') {
-      const loginCount = parseInt(localStorage.getItem(`login_count_${family.id}`) || '0');
-      localStorage.setItem(`tour_shown_${family.id}`, loginCount.toString());
+      localStorage.setItem(`tour_completed_${family.id}`, 'true');
     }
   }, [family]);
 
@@ -331,16 +329,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await handleAction<{ family: SerializableFamily }>('loginParent', { email, password }, ({ family }) => {
       applyFamily(family ?? null);
 
-      // Increment login count and check if tour should be shown
-      if (family && typeof window !== 'undefined') {
-        const currentCount = parseInt(localStorage.getItem(`login_count_${family.id}`) || '0');
-        const newCount = currentCount + 1;
-        localStorage.setItem(`login_count_${family.id}`, newCount.toString());
-
-        // Check if tour should be shown (only on 1st and 5th login)
-        if (shouldShowTour({ ...family, loginCount: newCount } as any)) {
-          setShowTour(true);
-        }
+      // Check if tour should be shown (only on first login ever)
+      if (family && shouldShowTour(family.id)) {
+        setShowTour(true);
       }
 
       // Check if family needs setup wizard (no children yet)

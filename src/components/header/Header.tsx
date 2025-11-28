@@ -31,8 +31,8 @@ export function Header() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/50 shadow-lg'
-          : 'bg-transparent border-b border-white/20'
+          ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/50 shadow-sm'
+          : 'bg-white/80 backdrop-blur-sm border-b border-slate-100'
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -50,16 +50,10 @@ export function Header() {
               <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
             </div>
             <div className="flex flex-col">
-              <span
-                className={`text-lg font-bold leading-tight ${isScrolled ? 'text-slate-900' : 'text-white'}`}
-                style={!isScrolled ? { textShadow: '0 2px 4px rgba(0,0,0,0.3)' } : {}}
-              >
+              <span className="text-lg font-bold leading-tight text-slate-900">
                 KlusjesKoning
               </span>
-              <span
-                className={`text-xs leading-tight ${isScrolled ? 'text-slate-500' : 'text-white/90'}`}
-                style={!isScrolled ? { textShadow: '0 1px 2px rgba(0,0,0,0.3)' } : {}}
-              >
+              <span className="text-xs leading-tight text-slate-500">
                 Game on voor je huishouden
               </span>
             </div>
@@ -71,12 +65,7 @@ export function Header() {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`text-sm font-semibold transition-all duration-300 ${
-                  isScrolled
-                    ? 'text-slate-700 hover:text-primary'
-                    : 'text-white hover:text-white/90 drop-shadow-lg'
-                }`}
-                style={!isScrolled ? { textShadow: '0 2px 4px rgba(0,0,0,0.3)' } : {}}
+                className="text-sm font-medium text-slate-600 hover:text-primary transition-colors"
               >
                 {item.name}
               </Link>
@@ -87,13 +76,9 @@ export function Header() {
           <div className="hidden md:flex items-center space-x-3 flex-shrink-0">
             <Button
               asChild
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className={`font-medium transition-all duration-300 ${
-                isScrolled
-                  ? 'border-primary/20 text-primary hover:bg-primary/5 bg-white'
-                  : 'border-white/80 bg-white/10 text-white hover:bg-white/30 hover:border-white backdrop-blur-md shadow-xl'
-              }`}
+              className="font-medium text-slate-600 hover:text-primary hover:bg-transparent"
             >
               <Link href="/app">
                 Inloggen
@@ -102,7 +87,7 @@ export function Header() {
             <Button
               asChild
               size="sm"
-              className="bg-primary hover:bg-primary/90 text-white shadow-xl font-medium"
+              className="bg-primary hover:bg-primary/90 text-white font-medium"
             >
               <Link href="/app?register=true" className="flex items-center space-x-1.5">
                 <Crown className="h-3.5 w-3.5" />
@@ -117,12 +102,10 @@ export function Header() {
               <Button
                 variant="ghost"
                 size="sm"
-                className={`md:hidden p-2 rounded-md ${
-                  isScrolled ? 'hover:bg-slate-100' : 'hover:bg-white/10'
-                }`}
+                className="md:hidden p-2 rounded-md hover:bg-slate-100"
                 aria-label="Menu openen"
               >
-                <Menu className={`h-5 w-5 ${isScrolled ? 'text-slate-900' : 'text-white'}`} />
+                <Menu className="h-5 w-5 text-slate-900" />
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-72">

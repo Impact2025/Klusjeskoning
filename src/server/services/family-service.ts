@@ -1809,72 +1809,91 @@ export const redeemReward = async (params: {
     throw new Error('INVALID_PARAMETERS');
   }
 
-  // Get reward with family validation
-  const reward = await db
-    .query.rewards.findFirst({
+  // OPTIMIZED: Get reward AND child in ONE query with JOIN
+  const dataResult = await db.execute(sql`
+    SELECT
+      r.id as reward_id, r.name as reward_name, r.points as reward_points,
+      c.id as child_id, c.name as child_name, c.points as child_points, c.total_points_ever
+    FROM rewards r
+    CROSS JOIN children c
+    WHERE r.id = ${params.rewardId} AND r.family_id = ${params.familyId}
+      AND c.id = ${params.childId} AND c.family_id = ${params.familyId}
+  `);
+
+  if (!dataResult.rows || dataResult.rows.length === 0) {
+    // Determine which one is missing for better error
+    const rewardCheck = await db.query.rewards.findFirst({
       where: and(eq(rewards.id, params.rewardId), eq(rewards.familyId, params.familyId)),
     });
-
-  if (!reward) {
-    throw new Error('REWARD_NOT_FOUND');
+    throw new Error(rewardCheck ? 'CHILD_NOT_FOUND' : 'REWARD_NOT_FOUND');
   }
 
-  // Get child and validate they belong to the family
-  const child = await db.query.children.findFirst({
-    where: and(eq(children.id, params.childId), eq(children.familyId, params.familyId))
-  });
+  const data = dataResult.rows[0] as {
+    reward_id: string;
+    reward_name: string;
+    reward_points: number;
+    child_id: string;
+    child_name: string;
+    child_points: number;
+    total_points_ever: number;
+  };
 
-  if (!child) {
-    throw new Error('CHILD_NOT_FOUND');
-  }
+  const childPoints = Number(data.child_points);
+  const rewardPoints = Number(data.reward_points);
 
   // CRITICAL: Validate sufficient points BEFORE any database operations
-  if (child.points < reward.points) {
-    console.warn(`[POINTS_VALIDATION] Child ${params.childId} attempted to redeem reward ${params.rewardId} but only has ${child.points} points, needs ${reward.points}`);
+  if (childPoints < rewardPoints) {
+    console.warn(`[POINTS_VALIDATION] Child ${params.childId} attempted to redeem reward ${params.rewardId} but only has ${childPoints} points, needs ${rewardPoints}`);
     throw new Error('INSUFFICIENT_POINTS');
   }
 
-  // Prevent negative points (additional safety check)
-  const newPointsBalance = child.points - reward.points;
+  const newPointsBalance = childPoints - rewardPoints;
   if (newPointsBalance < 0) {
-    console.error(`[POINTS_SAFETY] Prevented negative balance for child ${params.childId}: ${child.points} - ${reward.points} = ${newPointsBalance}`);
+    console.error(`[POINTS_SAFETY] Prevented negative balance for child ${params.childId}: ${childPoints} - ${rewardPoints} = ${newPointsBalance}`);
     throw new Error('INSUFFICIENT_POINTS');
   }
 
-  // Use transaction to ensure atomicity
   try {
-    // Deduct points
-    await db
-      .update(children)
-      .set({
-        points: newPointsBalance,
-        totalPointsEver: child.totalPointsEver // Keep total ever the same
-      })
-      .where(eq(children.id, child.id));
+    // OPTIMIZED: Run points update, transaction record, and pending reward IN PARALLEL
+    await Promise.all([
+      // Deduct points
+      db.update(children)
+        .set({
+          points: newPointsBalance,
+          totalPointsEver: data.total_points_ever // Keep total ever the same
+        })
+        .where(eq(children.id, data.child_id)),
 
-    // Record the points transaction
-    await recordPointsTransaction({
-      familyId: params.familyId,
-      childId: params.childId,
-      type: 'spent',
-      amount: -reward.points, // Negative for spending
-      description: `Ingewisseld voor "${reward.name}"`,
-      relatedRewardId: params.rewardId,
-      balanceBefore: child.points,
-      balanceAfter: newPointsBalance,
-    });
+      // Record the points transaction
+      recordPointsTransaction({
+        familyId: params.familyId,
+        childId: params.childId,
+        type: 'spent',
+        amount: -rewardPoints,
+        description: `Ingewisseld voor "${data.reward_name}"`,
+        relatedRewardId: params.rewardId,
+        balanceBefore: childPoints,
+        balanceAfter: newPointsBalance,
+      }),
 
-    // Record the pending reward
-    await recordPendingReward({
-      familyId: params.familyId,
-      childId: params.childId,
-      rewardId: params.rewardId,
-      points: reward.points,
-    });
+      // Record the pending reward
+      recordPendingReward({
+        familyId: params.familyId,
+        childId: params.childId,
+        rewardId: params.rewardId,
+        points: rewardPoints,
+      }),
+    ]);
 
-    console.log(`[POINTS_TRANSACTION] Child ${params.childId} redeemed reward ${params.rewardId} for ${reward.points} points. Balance: ${child.points} → ${newPointsBalance}`);
+    // Invalidate cache - family data has changed
+    await FamilyCache.del(params.familyId);
 
-    return { reward, child: { ...child, points: newPointsBalance } };
+    console.log(`[POINTS_TRANSACTION] Child ${params.childId} redeemed reward ${params.rewardId} for ${rewardPoints} points. Balance: ${childPoints} → ${newPointsBalance}`);
+
+    return {
+      reward: { id: data.reward_id, name: data.reward_name, points: rewardPoints },
+      child: { id: data.child_id, name: data.child_name, points: newPointsBalance }
+    };
   } catch (error) {
     console.error('[POINTS_TRANSACTION_ERROR] Failed to complete reward redemption:', error);
     throw new Error('REDEMPTION_FAILED');
@@ -1940,6 +1959,9 @@ export const submitChoreForApproval = async (params: {
       throw new Error('Chore not found');
     }
   }
+
+  // Invalidate cache - family data has changed
+  await FamilyCache.del(params.familyId);
 };
 
 export const approveChore = async (familyId: string, choreId: string) => {

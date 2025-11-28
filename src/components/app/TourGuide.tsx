@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { X, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 
@@ -152,58 +151,46 @@ export default function TourGuide({ isOpen, onClose }: TourGuideProps) {
                   Stap {currentStep + 1} van {TOUR_STEPS.length}
                 </span>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSkip();
-                }}
-                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 flex-shrink-0"
+              <button
+                type="button"
+                onClick={handleSkip}
+                className="h-8 w-8 p-0 rounded-md hover:bg-red-50 hover:text-red-600 flex-shrink-0 flex items-center justify-center text-gray-500"
                 aria-label="Sluit rondleiding"
               >
-                <X className="h-4 w-4" />
-              </Button>
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
             <h3 className="text-lg font-bold mb-2 pr-8">{step.title}</h3>
             <p className="text-gray-600 mb-6 leading-relaxed">{step.description}</p>
 
             <div className="flex items-center justify-between gap-3">
-              <Button
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePrevious();
-                }}
+              <button
+                type="button"
+                onClick={handlePrevious}
                 disabled={currentStep === 0}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Vorige
-              </Button>
+              </button>
 
               <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSkip();
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  className="px-4 py-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                 >
                   Overslaan
-                </Button>
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNext();
-                  }}
-                  className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white hover:bg-primary/90"
                 >
                   {currentStep === TOUR_STEPS.length - 1 ? 'Voltooien' : 'Volgende'}
                   <ChevronRight className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             </div>
           </CardContent>

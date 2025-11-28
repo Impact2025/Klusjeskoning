@@ -20,6 +20,7 @@ import VirtualRoom from '@/components/gamification/VirtualRoom';
 import AIPersona from '@/components/gamification/AIPersona';
 import FamilyRanking from '@/components/gamification/FamilyRanking';
 import ChampionCelebration from '@/components/gamification/ChampionCelebration';
+import QuestCelebration from '@/components/gamification/QuestCelebration';
 import type { Chore } from '@/lib/types';
 import type { VirtualPet as VirtualPetType } from '@/server/db/schema';
 import { getLevelFromXp, LEVEL_BADGES, calculateLevel } from '@/lib/xp-utils';
@@ -75,6 +76,8 @@ export default function ChildDashboard() {
   const [isSpinLoading, setIsSpinLoading] = useState(true);
   const [lastPetLoad, setLastPetLoad] = useState(0);
   const [lastSpinLoad, setLastSpinLoad] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationPoints, setCelebrationPoints] = useState(0);
 
   // Compliment notifications
   const { compliments, addCompliment, dismissCompliment } = useComplimentNotifications();
@@ -301,6 +304,14 @@ export default function ChildDashboard() {
 
   const handleSubmissionSuccess = (choreId: string) => {
     // Keep it in optimistic set until state updates
+
+    // Find the chore to get its points
+    const chore = family?.chores.find(c => c.id === choreId);
+    const points = chore?.points || 10;
+
+    // Trigger celebration!
+    setCelebrationPoints(points);
+    setShowCelebration(true);
   };
 
   const handleSubmissionError = (choreId: string) => {
@@ -743,6 +754,14 @@ export default function ChildDashboard() {
       />
       <LevelsModal isOpen={isLevelsModalOpen} setIsOpen={setLevelsModalOpen} />
       <ChildOnboardingModal isOpen={isOnboardingOpen} setIsOpen={setIsOnboardingOpen} />
+
+      {/* Chore Submission Celebration */}
+      <QuestCelebration
+        isVisible={showCelebration}
+        onComplete={() => setShowCelebration(false)}
+        pointsGained={celebrationPoints}
+        xpGained={celebrationPoints}
+      />
 
       {/* Game Modals - Mobile Optimized */}
       <Dialog open={isSpinWheelOpen} onOpenChange={setIsSpinWheelOpen}>
