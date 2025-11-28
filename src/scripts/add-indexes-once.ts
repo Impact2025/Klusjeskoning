@@ -161,7 +161,7 @@ async function addIndexes() {
 
   for (const table of tables) {
     try {
-      await sql`SELECT 1 FROM ${sql.identifier([table])} LIMIT 1`;
+      await sql`SELECT 1 FROM "${table}" LIMIT 1`;
       // Use raw query for ANALYZE
       await sql.query(`ANALYZE ${table}`);
       console.log(`✅ Analyzed ${table}`);
