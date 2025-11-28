@@ -168,7 +168,7 @@ export const createFamily = async (params: {
       passwordHash,
       familyCode,
     })
-    .returning({ id: families.id, familyCode: families.familyCode });
+    .returning({ id: families.id, familyCode: families.familyCode, createdAt: families.createdAt });
 
   return family;
 };
@@ -2483,7 +2483,7 @@ export const createFamilyAdmin = async (params: {
       passwordHash,
       familyCode: code,
     })
-    .returning({ id: families.id, familyCode: families.familyCode });
+    .returning({ id: families.id, familyCode: families.familyCode, createdAt: families.createdAt });
 
   return family;
 };

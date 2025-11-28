@@ -511,7 +511,7 @@ export async function POST(request: Request) {
           password: z.string().min(6),
         }).parse(payload);
 
-        const { id: familyId, familyCode } = await completeFamilyRegistration({
+        const { id: familyId, familyCode, createdAt } = await completeFamilyRegistration({
           email: data.email,
           code: data.code,
           familyName: data.familyName,
@@ -521,15 +521,15 @@ export async function POST(request: Request) {
 
         await createSession(familyId);
 
-        // Send welcome email with family code
-        await sendNotification(request, {
+        // Send welcome email with family code (don't await - fire and forget for speed)
+        sendNotification(request, {
           type: 'welcome_parent',
           to: data.email,
           data: { familyName: data.familyName, familyCode },
-        });
+        }).catch(console.error);
 
-        // Notify admin
-        await sendNotification(request, {
+        // Notify admin (fire and forget)
+        sendNotification(request, {
           type: 'admin_new_registration',
           to: ADMIN_NOTIFICATION_EMAIL,
           data: {
@@ -539,14 +539,36 @@ export async function POST(request: Request) {
             familyCode,
             timestamp: new Date().toISOString(),
           },
-        });
+        }).catch(console.error);
 
-        return respondWithFamily(familyId);
+        // Return new family directly - no need to query DB for empty data
+        return NextResponse.json({
+          family: {
+            id: familyId,
+            familyCode,
+            familyName: data.familyName,
+            city: data.city,
+            email: data.email,
+            createdAt: createdAt?.toISOString() ?? new Date().toISOString(),
+            recoveryEmail: null,
+            subscriptionPlan: null,
+            subscriptionStatus: 'inactive',
+            subscriptionInterval: null,
+            subscriptionRenewalDate: null,
+            subscriptionLastPaymentAt: null,
+            subscriptionOrderId: null,
+            children: [],
+            chores: [],
+            rewards: [],
+            pendingRewards: [],
+            teamChores: [],
+          }
+        });
       }
       case 'registerFamily': {
         // Keep backward compatibility for admin use
         const data = registerSchema.parse(payload);
-        const { id: familyId, familyCode } = await createFamily({
+        const { id: familyId, familyCode, createdAt } = await createFamily({
           familyName: data.familyName,
           city: data.city,
           email: data.email,
@@ -554,12 +576,15 @@ export async function POST(request: Request) {
           skipVerification: true,
         });
         await createSession(familyId);
-        await sendNotification(request, {
+
+        // Fire and forget notifications for speed
+        sendNotification(request, {
           type: 'welcome_parent',
           to: data.email,
           data: { familyName: data.familyName, familyCode },
-        });
-        await sendNotification(request, {
+        }).catch(console.error);
+
+        sendNotification(request, {
           type: 'admin_new_registration',
           to: ADMIN_NOTIFICATION_EMAIL,
           data: {
@@ -569,8 +594,31 @@ export async function POST(request: Request) {
             familyCode,
             timestamp: new Date().toISOString(),
           },
+        }).catch(console.error);
+
+        // Return new family directly - no need to query DB for empty data
+        return NextResponse.json({
+          family: {
+            id: familyId,
+            familyCode,
+            familyName: data.familyName,
+            city: data.city,
+            email: data.email,
+            createdAt: createdAt?.toISOString() ?? new Date().toISOString(),
+            recoveryEmail: null,
+            subscriptionPlan: null,
+            subscriptionStatus: 'inactive',
+            subscriptionInterval: null,
+            subscriptionRenewalDate: null,
+            subscriptionLastPaymentAt: null,
+            subscriptionOrderId: null,
+            children: [],
+            chores: [],
+            rewards: [],
+            pendingRewards: [],
+            teamChores: [],
+          }
         });
-        return respondWithFamily(familyId);
       }
       case 'loginParent': {
         const data = loginSchema.parse(payload);
