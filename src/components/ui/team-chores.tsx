@@ -113,9 +113,14 @@ export default function TeamChores() {
         ))}
 
         {teamChores.length === 0 && (
-          <p className="text-center text-gray-500 py-8">
-            Geen team klusjes beschikbaar. Vraag je ouders om er een toe te voegen!
-          </p>
+          <div className="text-center py-8 space-y-3">
+            <p className="text-gray-500">
+              Nog geen team klusjes beschikbaar.
+            </p>
+            <p className="text-sm text-gray-400">
+              Vraag je ouders om er een toe te voegen, of klik op het vernieuw-icoon 🔄 rechtsboven om te controleren.
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../AppProvider';
 import { Button } from '@/components/ui/button';
-import { LogOut, Star, ListTodo, Store, Hourglass, Trophy, Users, Gamepad2, ChevronUp, ChevronDown, Share2 } from 'lucide-react';
+import { LogOut, Star, ListTodo, Store, Hourglass, Trophy, Users, Gamepad2, ChevronUp, ChevronDown, Share2, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import RewardShopModal from '../models/RewardShopModal';
@@ -29,6 +29,7 @@ import { Timestamp } from '@/lib/timestamp';
 import ComplimentNotification, { useComplimentNotifications } from '@/components/gamification/ComplimentNotification';
 import { ChildInvitation } from '@/components/powerklusjes/ChildInvitation';
 import { CoachWidget } from '@/components/coach';
+import ChildTourGuide from '../ChildTourGuide';
 
 const levels = [
   { points: 1000, name: 'KlusjesKoning', icon: '👑' },
@@ -77,6 +78,7 @@ export default function ChildDashboard() {
   const [lastSpinLoad, setLastSpinLoad] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationPoints, setCelebrationPoints] = useState(0);
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   // Compliment notifications
   const { compliments, addCompliment, dismissCompliment } = useComplimentNotifications();
@@ -88,6 +90,17 @@ export default function ChildDashboard() {
       if (!onboardingCompleted) {
         // Small delay to ensure the dashboard has loaded
         setTimeout(() => setIsOnboardingOpen(true), 1000);
+      }
+    }
+  }, [user]);
+
+  // Check if child has seen the welcome tour
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      const tourCompleted = localStorage.getItem(`child_tour_${user.id}`);
+      if (!tourCompleted) {
+        // Show tour after onboarding and dashboard has loaded
+        setTimeout(() => setIsTourOpen(true), 2000);
       }
     }
   }, [user]);
@@ -343,6 +356,30 @@ export default function ChildDashboard() {
     logout();
   }
 
+  const handleTourClose = () => {
+    setIsTourOpen(false);
+    if (user) {
+      localStorage.setItem(`child_tour_${user.id}`, 'completed');
+    }
+  }
+
+  const handleRefresh = async () => {
+    try {
+      const response = await fetch('/api/app', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Update the family data in the context
+        // This will trigger a re-render with fresh data
+        window.location.reload(); // Simple refresh for now
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  }
+
   // Handle receiving compliments from parents
   const handleReceiveCompliment = (from: string, card: any) => {
     addCompliment(from, card);
@@ -402,10 +439,10 @@ export default function ChildDashboard() {
               </div>
             </div>
 
-            {/* Points & Logout */}
+            {/* Points & Actions */}
             <div className="flex items-center space-x-3">
               {/* Enhanced Points Display */}
-              <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl px-4 py-3 shadow-lg">
+              <div data-tour="points" className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl px-4 py-3 shadow-lg">
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
                     <Star className="w-4 h-4 text-white" />
@@ -416,6 +453,16 @@ export default function ChildDashboard() {
                   </div>
                 </div>
               </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                className="w-10 h-10 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200"
+                title="Vernieuw gegevens"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </Button>
 
               <Button
                 variant="ghost"
@@ -472,13 +519,25 @@ export default function ChildDashboard() {
       <div className="flex-1 overflow-y-auto">
         <main className="p-6 space-y-8 pb-24">
           {/* Welcome Section */}
-          <div className="text-center space-y-2">
+          <div className="text-center space-y-4">
             <h2 className="text-2xl font-bold text-gray-900">Welkom terug, {user.name}! 👋</h2>
             <p className="text-gray-600">Laten we samen klusjes klaren en punten verdienen!</p>
+            <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-red-100 border-2 border-yellow-300 rounded-2xl p-4 shadow-lg animate-pulse">
+              <h3 className="text-lg font-bold text-orange-800 mb-2">🚀 SPECIALE TEST UITDAGING! 🚀</h3>
+              <p className="text-sm text-orange-700 font-semibold">
+                Hé {user.name}! Ben je klaar voor het MEGAGROOTSTE avontuur ooit? Test onze supercoole KlusjesKoning app en word misschien wel DE GROTE WINNAAR! 🎉👑
+              </p>
+              <p className="text-sm text-orange-700 mt-2">
+                Doe mee, verdien ZOVEEL MOGELIJK punten, en wie weet win je naast de EER van Kampioen ook nog eens <span className="font-bold text-2xl text-green-600">€5,-</span> voor de meeste punten! 💰🏆
+              </p>
+              <p className="text-xs text-orange-600 mt-2 font-bold">
+                Kom op, laten we ERGENS MEE BEGINNEN! 🔥⚡
+              </p>
+            </div>
           </div>
 
           {/* Primary Focus: Available Chores */}
-          <div className="space-y-6">
+          <div data-tour="chores" className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -696,6 +755,7 @@ export default function ChildDashboard() {
           </Button>
 
           <Button
+            data-tour="rewards"
             variant="ghost"
             onClick={() => setRewardShopOpen(true)}
             className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] p-1 text-gray-600 hover:text-pink-600 hover:bg-pink-50 rounded-xl transition-all duration-200 active:scale-95"
@@ -718,6 +778,7 @@ export default function ChildDashboard() {
           </Button>
 
           <Button
+            data-tour="games"
             variant="ghost"
             onClick={() => setIsGamesMenuOpen(true)}
             className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-all duration-200 active:scale-95"
@@ -994,6 +1055,12 @@ export default function ChildDashboard() {
           childName={user.name}
         />
       )}
+
+      {/* Child Welcome Tour */}
+      <ChildTourGuide
+        isOpen={isTourOpen}
+        onClose={handleTourClose}
+      />
     </div>
   );
 }
