@@ -3,7 +3,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../AppProvider';
 import { Button } from '@/components/ui/button';
 import { LogOut, Star, ListTodo, Store, Hourglass, Trophy, Users, Gamepad2, ChevronUp, ChevronDown, Share2 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import RewardShopModal from '../models/RewardShopModal';
@@ -367,7 +366,7 @@ export default function ChildDashboard() {
   );
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
       {/* Professional Child Header */}
       <header className="relative bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 text-white overflow-hidden" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
         {/* Background Pattern */}
@@ -470,7 +469,7 @@ export default function ChildDashboard() {
         </div>
       )}
 
-      <ScrollArea className="flex-grow">
+      <div className="flex-1 overflow-y-auto">
         <main className="p-6 space-y-8 pb-24">
           {/* Welcome Section */}
           <div className="text-center space-y-2">
@@ -681,7 +680,7 @@ export default function ChildDashboard() {
             </Card>
           )}
         </main>
-      </ScrollArea>
+      </div>
       
       {/* Professional Bottom Navigation - Mobile Optimized */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 z-50 shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
