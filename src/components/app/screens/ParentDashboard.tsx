@@ -32,7 +32,9 @@ import {
   Star,
   Trophy,
   Zap,
-  BookOpen
+  BookOpen,
+  X,
+  Sparkles
 } from 'lucide-react';
 import type { Chore, Child, Reward } from '@/lib/types';
 import AddChildModal from '../models/AddChildModal';
@@ -82,6 +84,26 @@ export default function ParentDashboard() {
 
   // Chore Library state
   const [showChoreLibrary, setShowChoreLibrary] = useState(false);
+
+  // Welcome banner state (shows only on first visit)
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
+
+  // Check if this is the first visit
+  useEffect(() => {
+    if (family && typeof window !== 'undefined') {
+      const welcomeDismissed = localStorage.getItem(`welcome_dismissed_${family.id}`);
+      if (!welcomeDismissed) {
+        setShowWelcomeBanner(true);
+      }
+    }
+  }, [family]);
+
+  const dismissWelcomeBanner = () => {
+    setShowWelcomeBanner(false);
+    if (family && typeof window !== 'undefined') {
+      localStorage.setItem(`welcome_dismissed_${family.id}`, 'true');
+    }
+  };
 
   useEffect(() => {
     if (family) {
@@ -315,6 +337,30 @@ export default function ParentDashboard() {
 
       <ScrollArea className="flex-grow">
         <main className="p-6 pb-24 md:pb-6 max-w-7xl mx-auto">
+          {/* Welcome Banner - shows only on first visit */}
+          {showWelcomeBanner && (
+            <div className="mb-6 bg-gradient-to-r from-primary/10 via-amber-50 to-orange-50 border border-primary/20 rounded-xl p-4 relative">
+              <button
+                onClick={dismissWelcomeBanner}
+                className="absolute top-3 right-3 p-1 rounded-full hover:bg-white/50 text-slate-500 hover:text-slate-700 transition-colors"
+                aria-label="Sluiten"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <div className="flex items-start gap-4 pr-8">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-orange-500/25">
+                  <Sparkles className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Welkom bij KlusjesKoning!</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    Begin met het toevoegen van kinderen onder <strong>Kinderen</strong>, maak daarna klusjes aan bij <strong>Klusjes</strong>, en stel beloningen in bij <strong>Beloningen</strong>. Veel plezier!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
             {/* Mobile Bottom Navigation - Optimized for Touch */}

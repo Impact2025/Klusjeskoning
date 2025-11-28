@@ -142,8 +142,8 @@ function AppContent() {
           <div className="h-full w-full">{screens[currentScreen]}</div>
         </div>
       </div>
-      {/* TourGuide outside overflow-hidden container */}
-      <TourGuide isOpen={showTour} onClose={closeTour} />
+      {/* TourGuide disabled - using welcome banner in ParentDashboard instead */}
+      {/* <TourGuide isOpen={showTour} onClose={closeTour} /> */}
     </>
   );
 }
