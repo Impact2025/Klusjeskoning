@@ -1945,11 +1945,14 @@ export const submitChoreForApproval = async (params: {
 export const approveChore = async (familyId: string, choreId: string) => {
   if (!db) throw new Error('Database not initialized');
 
-  // Get chore using raw SQL
+  // Get chore AND child name in single query with JOIN - saves 1 query
   const choreResult = await db.execute(sql`
-    SELECT id, family_id, name, points, status, submitted_by_child_id, submitted_at, emotion, photo_url, created_at
-    FROM chores
-    WHERE id = ${choreId} AND family_id = ${familyId}
+    SELECT c.id, c.family_id, c.name, c.points, c.status, c.submitted_by_child_id,
+           c.submitted_at, c.emotion, c.photo_url, c.created_at,
+           ch.name as child_name
+    FROM chores c
+    LEFT JOIN children ch ON c.submitted_by_child_id = ch.id
+    WHERE c.id = ${choreId} AND c.family_id = ${familyId}
   `);
 
   if (choreResult.rows.length === 0) {
@@ -1962,40 +1965,32 @@ export const approveChore = async (familyId: string, choreId: string) => {
     throw new Error('CHORE_NOT_SUBMITTED');
   }
 
-  // Update chore status
-  await db.execute(sql`
-    UPDATE chores SET status = 'approved' WHERE id = ${choreId}
-  `);
+  // Update chore status and award points in parallel
+  await Promise.all([
+    // Update chore status
+    db.execute(sql`UPDATE chores SET status = 'approved' WHERE id = ${choreId}`),
+    // Award points and XP
+    updateChildPoints(chore.submitted_by_child_id as string, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, choreId),
+  ]);
 
-  // Award points and XP (XP is now automatically calculated in updateChildPoints)
-  await updateChildPoints(chore.submitted_by_child_id as string, Number(chore.points), `Klus "${chore.name}" goedgekeurd`, choreId);
+  // Invalidate cache so next load gets fresh data
+  await FamilyCache.del(familyId);
 
-  // Create family feed item
-  try {
-    // Get child name
-    const childResult = await db.execute(sql`
-      SELECT name FROM children WHERE id = ${chore.submitted_by_child_id}
-    `);
-    const childName = childResult.rows[0]?.name as string || 'Kind';
-
-    await db.insert(familyFeed).values({
-      familyId,
-      childId: chore.submitted_by_child_id as string,
-      type: 'chore_completed',
-      message: `heeft "${chore.name}" voltooid! +${chore.points} punten 🎉`,
-      data: JSON.stringify({
-        choreId,
-        choreName: chore.name,
-        points: chore.points,
-        emoji: '✅',
-        childName,
-      }),
-      reactions: '[]',
-    });
-  } catch (feedError) {
-    // Don't fail the approval if feed creation fails
-    console.error('Error creating feed item:', feedError);
-  }
+  // Create family feed item (fire and forget - don't block response)
+  db.insert(familyFeed).values({
+    familyId,
+    childId: chore.submitted_by_child_id as string,
+    type: 'chore_completed',
+    message: `heeft "${chore.name}" voltooid! +${chore.points} punten 🎉`,
+    data: JSON.stringify({
+      choreId,
+      choreName: chore.name,
+      points: chore.points,
+      emoji: '✅',
+      childName: chore.child_name || 'Kind',
+    }),
+    reactions: '[]',
+  }).catch(console.error); // Fire and forget
 };
 
 export const rejectChore = async (familyId: string, choreId: string) => {
@@ -2010,12 +2005,18 @@ export const rejectChore = async (familyId: string, choreId: string) => {
       photo_url = NULL
     WHERE id = ${choreId} AND family_id = ${familyId}
   `);
+
+  // Invalidate cache so next load gets fresh data
+  await FamilyCache.del(familyId);
 };
 
 export const clearPendingReward = async (familyId: string, pendingRewardId: string) => {
   if (!db) throw new Error('Database not initialized');
 
   await db.delete(pendingRewards).where(and(eq(pendingRewards.id, pendingRewardId), eq(pendingRewards.familyId, familyId)));
+
+  // Invalidate cache
+  await FamilyCache.del(familyId);
 };
 
 export const updateChildPoints = async (childId: string, delta: number, description?: string, relatedChoreId?: string) => {
