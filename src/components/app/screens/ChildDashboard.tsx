@@ -489,7 +489,7 @@ export default function ChildDashboard() {
             </div>
 
             <XPProgressBar
-              currentXP={user.xp % 100}
+              currentXP={(user.xp || 0) % 100}
               xpToNextLevel={100}
               level={getLevelFromXp(user.totalXpEver || 0)}
               animated={true}
@@ -499,7 +499,7 @@ export default function ChildDashboard() {
 
             <div className="flex justify-between items-center mt-3 text-sm">
               <span className="text-white/80">Level {currentLevelInfo.level}</span>
-              <span className="text-white/80">{user.xp % 100}/100 XP naar level {currentLevelInfo.level + 1}</span>
+              <span className="text-white/80">{(user.xp || 0) % 100}/100 XP naar level {currentLevelInfo.level + 1}</span>
             </div>
           </div>
         </div>

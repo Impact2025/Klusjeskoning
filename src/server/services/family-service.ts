@@ -41,6 +41,8 @@ export type SerializableChild = {
   pin: string;
   points: number;
   totalPointsEver: number;
+  xp: number;
+  totalXpEver: number;
   avatar: string;
   createdAt: SerializableDate;
 };
@@ -314,7 +316,7 @@ const loadFamilyDataOptimized = async (familyId: string, familyRecord?: any) => 
     teamChoresResult
   ] = await Promise.all([
     db.execute(sql`
-      SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
+      SELECT id, family_id, name, pin, points, total_points_ever, xp, total_xp_ever, avatar, created_at
       FROM children WHERE family_id = ${familyId}
     `),
     db.execute(sql`
@@ -368,6 +370,8 @@ const loadFamilyDataOptimized = async (familyId: string, familyRecord?: any) => 
       pin: child.pin,
       points: Number(child.points),
       totalPointsEver: Number(child.total_points_ever),
+      xp: Number(child.xp),
+      totalXpEver: Number(child.total_xp_ever),
       avatar: child.avatar,
       createdAt: child.created_at,
     })),
@@ -621,7 +625,7 @@ export const loadFamilyWithRelations = async (familyId: string) => {
   ] = await Promise.all([
     // Get children
     db.execute(sql`
-      SELECT id, family_id, name, pin, points, total_points_ever, avatar, created_at
+      SELECT id, family_id, name, pin, points, total_points_ever, xp, total_xp_ever, avatar, created_at
       FROM children
       WHERE family_id = ${familyId}
     `),
@@ -689,11 +693,10 @@ export const loadFamilyWithRelations = async (familyId: string) => {
       pin: child.pin,
       points: Number(child.points),
       totalPointsEver: Number(child.total_points_ever),
+      xp: Number(child.xp),
+      totalXpEver: Number(child.total_xp_ever),
       avatar: child.avatar,
       createdAt: child.created_at,
-      // Exclude gamification columns for now
-      // xp: child.xp,
-      // totalXpEver: child.total_xp_ever,
     })),
     chores: Object.values(
       choresResult.rows.reduce((acc, row: any) => {
