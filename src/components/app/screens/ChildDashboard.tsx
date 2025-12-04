@@ -215,18 +215,26 @@ export default function ChildDashboard() {
     }
   };
 
-  // Load compliments from localStorage
+  // Load compliments from localStorage with safe JSON parsing
   const loadCompliments = useCallback(() => {
     if (!user) return;
 
-    const storedCompliments = JSON.parse(
-      localStorage.getItem(`child_compliments_${user.id}`) || '[]'
-    );
+    try {
+      const rawData = localStorage.getItem(`child_compliments_${user.id}`);
+      const storedCompliments = rawData ? JSON.parse(rawData) : [];
 
-    // Convert stored compliments to the format expected by the hook
-    storedCompliments.forEach((compliment: any) => {
-      addCompliment(compliment.from, compliment.card);
-    });
+      // Validate data structure before processing
+      if (Array.isArray(storedCompliments)) {
+        storedCompliments.forEach((compliment: { from?: string; card?: unknown }) => {
+          if (compliment?.from && compliment?.card) {
+            addCompliment(compliment.from, compliment.card as Parameters<typeof addCompliment>[1]);
+          }
+        });
+      }
+    } catch (error) {
+      // Clear corrupted data silently
+      localStorage.removeItem(`child_compliments_${user.id}`);
+    }
   }, [user, addCompliment]);
 
   // Load virtual pet, daily spins, and compliments
@@ -269,21 +277,30 @@ export default function ChildDashboard() {
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key?.startsWith('child_compliments_') && user && e.key.endsWith(user.id)) {
-        // Only process new compliments, not all stored ones
-        const newCompliments = JSON.parse(e.newValue || '[]');
-        const oldCompliments = JSON.parse(e.oldValue || '[]');
+        try {
+          // Only process new compliments, not all stored ones
+          const newCompliments = e.newValue ? JSON.parse(e.newValue) : [];
+          const oldCompliments = e.oldValue ? JSON.parse(e.oldValue) : [];
 
-        // Find new compliments that weren't in the old storage
-        const addedCompliments = newCompliments.filter((newC: any) =>
-          !oldCompliments.some((oldC: any) =>
-            oldC.from === newC.from && oldC.timestamp === newC.timestamp
-          )
-        );
+          // Validate arrays before processing
+          if (!Array.isArray(newCompliments) || !Array.isArray(oldCompliments)) return;
 
-        // Only add the new compliments to avoid duplicates
-        addedCompliments.forEach((compliment: any) => {
-          addCompliment(compliment.from, compliment.card);
-        });
+          // Find new compliments that weren't in the old storage
+          const addedCompliments = newCompliments.filter((newC: { from?: string; timestamp?: number }) =>
+            !oldCompliments.some((oldC: { from?: string; timestamp?: number }) =>
+              oldC.from === newC.from && oldC.timestamp === newC.timestamp
+            )
+          );
+
+          // Only add the new compliments to avoid duplicates
+          addedCompliments.forEach((compliment: { from?: string; card?: unknown }) => {
+            if (compliment?.from && compliment?.card) {
+              addCompliment(compliment.from, compliment.card as Parameters<typeof addCompliment>[1]);
+            }
+          });
+        } catch {
+          // Ignore malformed storage data
+        }
       }
     };
 
@@ -310,13 +327,11 @@ export default function ChildDashboard() {
     [user.totalXpEver]
   );
   
-  const handleSubmissionStart = (choreId: string) => {
+  const handleSubmissionStart = useCallback((choreId: string) => {
     setOptimisticallySubmittedChores(prev => new Set(prev).add(choreId));
-  };
+  }, []);
 
-  const handleSubmissionSuccess = (choreId: string) => {
-    // Keep it in optimistic set until state updates
-
+  const handleSubmissionSuccess = useCallback((choreId: string) => {
     // Find the chore to get its points
     const chore = family?.chores.find(c => c.id === choreId);
     const points = chore?.points || 10;
@@ -324,18 +339,18 @@ export default function ChildDashboard() {
     // Trigger celebration!
     setCelebrationPoints(points);
     setShowCelebration(true);
-  };
+  }, [family?.chores]);
 
-  const handleSubmissionError = (choreId: string) => {
+  const handleSubmissionError = useCallback((choreId: string) => {
     // Remove from optimistic set on error
     setOptimisticallySubmittedChores(prev => {
       const newSet = new Set(prev);
       newSet.delete(choreId);
       return newSet;
     });
-  };
+  }, []);
 
-  const handleModalClose = (choreId: string | null) => {
+  const handleModalClose = useCallback((choreId: string | null) => {
     if (choreId) {
       // Remove from optimistic set if modal is closed without submission
       setOptimisticallySubmittedChores(prev => {
@@ -344,46 +359,42 @@ export default function ChildDashboard() {
         return newSet;
       });
     }
-  };
+  }, []);
 
-  const openSubmitModal = (choreId: string) => {
-    console.log('Opening submit modal for chore:', choreId);
+  const openSubmitModal = useCallback((choreId: string) => {
     setSelectedChoreId(choreId);
     setSubmitChoreOpen(true);
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
-  }
+  }, [logout]);
 
-  const handleTourClose = () => {
+  const handleTourClose = useCallback(() => {
     setIsTourOpen(false);
     if (user) {
       localStorage.setItem(`child_tour_${user.id}`, 'completed');
     }
-  }
+  }, [user]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       const response = await fetch('/api/app', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
       if (response.ok) {
-        const data = await response.json();
-        // Update the family data in the context
-        // This will trigger a re-render with fresh data
-        window.location.reload(); // Simple refresh for now
+        window.location.reload();
       }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
+    } catch {
+      // Silently handle refresh errors
     }
-  }
+  }, []);
 
   // Handle receiving compliments from parents
-  const handleReceiveCompliment = (from: string, card: any) => {
+  const handleReceiveCompliment = useCallback((from: string, card: Parameters<typeof addCompliment>[1]) => {
     addCompliment(from, card);
-  };
+  }, [addCompliment]);
 
 
   // Get available chores from family chores (created by parents)

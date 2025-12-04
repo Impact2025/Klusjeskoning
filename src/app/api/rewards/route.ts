@@ -53,7 +53,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // TODO: Add admin check here
+    // SECURITY: Admin check - verify user is admin
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+    if (!ADMIN_EMAIL || session.family.email !== ADMIN_EMAIL) {
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+    }
 
     const body = await request.json();
     const { name, description, category, defaultPoints, minAge, emoji } = body;

@@ -124,7 +124,10 @@ const toSerializableDate = (date?: Date | string | null): SerializableDate => {
 
 const DEFAULT_CODE_ATTEMPTS = 10;
 
-const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+const generateCode = () => {
+  const { randomBytes } = require('node:crypto');
+  return randomBytes(4).toString('hex').toUpperCase();
+};
 
 const PLAN_PRICING = {
   monthly: PLAN_DEFINITIONS.premium.priceMonthlyCents,
@@ -285,10 +288,38 @@ export const authenticateFamilyWithData = async (email: string, password: string
   return { family, familyData };
 };
 
+// Type for raw family database record
+type FamilyDbRecord = {
+  id?: string;
+  familyId?: string;
+  family_code?: string;
+  familyCode?: string;
+  family_name?: string;
+  familyName?: string;
+  city?: string;
+  email?: string;
+  created_at?: Date;
+  createdAt?: Date;
+  recovery_email?: string | null;
+  recoveryEmail?: string | null;
+  subscription_plan?: string | null;
+  subscriptionPlan?: string | null;
+  subscription_status?: string | null;
+  subscriptionStatus?: string | null;
+  subscription_interval?: string | null;
+  subscriptionInterval?: string | null;
+  subscription_renewal_date?: Date | null;
+  subscriptionRenewalDate?: Date | null;
+  subscription_last_payment_at?: Date | null;
+  subscriptionLastPaymentAt?: Date | null;
+  subscription_order_id?: string | null;
+  subscriptionOrderId?: string | null;
+};
+
 /**
  * Internal helper to load family data with optional pre-fetched family record
  */
-const loadFamilyDataOptimized = async (familyId: string, familyRecord?: any) => {
+const loadFamilyDataOptimized = async (familyId: string, familyRecord?: FamilyDbRecord) => {
   if (!db) throw new Error('Database not initialized');
 
   // Use provided family record or fetch it
@@ -1029,13 +1060,14 @@ export const getCouponStats = async () => {
 };
 
 /**
- * Generate unique coupon code
+ * Generate unique coupon code using cryptographically secure random
  */
 export const generateCouponCode = (prefix = 'KK', length = 8): string => {
+  const { randomInt } = require('node:crypto');
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = prefix;
   for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(randomInt(chars.length));
   }
   return result;
 };
@@ -1357,6 +1389,8 @@ export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof lo
       pin: string;
       points: number;
       totalPointsEver: number;
+      xp: number;
+      totalXpEver: number;
       avatar: string;
       createdAt: Date | null;
     }>;
@@ -1397,6 +1431,8 @@ export const serializeFamily = (family: NonNullable<Awaited<ReturnType<typeof lo
     pin: child.pin,
     points: child.points,
     totalPointsEver: child.totalPointsEver,
+    xp: child.xp,
+    totalXpEver: child.totalXpEver,
     avatar: child.avatar,
     createdAt: toSerializableDate(child.createdAt),
   }));
@@ -2624,10 +2660,11 @@ export const getFinancialOverview = async () => {
 // ===== EMAIL VERIFICATION FUNCTIONS =====
 
 /**
- * Generate a 6-digit verification code
+ * Generate a 6-digit verification code using cryptographically secure random
  */
 export const generateVerificationCode = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const { randomInt } = require('node:crypto');
+  return randomInt(100000, 1000000).toString();
 };
 
 /**
@@ -2663,10 +2700,10 @@ export const createVerificationCode = async (params: {
     });
 
     return code;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as Error & { message?: string };
     // If table doesn't exist, create it and retry
-    if (error.message?.includes('relation "verification_codes" does not exist')) {
-      console.log('Creating verification_codes table...');
+    if (err.message?.includes('relation "verification_codes" does not exist')) {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS verification_codes (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

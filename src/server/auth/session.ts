@@ -30,8 +30,8 @@ export const createSession = async (familyId: string) => {
 
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true, // Always use secure cookies (HTTPS required)
+    sameSite: 'strict', // Stricter CSRF protection
     path: '/',
     expires: expiresAt,
     ...(cookieDomain && { domain: cookieDomain }),

@@ -73,8 +73,14 @@ const actionSchema = z.object({
 });
 
 const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL ?? process.env.SENDGRID_FROM_EMAIL ?? 'info@Klusjeskoning.app';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@klusjeskoning.nl';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'SuperGeheim123!';
+
+// SECURITY: Admin credentials MUST be set via environment variables
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.warn('[SECURITY] ADMIN_EMAIL and ADMIN_PASSWORD environment variables are not set. Admin login will be disabled.');
+}
 
 const registerSchema = z.object({
   familyName: z.string().min(1),
@@ -632,6 +638,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ family: serializeFamily(authResult.familyData) });
       }
       case 'adminLogin': {
+        // SECURITY: Reject if admin credentials are not configured
+        if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+          return errorResponse('Admin login is niet geconfigureerd. Stel ADMIN_EMAIL en ADMIN_PASSWORD in als environment variables.', 503);
+        }
+
         const data = adminLoginSchema.parse(payload);
         if (data.email !== ADMIN_EMAIL || data.password !== ADMIN_PASSWORD) {
           return errorResponse('Onjuiste admin-gegevens.', 401);

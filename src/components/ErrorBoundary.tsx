@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import * as Sentry from '@sentry/nextjs';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -31,12 +32,18 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       errorInfo,
     });
 
-    // Log error to monitoring service in production
+    // Send error to Sentry in production
     if (process.env.NODE_ENV === 'production') {
-      console.error('Error Boundary caught an error:', error, errorInfo);
-
-      // Here you would send to error monitoring service like Sentry
-      // Example: Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } });
+      Sentry.captureException(error, {
+        contexts: {
+          react: {
+            componentStack: errorInfo.componentStack || 'No component stack available',
+          },
+        },
+        tags: {
+          errorBoundary: 'true',
+        },
+      });
     }
   }
 

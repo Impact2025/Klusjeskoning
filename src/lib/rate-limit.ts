@@ -58,7 +58,15 @@ export async function checkAuthRateLimit(request: Request, identifier?: string):
   remaining?: number;
   reset?: Date;
 }> {
-  if (!redis || !authRateLimit) return { success: true }; // No rate limiting if Redis not configured
+  // In development without Redis, allow requests but log warning
+  if (!redis || !authRateLimit) {
+    if (process.env.NODE_ENV === 'development') {
+      return { success: true };
+    }
+    // SECURITY: In production, fail-closed if Redis not configured
+    console.error('SECURITY: Redis not configured in production - blocking auth request');
+    return { success: false, reset: new Date(Date.now() + 60000) };
+  }
 
   try {
     const ip = identifier || getClientIP(request);
@@ -72,8 +80,9 @@ export async function checkAuthRateLimit(request: Request, identifier?: string):
     };
   } catch (error) {
     console.error('Rate limit check failed:', error);
-    // Allow request if rate limiting fails (fail-open)
-    return { success: true };
+    // SECURITY: Fail-closed - block request if rate limiting fails
+    // This prevents bypass attacks when Redis is unavailable
+    return { success: false, reset: new Date(Date.now() + 60000) };
   }
 }
 
@@ -84,7 +93,15 @@ export async function checkApiRateLimit(request: Request, identifier?: string): 
   remaining?: number;
   reset?: Date;
 }> {
-  if (!redis || !apiRateLimit) return { success: true }; // No rate limiting if Redis not configured
+  // In development without Redis, allow requests but log warning
+  if (!redis || !apiRateLimit) {
+    if (process.env.NODE_ENV === 'development') {
+      return { success: true };
+    }
+    // SECURITY: In production, fail-closed if Redis not configured
+    console.error('SECURITY: Redis not configured in production - blocking request');
+    return { success: false, reset: new Date(Date.now() + 60000) };
+  }
 
   try {
     const ip = identifier || getClientIP(request);
@@ -98,8 +115,8 @@ export async function checkApiRateLimit(request: Request, identifier?: string): 
     };
   } catch (error) {
     console.error('API rate limit check failed:', error);
-    // Allow request if rate limiting fails (fail-open)
-    return { success: true };
+    // SECURITY: Fail-closed - block request if rate limiting fails
+    return { success: false, reset: new Date(Date.now() + 60000) };
   }
 }
 
@@ -110,7 +127,15 @@ export async function checkWebhookRateLimit(request: Request, identifier?: strin
   remaining?: number;
   reset?: Date;
 }> {
-  if (!redis || !webhookRateLimit) return { success: true }; // No rate limiting if Redis not configured
+  // Webhooks from payment providers need to work even without Redis
+  if (!redis || !webhookRateLimit) {
+    if (process.env.NODE_ENV === 'development') {
+      return { success: true };
+    }
+    // For webhooks in production, log but allow (payment webhooks are critical)
+    console.warn('SECURITY: Redis not configured - allowing webhook without rate limit');
+    return { success: true };
+  }
 
   try {
     const ip = identifier || getClientIP(request);
@@ -124,7 +149,8 @@ export async function checkWebhookRateLimit(request: Request, identifier?: strin
     };
   } catch (error) {
     console.error('Webhook rate limit check failed:', error);
-    // Allow request if rate limiting fails (fail-open)
+    // For webhooks, allow on error (payment webhooks are critical)
+    console.warn('SECURITY: Rate limit failed for webhook - allowing request');
     return { success: true };
   }
 }

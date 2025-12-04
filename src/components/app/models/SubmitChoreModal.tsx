@@ -19,6 +19,11 @@ type SubmitChoreModalProps = {
 
 const emotions = ['😫', '😕', '🙂', '😁', '😎'];
 
+// File upload validation constants
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+
 export default function SubmitChoreModal({
   isOpen,
   setIsOpen,
@@ -41,14 +46,56 @@ export default function SubmitChoreModal({
 
   const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        variant: "destructive",
+        title: "Bestand te groot",
+        description: "Het bestand mag maximaal 10MB zijn."
+      });
+      resetPhoto();
+      return;
     }
+
+    // Validate MIME type
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      toast({
+        variant: "destructive",
+        title: "Ongeldig bestandstype",
+        description: "Upload een afbeelding (JPG, PNG, GIF of WebP)."
+      });
+      resetPhoto();
+      return;
+    }
+
+    // Validate file extension (extra security layer)
+    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      toast({
+        variant: "destructive",
+        title: "Ongeldig bestandstype",
+        description: "Upload een afbeelding (JPG, PNG, GIF of WebP)."
+      });
+      resetPhoto();
+      return;
+    }
+
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.onerror = () => {
+      toast({
+        variant: "destructive",
+        title: "Fout bij laden",
+        description: "Kon het bestand niet laden. Probeer opnieuw."
+      });
+      resetPhoto();
+    };
+    reader.readAsDataURL(file);
   };
 
   const resetPhoto = () => {

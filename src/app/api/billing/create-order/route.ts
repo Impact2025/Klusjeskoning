@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomBytes } from 'node:crypto';
 import { PLAN_DEFINITIONS } from '@/lib/plans';
 import type { BillingInterval, PlanTier } from '@/lib/types';
 import { validateCoupon, applyCouponToOrder } from '@/server/services/family-service';
@@ -34,11 +35,8 @@ export async function POST(request: NextRequest) {
   let payload: CreateOrderRequest;
   try {
     const rawBody = await request.text();
-    console.log('Raw request body:', rawBody);
     payload = JSON.parse(rawBody) as CreateOrderRequest;
-    console.log('Parsed payload:', payload);
   } catch (error) {
-    console.error('JSON parsing error:', error);
     return NextResponse.json({ error: 'Ongeldige JSON payload.' }, { status: 400 });
   }
 
@@ -63,10 +61,8 @@ export async function POST(request: NextRequest) {
 
   // Validate and apply coupon if provided
   if (couponCode) {
-    console.log('Validating coupon:', couponCode, 'for family:', familyId);
     try {
       const coupon = await validateCoupon(couponCode, familyId);
-      console.log('Coupon validated:', coupon);
 
       // Calculate discount
       if (coupon.discountType === 'percentage') {
@@ -75,13 +71,10 @@ export async function POST(request: NextRequest) {
         discountAmount = Math.min(coupon.discountValue, amount);
       }
 
-      console.log('Original amount:', amount + discountAmount, 'Discount:', discountAmount, 'Final amount:', amount);
-
       // Apply discount
       amount = Math.max(0, amount - discountAmount);
       appliedCoupon = coupon;
     } catch (error) {
-      console.error('Coupon validation error:', error);
       return NextResponse.json({
         error: error instanceof Error ? error.message : 'Coupon code ongeldig.'
       }, { status: 400 });
@@ -89,12 +82,13 @@ export async function POST(request: NextRequest) {
   }
 
   const origin = request.nextUrl.origin;
-  const orderId = `sub-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  // SECURITY: Use cryptographically secure random for order IDs
+  const orderId = `sub-${Date.now()}-${randomBytes(4).toString('hex')}`;
 
   // Handle free orders (100% discount) after coupon processing
   if (amount <= 0) {
     // For free orders, create a mock successful response
-    const freeOrderId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const freeOrderId = `free-${Date.now()}-${randomBytes(4).toString('hex')}`;
     return NextResponse.json({
       orderId: freeOrderId,
       paymentUrl: `${origin}/app/success?order_id=${freeOrderId}&interval=${interval}&free=true`,
