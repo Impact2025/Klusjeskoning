@@ -275,6 +275,7 @@ export default function FamiliesManagement() {
                       value={form.password}
                       onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
                       placeholder="Minimaal 6 tekens"
+                      autoComplete="new-password"
                     />
                   </div>
                 </div>

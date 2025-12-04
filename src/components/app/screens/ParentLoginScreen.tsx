@@ -166,6 +166,7 @@ export default function ParentLoginScreen() {
               onChange={(e) => handleEmailChange(e.target.value)}
               placeholder="jouw@email.nl"
               className="mt-1 bg-white border-slate-200 focus:border-primary"
+              autoComplete="email"
               required
             />
           </div>
@@ -179,6 +180,7 @@ export default function ParentLoginScreen() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimaal 6 tekens"
               className="mt-1 bg-white border-slate-200 focus:border-primary"
+              autoComplete="current-password"
               required
             />
           </div>

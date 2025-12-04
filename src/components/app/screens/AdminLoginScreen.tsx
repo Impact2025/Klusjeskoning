@@ -46,25 +46,27 @@ export default function AdminLoginScreen() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email">E-mailadres</Label>
-            <Input 
-                id="email" 
-                type="email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                placeholder="admin@email.com" 
-                required 
+            <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@email.com"
+                required
+                autoComplete="email"
                 className="bg-gray-700 border-gray-600 text-white"
             />
           </div>
           <div>
             <Label htmlFor="password">Wachtwoord</Label>
-            <Input 
-                id="password" 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder="********" 
-                required 
+            <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="********"
+                required
+                autoComplete="current-password"
                 className="bg-gray-700 border-gray-600 text-white"
             />
           </div>
