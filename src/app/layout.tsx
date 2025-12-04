@@ -5,7 +5,6 @@ import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { MicrosoftClarity } from '@/components/analytics/MicrosoftClarity';
 import { CookieConsent } from '@/components/analytics/CookieConsent';
 import { GoogleReCaptcha } from '@/components/analytics/GoogleReCaptcha';
-import * as Sentry from "@sentry/nextjs";
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
