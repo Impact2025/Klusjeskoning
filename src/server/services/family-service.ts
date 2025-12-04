@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { randomBytes, randomInt } from 'node:crypto';
 import { eq, and, sql, desc, gte, lte, or, isNull } from 'drizzle-orm';
 
 import { db } from '../db/client';
@@ -125,7 +126,6 @@ const toSerializableDate = (date?: Date | string | null): SerializableDate => {
 const DEFAULT_CODE_ATTEMPTS = 10;
 
 const generateCode = () => {
-  const { randomBytes } = require('node:crypto');
   return randomBytes(4).toString('hex').toUpperCase();
 };
 
@@ -1063,7 +1063,6 @@ export const getCouponStats = async () => {
  * Generate unique coupon code using cryptographically secure random
  */
 export const generateCouponCode = (prefix = 'KK', length = 8): string => {
-  const { randomInt } = require('node:crypto');
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = prefix;
   for (let i = 0; i < length; i++) {
@@ -2663,7 +2662,6 @@ export const getFinancialOverview = async () => {
  * Generate a 6-digit verification code using cryptographically secure random
  */
 export const generateVerificationCode = (): string => {
-  const { randomInt } = require('node:crypto');
   return randomInt(100000, 1000000).toString();
 };
 

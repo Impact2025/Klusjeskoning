@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/server/db/client';
-import { stickerCollections } from '@/server/db/schema';
+import { stickerCollections, children } from '@/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireSession } from '@/server/auth/session';
 
@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
     // Verify child belongs to family
     const [child] = await db
       .select()
-      .from(require('@/server/db/schema').children)
+      .from(children)
       .where(and(
-        eq(require('@/server/db/schema').children.id, childId),
-        eq(require('@/server/db/schema').children.familyId, familyId)
+        eq(children.id, childId),
+        eq(children.familyId, familyId)
       ));
 
     if (!child) {
