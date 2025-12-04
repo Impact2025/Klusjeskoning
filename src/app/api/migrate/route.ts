@@ -3,6 +3,9 @@ import { db } from '@/server/db/client';
 import fs from 'fs';
 import path from 'path';
 
+// Prevent static generation - this route needs runtime data
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Running migration...');

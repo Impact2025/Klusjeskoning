@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { fetchPublishedBlogPosts, getAllBlogTags } from '@/lib/content';
 
+// Prevent static generation - this route needs runtime data
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const [posts, tags] = await Promise.all([

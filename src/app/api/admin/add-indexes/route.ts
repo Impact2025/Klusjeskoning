@@ -3,6 +3,9 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import { requireSession } from '@/server/auth/session';
 
+// Prevent static generation - this route needs runtime data
+export const dynamic = 'force-dynamic';
+
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@klusjeskoning.nl';
 
 const indexes = [
