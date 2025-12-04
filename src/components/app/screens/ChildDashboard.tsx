@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../AppProvider';
 import { Button } from '@/components/ui/button';
-import { LogOut, Star, ListTodo, Store, Hourglass, Trophy, Users, Gamepad2, ChevronUp, ChevronDown, Share2, RefreshCw } from 'lucide-react';
+import { LogOut, Star, ListTodo, Store, Hourglass, Trophy, Users, Gamepad2, ChevronUp, ChevronDown, Share2, RefreshCw, Settings } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import RewardShopModal from '../models/RewardShopModal';
@@ -79,6 +79,7 @@ export default function ChildDashboard() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationPoints, setCelebrationPoints] = useState(0);
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Compliment notifications
   const { compliments, addCompliment, dismissCompliment } = useComplimentNotifications();
@@ -478,8 +479,19 @@ export default function ChildDashboard() {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => setIsSettingsOpen(true)}
+                className="w-10 h-10 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200"
+                title="Instellingen"
+              >
+                <Settings className="w-5 h-5" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleLogout}
                 className="w-10 h-10 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200"
+                title="Uitloggen"
               >
                 <LogOut className="w-5 h-5" />
               </Button>
@@ -825,6 +837,80 @@ export default function ChildDashboard() {
       />
       <LevelsModal isOpen={isLevelsModalOpen} setIsOpen={setLevelsModalOpen} />
       <ChildOnboardingModal isOpen={isOnboardingOpen} setIsOpen={setIsOnboardingOpen} />
+
+      {/* Settings Modal */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Instellingen
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Profile Section */}
+            <div className="bg-gradient-to-r from-sky-100 to-blue-100 rounded-xl p-4">
+              <h3 className="font-semibold text-gray-800 mb-3">Mijn Profiel</h3>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-sky-400 to-blue-500 rounded-full flex items-center justify-center text-3xl shadow-lg">
+                  {user?.avatar || '😊'}
+                </div>
+                <div>
+                  <div className="font-bold text-lg text-gray-800">{user?.name}</div>
+                  <div className="text-sm text-gray-600">Level {getLevelFromXp(user?.totalXpEver || 0)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Section */}
+            <div className="bg-gray-50 rounded-xl p-4">
+              <h3 className="font-semibold text-gray-800 mb-3">Statistieken</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                  <div className="text-2xl font-bold text-sky-600">{user?.points || 0}</div>
+                  <div className="text-xs text-gray-500">Punten</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                  <div className="text-2xl font-bold text-purple-600">{user?.totalXpEver || 0}</div>
+                  <div className="text-xs text-gray-500">Totale XP</div>
+                </div>
+              </div>
+            </div>
+
+            {/* PIN Section */}
+            <div className="bg-amber-50 rounded-xl p-4">
+              <h3 className="font-semibold text-gray-800 mb-2">Jouw PIN</h3>
+              <p className="text-sm text-gray-600 mb-2">Gebruik deze PIN om in te loggen:</p>
+              <div className="flex justify-center gap-2">
+                {(user?.pin || '****').split('').map((digit, i) => (
+                  <div key={i} className="w-10 h-12 bg-white rounded-lg flex items-center justify-center text-xl font-bold text-amber-600 shadow-sm border-2 border-amber-200">
+                    {digit}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsSettingsOpen(false)}
+              >
+                Sluiten
+              </Button>
+              <Button
+                variant="default"
+                className="flex-1 bg-red-500 hover:bg-red-600"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Uitloggen
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Chore Submission Celebration */}
       <QuestCelebration
