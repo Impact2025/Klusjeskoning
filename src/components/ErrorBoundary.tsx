@@ -31,22 +31,9 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       errorInfo,
     });
 
-    // Send error to Sentry in production (dynamic import to avoid SSR issues)
+    // Log error to console in production
     if (process.env.NODE_ENV === 'production') {
-      import('@sentry/nextjs').then((Sentry) => {
-        Sentry.captureException(error, {
-          contexts: {
-            react: {
-              componentStack: errorInfo.componentStack || 'No component stack available',
-            },
-          },
-          tags: {
-            errorBoundary: 'true',
-          },
-        });
-      }).catch(() => {
-        // Silently fail if Sentry is not available
-      });
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
   }
 
