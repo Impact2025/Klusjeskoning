@@ -15,13 +15,13 @@ const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_RE
 // Note: If redis is null, rate limiting will be disabled in development
 export const authRateLimit = redis ? new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(5, '10 m'), // 5 requests per 10 minutes for auth
+  limiter: Ratelimit.slidingWindow(10, '10 m'), // 10 requests per 10 minutes for auth
   analytics: true,
 }) : null;
 
 export const apiRateLimit = redis ? new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(100, '1 h'), // 100 requests per hour for general API
+  limiter: Ratelimit.slidingWindow(300, '1 m'), // 300 requests per minute for general API
   analytics: true,
 }) : null;
 
