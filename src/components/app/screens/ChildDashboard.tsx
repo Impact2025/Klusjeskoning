@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import RewardShopModal from '../models/RewardShopModal';
 import SubmitChoreModal from '../models/SubmitChoreModal';
 import LevelsModal from '../models/LevelsModal';
-import ChildOnboardingModal from '../models/ChildOnboardingModal';
 import { QuestCard } from '@/components/ui/quest-card';
 import TeamChores from '@/components/ui/team-chores';
 import SpinWheel from '@/components/gamification/SpinWheel';
@@ -50,7 +49,6 @@ export default function ChildDashboard() {
   const [isRewardShopOpen, setRewardShopOpen] = useState(false);
   const [isSubmitChoreOpen, setSubmitChoreOpen] = useState(false);
   const [isLevelsModalOpen, setLevelsModalOpen] = useState(false);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isGamesMenuOpen, setIsGamesMenuOpen] = useState(false);
   const [isSpinWheelOpen, setIsSpinWheelOpen] = useState(false);
   const [isStickerAlbumOpen, setIsStickerAlbumOpen] = useState(false);
@@ -80,28 +78,18 @@ export default function ChildDashboard() {
   const [celebrationPoints, setCelebrationPoints] = useState(0);
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
   // Compliment notifications
   const { compliments, addCompliment, dismissCompliment } = useComplimentNotifications();
 
-  // Check if child has completed onboarding
-  useEffect(() => {
-    if (typeof window !== 'undefined' && user) {
-      const onboardingCompleted = localStorage.getItem(`child_onboarding_${user.id}`);
-      if (!onboardingCompleted) {
-        // Small delay to ensure the dashboard has loaded
-        setTimeout(() => setIsOnboardingOpen(true), 1000);
-      }
-    }
-  }, [user]);
-
-  // Check if child has seen the welcome tour
+  // Check if child has seen the welcome tour (only show once on first login)
   useEffect(() => {
     if (typeof window !== 'undefined' && user) {
       const tourCompleted = localStorage.getItem(`child_tour_${user.id}`);
       if (!tourCompleted) {
-        // Show tour after onboarding and dashboard has loaded
-        setTimeout(() => setIsTourOpen(true), 2000);
+        // Show tour after dashboard has loaded
+        setTimeout(() => setIsTourOpen(true), 1500);
       }
     }
   }, [user]);
@@ -416,117 +404,120 @@ export default function ChildDashboard() {
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
-      {/* Professional Child Header */}
-      <header className="relative bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 text-white overflow-hidden" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
+      {/* Professional Child Header - Collapsible */}
+      <header className="relative bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 text-white overflow-hidden transition-all duration-300" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.3),transparent_50%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.2),transparent_50%)]" />
         </div>
 
-        <div className="relative px-6 pt-8 pb-6">
-          {/* Top Row - Avatar and Basic Info */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              {/* Professional Avatar */}
+        <div className={`relative px-4 transition-all duration-300 ${isHeaderCollapsed ? 'pt-3 pb-2' : 'pt-6 pb-4'}`}>
+          {/* Top Row - Always visible */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              {/* Avatar - smaller when collapsed */}
               <div className="relative">
-                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border-2 border-white/30 shadow-lg">
-                  <span className="text-2xl font-bold text-white drop-shadow-lg">
+                <div className={`bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border-2 border-white/30 shadow-lg transition-all duration-300 ${isHeaderCollapsed ? 'w-10 h-10' : 'w-14 h-14'}`}>
+                  <span className={`font-bold text-white drop-shadow-lg transition-all duration-300 ${isHeaderCollapsed ? 'text-base' : 'text-xl'}`}>
                     {user.name.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 {/* Level Badge */}
-                <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-white shadow-md">
-                  <span className="text-xs font-bold text-white">{currentLevelInfo.level}</span>
+                <div className={`absolute -bottom-1 -right-1 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-all duration-300 ${isHeaderCollapsed ? 'w-5 h-5' : 'w-6 h-6'}`}>
+                  <span className={`font-bold text-white ${isHeaderCollapsed ? 'text-[10px]' : 'text-xs'}`}>{currentLevelInfo.level}</span>
                 </div>
               </div>
 
-              <div>
-                <h1 className="text-2xl font-bold text-white drop-shadow-sm">{user.name}</h1>
-                <p className="text-white/90 font-medium">{currentLevelInfo.title}</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-white/80">Online</span>
-                </div>
+              <div className={`transition-all duration-300 ${isHeaderCollapsed ? 'space-y-0' : 'space-y-0.5'}`}>
+                <h1 className={`font-bold text-white drop-shadow-sm transition-all duration-300 ${isHeaderCollapsed ? 'text-base' : 'text-xl'}`}>{user.name}</h1>
+                {!isHeaderCollapsed && (
+                  <p className="text-white/90 text-sm font-medium">{currentLevelInfo.title}</p>
+                )}
               </div>
             </div>
 
-            {/* Points & Actions */}
-            <div className="flex items-center space-x-3">
-              {/* Enhanced Points Display */}
-              <div data-tour="points" className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl px-4 py-3 shadow-lg">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-                    <Star className="w-4 h-4 text-white" />
+            {/* Points & Actions - Always visible */}
+            <div className="flex items-center space-x-2">
+              {/* Compact Points Display */}
+              <div data-tour="points" className={`bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl shadow-lg transition-all duration-300 ${isHeaderCollapsed ? 'px-2 py-1.5' : 'px-3 py-2'}`}>
+                <div className="flex items-center space-x-1.5">
+                  <div className={`bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center transition-all duration-300 ${isHeaderCollapsed ? 'w-6 h-6' : 'w-7 h-7'}`}>
+                    <Star className={`text-white ${isHeaderCollapsed ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} />
                   </div>
-                  <div>
-                    <div className="text-lg font-bold text-white">{user.points}</div>
-                    <div className="text-xs text-white/80">Punten</div>
-                  </div>
+                  <div className={`font-bold text-white ${isHeaderCollapsed ? 'text-sm' : 'text-base'}`}>{user.points}</div>
                 </div>
               </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleRefresh}
-                className="w-10 h-10 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200"
-                title="Vernieuw gegevens"
-              >
-                <RefreshCw className="w-5 h-5" />
-              </Button>
 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsSettingsOpen(true)}
-                className="w-10 h-10 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200"
+                className={`bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200 ${isHeaderCollapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
                 title="Instellingen"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className={isHeaderCollapsed ? 'w-4 h-4' : 'w-4.5 h-4.5'} />
               </Button>
 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleLogout}
-                className="w-10 h-10 bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200"
+                className={`bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl text-white hover:text-white transition-all duration-200 ${isHeaderCollapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
                 title="Uitloggen"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className={isHeaderCollapsed ? 'w-4 h-4' : 'w-4.5 h-4.5'} />
               </Button>
             </div>
           </div>
 
-          {/* XP Progress Section */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-2">
-                <Trophy className="w-5 h-5 text-yellow-300" />
-                <span className="text-white font-semibold">Ervaringspunten</span>
+          {/* XP Progress Section - Only visible when expanded */}
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isHeaderCollapsed ? 'max-h-0 opacity-0 mt-0' : 'max-h-40 opacity-100 mt-4'}`}>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <Trophy className="w-4 h-4 text-yellow-300" />
+                  <span className="text-white text-sm font-semibold">Ervaringspunten</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-base font-bold text-white">{user.totalXpEver || 0} XP</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-white">{user.totalXpEver || 0} XP</div>
-                <div className="text-xs text-white/80">Totaal verdiend</div>
+
+              <XPProgressBar
+                currentXP={(user.xp || 0) % 100}
+                xpToNextLevel={100}
+                level={getLevelFromXp(user.totalXpEver || 0)}
+                animated={true}
+                showSoundEffect={true}
+                className="text-sm"
+              />
+
+              <div className="flex justify-between items-center mt-2 text-xs">
+                <span className="text-white/80">Level {currentLevelInfo.level}</span>
+                <span className="text-white/80">{(user.xp || 0) % 100}/100 XP</span>
               </div>
-            </div>
-
-            <XPProgressBar
-              currentXP={(user.xp || 0) % 100}
-              xpToNextLevel={100}
-              level={getLevelFromXp(user.totalXpEver || 0)}
-              animated={true}
-              showSoundEffect={true}
-              className="text-sm"
-            />
-
-            <div className="flex justify-between items-center mt-3 text-sm">
-              <span className="text-white/80">Level {currentLevelInfo.level}</span>
-              <span className="text-white/80">{(user.xp || 0) % 100}/100 XP naar level {currentLevelInfo.level + 1}</span>
             </div>
           </div>
         </div>
+
+        {/* Collapse/Expand Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center z-10 hover:bg-gray-50 active:scale-95 transition-all duration-200 border-2 border-purple-200"
+          aria-label={isHeaderCollapsed ? 'Header uitklappen' : 'Header inklappen'}
+        >
+          {isHeaderCollapsed ? (
+            <ChevronDown className="w-5 h-5 text-purple-600" />
+          ) : (
+            <ChevronUp className="w-5 h-5 text-purple-600" />
+          )}
+        </button>
       </header>
+
+      {/* Spacer for the toggle button */}
+      <div className="h-4 bg-gradient-to-b from-purple-100/50 to-transparent" />
 
       {/* Compliment Notification Banner */}
       {compliments.length > 0 && (
@@ -836,7 +827,6 @@ export default function ChildDashboard() {
         onModalClose={handleModalClose}
       />
       <LevelsModal isOpen={isLevelsModalOpen} setIsOpen={setLevelsModalOpen} />
-      <ChildOnboardingModal isOpen={isOnboardingOpen} setIsOpen={setIsOnboardingOpen} />
 
       {/* Settings Modal */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
