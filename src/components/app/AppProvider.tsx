@@ -3,7 +3,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 // Dynamic import for confetti to reduce initial bundle size (~50KB saved)
-const fireConfetti = async (options: { particleCount?: number; spread?: number; origin?: { y: number }; colors?: string[] }) => {
+const fireConfetti = async (options: {
+  particleCount?: number;
+  spread?: number;
+  origin?: { x?: number; y?: number };
+  colors?: string[];
+  angle?: number;
+  startVelocity?: number;
+  gravity?: number;
+  shapes?: ('square' | 'circle')[];
+  scalar?: number;
+}) => {
   const confetti = (await import('canvas-confetti')).default;
   confetti(options);
 };
@@ -710,34 +720,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notify('destructive', 'Fout', 'Geen kind geselecteerd.');
       return;
     }
-    setIsLoading(true);
+
+    // Show immediate feedback - don't wait for upload
+    notify('info', '📤 Bezig...', 'Je klusje wordt verstuurd!');
+
     try {
-      let photoUrl: string | null = null;
+      // Start photo upload in parallel if needed
+      let photoUploadPromise: Promise<string | null> = Promise.resolve(null);
+
       if (photoFile) {
-        try {
-          const formData = new FormData();
-          formData.append('file', photoFile);
-          formData.append('folder', 'chore-proof');
+        photoUploadPromise = (async () => {
+          try {
+            const formData = new FormData();
+            formData.append('file', photoFile);
+            formData.append('folder', 'chore-proof');
 
-          const uploadResponse = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
+            const uploadResponse = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            });
 
-          if (uploadResponse.ok) {
-            const uploadData = await uploadResponse.json();
-            photoUrl = uploadData.url;
-            if (uploadData.isMock) {
-              console.warn('Using mock upload URL - file not actually uploaded');
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json();
+              return uploadData.url as string;
             }
-          } else {
             console.warn('Photo upload failed, continuing without photo');
+            return null;
+          } catch (uploadError) {
+            console.warn('Photo upload error:', uploadError);
+            return null;
           }
-        } catch (uploadError) {
-          console.warn('Photo upload error:', uploadError);
-          // Continue without photo
-        }
+        })();
       }
+
+      // Wait for photo upload (but user already sees feedback)
+      const photoUrl = await photoUploadPromise;
+
+      // Submit the chore
       const result = await callAppApi<{ family: SerializableFamily }>('submitChoreForApproval', {
         choreId,
         childId: user.id,
@@ -745,20 +764,71 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         photoUrl,
         submittedAt: new Date().toISOString(),
       });
+
       applyFamily(result.family ?? null);
-      notify('success', '🎉 Top gedaan!', 'Klusje is ter controle verstuurd.');
-      // Celebrate when children submit chores for approval
+
+      // EPIC CELEBRATION for kids! Multiple waves of confetti
+      notify('success', '🎉 SUPER GEDAAN!', 'Je klusje is verstuurd naar mama/papa!');
+
+      // Wave 1: Big center burst
       void fireConfetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.7 },
-        colors: ['#10b981', '#3b82f6', '#f59e0b']
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.6 },
+        colors: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
+        startVelocity: 45,
       });
+
+      // Wave 2: Left side burst (delayed)
+      setTimeout(() => {
+        void fireConfetti({
+          particleCount: 80,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.65 },
+          colors: ['#fbbf24', '#f97316', '#ef4444'],
+        });
+      }, 200);
+
+      // Wave 3: Right side burst (delayed)
+      setTimeout(() => {
+        void fireConfetti({
+          particleCount: 80,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.65 },
+          colors: ['#22c55e', '#14b8a6', '#06b6d4'],
+        });
+      }, 400);
+
+      // Wave 4: Final rain from top
+      setTimeout(() => {
+        void fireConfetti({
+          particleCount: 100,
+          spread: 160,
+          origin: { y: 0 },
+          gravity: 0.8,
+          colors: ['#a855f7', '#ec4899', '#f43f5e'],
+          startVelocity: 30,
+        });
+      }, 700);
+
+      // Wave 5: Stars burst
+      setTimeout(() => {
+        void fireConfetti({
+          particleCount: 50,
+          spread: 360,
+          origin: { y: 0.5, x: 0.5 },
+          colors: ['#fbbf24', '#fcd34d', '#fef3c7'],
+          shapes: ['circle'],
+          scalar: 1.5,
+          startVelocity: 25,
+        });
+      }, 1000);
+
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Er ging iets mis bij het indienen van het klusje.';
       notify('destructive', 'Fout', message);
-    } finally {
-      setIsLoading(false);
     }
   }, [applyFamily, family, notify, user]);
 
