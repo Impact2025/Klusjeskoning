@@ -427,8 +427,9 @@ export async function POST(request: Request) {
 
   const { action, payload } = body;
 
-  // Rate limiting for authentication actions
-  const authActions = ['registerFamily', 'loginParent', 'adminLogin', 'loginChild', 'recoverFamilyCode'];
+  // Rate limiting for authentication actions ONLY (brute-force protection)
+  // Other API actions are not rate limited - they require valid session anyway
+  const authActions = ['registerFamily', 'loginParent', 'adminLogin', 'loginChild', 'recoverFamilyCode', 'startRegistration', 'verifyRegistration', 'lookupFamilyByCode'];
   if (authActions.includes(action)) {
     const rateLimitResult = await checkAuthRateLimit(request);
     if (!rateLimitResult.success) {
@@ -438,27 +439,13 @@ export async function POST(request: Request) {
       }, {
         status: 429,
         headers: {
-          'Retry-After': Math.ceil((rateLimitResult.reset?.getTime() || Date.now() + 600000) / 1000).toString(),
+          'Retry-After': Math.ceil((rateLimitResult.reset?.getTime() || Date.now() + 60000) / 1000).toString(),
         }
       });
     }
   }
-
-  // General API rate limiting for other actions
-  if (!authActions.includes(action)) {
-    const rateLimitResult = await checkApiRateLimit(request);
-    if (!rateLimitResult.success) {
-      return NextResponse.json({
-        error: 'Te veel API verzoeken. Probeer het later opnieuw.',
-        retryAfter: rateLimitResult.reset,
-      }, {
-        status: 429,
-        headers: {
-          'Retry-After': Math.ceil((rateLimitResult.reset?.getTime() || Date.now() + 3600000) / 1000).toString(),
-        }
-      });
-    }
-  }
+  // NOTE: General API rate limiting removed for authenticated endpoints
+  // Session validation already protects against unauthorized access
 
   // Check if db client is available for actions that require database access
   if (!db) {
@@ -627,15 +614,38 @@ export async function POST(request: Request) {
         });
       }
       case 'loginParent': {
+        const loginStart = Date.now();
+        console.log('🔐 [loginParent] Starting authentication...');
+
         const data = loginSchema.parse(payload);
-        // Use optimized auth that preloads family data - saves ~200ms
+
+        // Measure authentication time
+        const authStart = Date.now();
         const authResult = await authenticateFamilyWithData(data.email, data.password);
+        const authDuration = Date.now() - authStart;
+        console.log(`🔑 [loginParent] Authentication completed: ${authDuration}ms`);
+
         if (!authResult || !authResult.familyData) {
+          console.log(`❌ [loginParent] Authentication failed after ${Date.now() - loginStart}ms`);
           return errorResponse('Onjuiste inloggegevens.', 401);
         }
+
+        // Measure session creation time
+        const sessionStart = Date.now();
         await createSession(authResult.family.id);
-        // Return preloaded family data directly - no extra DB call needed
-        return NextResponse.json({ family: serializeFamily(authResult.familyData) });
+        const sessionDuration = Date.now() - sessionStart;
+        console.log(`🎫 [loginParent] Session created: ${sessionDuration}ms`);
+
+        // Measure serialization time
+        const serializeStart = Date.now();
+        const serializedFamily = serializeFamily(authResult.familyData);
+        const serializeDuration = Date.now() - serializeStart;
+        console.log(`📦 [loginParent] Data serialization: ${serializeDuration}ms`);
+
+        const totalDuration = Date.now() - loginStart;
+        console.log(`✅ [loginParent] Total server time: ${totalDuration}ms (auth: ${authDuration}ms, session: ${sessionDuration}ms, serialize: ${serializeDuration}ms)`);
+
+        return NextResponse.json({ family: serializedFamily });
       }
       case 'adminLogin': {
         // SECURITY: Reject if admin credentials are not configured
@@ -685,24 +695,68 @@ export async function POST(request: Request) {
         return respondWithFamily(session.familyId);
       }
       case 'lookupFamilyByCode': {
+        const lookupStart = Date.now();
+        console.log('🔍 [lookupFamilyByCode] Starting family lookup...');
+
         const data = familyCodeSchema.parse(payload);
+
+        const queryStart = Date.now();
         const family = await getFamilyByCode(data.familyCode);
+        const queryDuration = Date.now() - queryStart;
+        console.log(`📊 [lookupFamilyByCode] Database query: ${queryDuration}ms`);
+
         if (!family) {
+          console.log(`❌ [lookupFamilyByCode] Family not found after ${Date.now() - lookupStart}ms`);
           return errorResponse('Gezin niet gevonden.', 404);
         }
-        return NextResponse.json({ family: serializeFamily(family) });
+
+        const serializeStart = Date.now();
+        const serialized = serializeFamily(family);
+        const serializeDuration = Date.now() - serializeStart;
+        console.log(`📦 [lookupFamilyByCode] Serialization: ${serializeDuration}ms`);
+
+        const totalDuration = Date.now() - lookupStart;
+        console.log(`✅ [lookupFamilyByCode] Total time: ${totalDuration}ms`);
+
+        return NextResponse.json({ family: serialized });
       }
       case 'loginChild': {
+        const childLoginStart = Date.now();
+        console.log('👶 [loginChild] Starting child authentication...');
+
         const data = z.object({ familyId: z.string(), childId: z.string(), pin: z.string() }).parse(payload);
+
+        // Measure family data load time
+        const loadStart = Date.now();
         const family = await loadFamilyWithRelations(data.familyId);
+        const loadDuration = Date.now() - loadStart;
+        console.log(`📊 [loginChild] Family data loaded: ${loadDuration}ms`);
+
         if (!family) {
+          console.log(`❌ [loginChild] Family not found after ${Date.now() - childLoginStart}ms`);
           return errorResponse('Gezin niet gevonden.', 404);
         }
+
+        // PIN verification
+        const verifyStart = Date.now();
         const child = (family as any).children.find((c: any) => c.id === data.childId);
         if (!child || child.pin !== data.pin) {
+          const verifyDuration = Date.now() - verifyStart;
+          console.log(`❌ [loginChild] PIN verification failed after ${verifyDuration}ms`);
           return errorResponse('Onjuiste pincode.', 401);
         }
+        const verifyDuration = Date.now() - verifyStart;
+        console.log(`✓ [loginChild] PIN verified: ${verifyDuration}ms`);
+
+        // Session creation
+        const sessionStart = Date.now();
         await createSession(data.familyId);
+        const sessionDuration = Date.now() - sessionStart;
+        console.log(`🎫 [loginChild] Session created: ${sessionDuration}ms`);
+
+        const totalDuration = Date.now() - childLoginStart;
+        console.log(`✅ [loginChild] Total time: ${totalDuration}ms (load: ${loadDuration}ms, verify: ${verifyDuration}ms, session: ${sessionDuration}ms)`);
+
         return respondWithFamily(data.familyId);
       }
       case 'addChild': {

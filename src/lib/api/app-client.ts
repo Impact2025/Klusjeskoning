@@ -213,26 +213,160 @@ type AppApiResponse<T> = {
   error?: string;
 } & T;
 
-export const callAppApi = async <T extends object>(action: string, payload?: unknown): Promise<T> => {
-  const response = await fetch('/api/app', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, payload }),
-    credentials: 'include',
-  });
+// ============================================
+// REQUEST DEDUPLICATION & CACHING
+// ============================================
 
-  const data = (await response.json()) as AppApiResponse<T>;
-  if (!response.ok) {
-    throw new Error(data.error || 'Onbekende fout');
+// In-flight request cache to prevent duplicate API calls
+const inflightRequests = new Map<string, Promise<unknown>>();
+
+// Simple client-side cache with TTL
+const clientCache = new Map<string, { data: unknown; timestamp: number }>();
+const CACHE_TTL = 30000; // 30 seconds for client-side cache
+
+// Actions that should NOT be deduplicated (mutations)
+const MUTATION_ACTIONS = new Set([
+  'addChild', 'updateChild', 'deleteChild',
+  'addChore', 'updateChore', 'deleteChore',
+  'submitChoreForApproval', 'approveChore', 'rejectChore',
+  'addReward', 'updateReward', 'deleteReward',
+  'redeemReward', 'registerFamily', 'logout',
+]);
+
+// Actions that can use stale-while-revalidate
+const CACHEABLE_ACTIONS = new Set([
+  'getAdminStats', 'adminListFamilies', 'getGoodCauses',
+  'getBlogPosts', 'getReviews', 'getFinancialOverview',
+]);
+
+const getCacheKey = (action: string, payload?: unknown): string => {
+  return `${action}:${JSON.stringify(payload || {})}`;
+};
+
+export const callAppApi = async <T extends object>(action: string, payload?: unknown): Promise<T> => {
+  const cacheKey = getCacheKey(action, payload);
+  const isMutation = MUTATION_ACTIONS.has(action);
+  const isCacheable = CACHEABLE_ACTIONS.has(action);
+
+  // For cacheable actions, return cached data immediately if available
+  if (isCacheable) {
+    const cached = clientCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      // Return cached data immediately, but revalidate in background
+      if (Date.now() - cached.timestamp > CACHE_TTL / 2) {
+        // Cache is getting stale, revalidate in background
+        void doFetch<T>(action, payload, cacheKey);
+      }
+      return cached.data as T;
+    }
   }
-  return data;
+
+  // For non-mutations, deduplicate in-flight requests
+  if (!isMutation) {
+    const inflight = inflightRequests.get(cacheKey);
+    if (inflight) {
+      return inflight as Promise<T>;
+    }
+  }
+
+  return doFetch<T>(action, payload, cacheKey);
+};
+
+const doFetch = async <T extends object>(action: string, payload: unknown, cacheKey: string, retryCount = 0): Promise<T> => {
+  const MAX_RETRIES = 2;
+
+  const fetchPromise = (async () => {
+    const startTime = performance.now();
+
+    const response = await fetch('/api/app', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, payload }),
+      credentials: 'include',
+    });
+
+    const data = (await response.json()) as AppApiResponse<T>;
+
+    const duration = performance.now() - startTime;
+    if (duration > 1000) {
+      console.warn(`[API] Slow request: ${action} took ${duration.toFixed(0)}ms`);
+    }
+
+    // Handle rate limiting with automatic retry
+    if (response.status === 429 && retryCount < MAX_RETRIES) {
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '2', 10);
+      const waitTime = Math.min(retryAfter * 1000, 5000); // Max 5 seconds wait
+      console.warn(`[API] Rate limited on ${action}, retrying in ${waitTime}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return doFetch<T>(action, payload, cacheKey, retryCount + 1);
+    }
+
+    if (!response.ok) {
+      // For 429 after retries, give a friendlier message
+      if (response.status === 429) {
+        throw new Error('Even geduld alsjeblieft, probeer het zo opnieuw.');
+      }
+      throw new Error(data.error || 'Onbekende fout');
+    }
+
+    // Cache successful responses for cacheable actions
+    if (CACHEABLE_ACTIONS.has(action)) {
+      clientCache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+
+    return data;
+  })();
+
+  // Track in-flight request (only for first attempt)
+  if (retryCount === 0) {
+    inflightRequests.set(cacheKey, fetchPromise);
+  }
+
+  try {
+    return await fetchPromise;
+  } finally {
+    // Clean up in-flight tracking
+    if (retryCount === 0) {
+      inflightRequests.delete(cacheKey);
+    }
+  }
+};
+
+// Invalidate client cache (call after mutations)
+export const invalidateClientCache = (patterns?: string[]) => {
+  if (!patterns) {
+    clientCache.clear();
+    return;
+  }
+  for (const key of clientCache.keys()) {
+    if (patterns.some(p => key.includes(p))) {
+      clientCache.delete(key);
+    }
+  }
 };
 
 export const fetchCurrentFamily = async (): Promise<SerializableFamily | null> => {
-  const response = await fetch('/api/app', { credentials: 'include' });
-  if (!response.ok) {
-    throw new Error('Kon huidige gezin niet laden.');
+  // Check for in-flight request
+  const cacheKey = 'fetchCurrentFamily';
+  const inflight = inflightRequests.get(cacheKey);
+  if (inflight) {
+    return inflight as Promise<SerializableFamily | null>;
   }
-  const data = (await response.json()) as { family: SerializableFamily | null };
-  return data.family;
+
+  const fetchPromise = (async () => {
+    const response = await fetch('/api/app', { credentials: 'include' });
+    if (!response.ok) {
+      throw new Error('Kon huidige gezin niet laden.');
+    }
+    const data = (await response.json()) as { family: SerializableFamily | null };
+    return data.family;
+  })();
+
+  inflightRequests.set(cacheKey, fetchPromise);
+
+  try {
+    return await fetchPromise;
+  } finally {
+    inflightRequests.delete(cacheKey);
+  }
 };
