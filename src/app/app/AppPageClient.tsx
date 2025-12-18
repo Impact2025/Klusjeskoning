@@ -16,17 +16,14 @@ import RecoverCodeScreen from '@/components/app/screens/RecoverCodeScreen';
 import QrScannerScreen from '@/components/app/screens/QrScannerScreen';
 import AdminLoginScreen from '@/components/app/screens/AdminLoginScreen';
 import TourGuide from '@/components/app/TourGuide';
+import { ParentDashboardSkeleton, ChildDashboardSkeleton } from '@/components/app/DashboardSkeleton';
 import nextDynamic from 'next/dynamic';
 import type { Screen } from '@/lib/types';
 
 // Dynamically import components that might have Firebase issues
 const ParentDashboard = nextDynamic(() => import('@/components/app/screens/ParentDashboard'), {
   ssr: false,
-  loading: () => (
-    <div className="h-full w-full flex items-center justify-center bg-slate-50">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-    </div>
-  ),
+  loading: () => <ParentDashboardSkeleton />,
 });
 
 const AdminDashboard = nextDynamic(() => import('@/components/app/screens/AdminDashboard'), {
@@ -39,7 +36,7 @@ const AdminDashboard = nextDynamic(() => import('@/components/app/screens/AdminD
 });
 
 function AppContent() {
-  const { currentScreen, isLoading, family, addChild, addChore, addReward, setScreen, showTour, closeTour } = useApp();
+  const { currentScreen, isLoading, isLoadingInBackground, family, addChild, addChore, addReward, setScreen, showTour, closeTour } = useApp();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -114,20 +111,35 @@ function AppContent() {
     }
   }, [searchParams, router, family]);
 
-  const screens: Record<Screen, React.ReactNode> = {
-    landing: <LandingScreen />,
-    parentLogin: <ParentLoginScreen />,
-    emailVerification: <EmailVerificationScreen />,
-    familySetup: <FamilySetupWizard onComplete={handleFamilySetupComplete} />,
-    parentDashboard: <ParentDashboard />,
-    childLogin: <ChildLoginScreen />,
-    childProfileSelect: <ChildProfileSelectScreen />,
-    childPin: <ChildPinScreen />,
-    childDashboard: <ChildDashboard />,
-    recoverCode: <RecoverCodeScreen />,
-    qrScanner: <QrScannerScreen />,
-    adminLogin: <AdminLoginScreen />,
-    adminDashboard: <AdminDashboard />,
+  // Show skeletons during background loading when we don't have data yet
+  const getScreenContent = (screen: Screen): React.ReactNode => {
+    // For dashboards, show skeleton if loading in background without data
+    if (screen === 'parentDashboard' && isLoadingInBackground && !family) {
+      return <ParentDashboardSkeleton />;
+    }
+    if (screen === 'childDashboard' && isLoadingInBackground && !family) {
+      return <ChildDashboardSkeleton />;
+    }
+    if (screen === 'childProfileSelect' && isLoadingInBackground && !family) {
+      return <ChildDashboardSkeleton />;
+    }
+
+    const screens: Record<Screen, React.ReactNode> = {
+      landing: <LandingScreen />,
+      parentLogin: <ParentLoginScreen />,
+      emailVerification: <EmailVerificationScreen />,
+      familySetup: <FamilySetupWizard onComplete={handleFamilySetupComplete} />,
+      parentDashboard: <ParentDashboard />,
+      childLogin: <ChildLoginScreen />,
+      childProfileSelect: <ChildProfileSelectScreen />,
+      childPin: <ChildPinScreen />,
+      childDashboard: <ChildDashboard />,
+      recoverCode: <RecoverCodeScreen />,
+      qrScanner: <QrScannerScreen />,
+      adminLogin: <AdminLoginScreen />,
+      adminDashboard: <AdminDashboard />,
+    };
+    return screens[screen];
   };
 
   return (
@@ -139,7 +151,7 @@ function AppContent() {
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
           )}
-          <div className="h-full w-full">{screens[currentScreen]}</div>
+          <div className="h-full w-full">{getScreenContent(currentScreen)}</div>
         </div>
       </div>
       {/* TourGuide disabled - using welcome banner in ParentDashboard instead */}

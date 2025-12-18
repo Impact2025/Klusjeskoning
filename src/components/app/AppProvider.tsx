@@ -1,7 +1,12 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import confetti from 'canvas-confetti';
+
+// Dynamic import for confetti to reduce initial bundle size (~50KB saved)
+const fireConfetti = async (options: { particleCount?: number; spread?: number; origin?: { y: number }; colors?: string[] }) => {
+  const confetti = (await import('canvas-confetti')).default;
+  confetti(options);
+};
 
 import {
   PLAN_DEFINITIONS,
@@ -114,6 +119,7 @@ interface AppContextType {
   currentScreen: Screen;
   setScreen: (screen: Screen) => void;
   isLoading: boolean;
+  isLoadingInBackground: boolean;
   activePlan: PlanTier;
   planDefinition: PlanDefinition;
   isPremium: boolean;
@@ -216,8 +222,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [currentScreen, setScreen] = useState<Screen>(() => getInitialScreen());
   const [isLoading, setIsLoading] = useState(false);
-  const [family, setFamily] = useState<Family | null>(null);
-  const [user, setUser] = useState<Child | null>(null);
+  const [isLoadingInBackground, setIsLoadingInBackground] = useState(false);
+  const [family, setFamily] = useState<Family | null>(() => {
+    // Try to restore cached family data for instant display
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('kk_family_cache');
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          // Use cache if less than 5 minutes old
+          if (Date.now() - timestamp < 5 * 60 * 1000) {
+            return data;
+          }
+        }
+      } catch {
+        // Ignore cache errors
+      }
+    }
+    return null;
+  });
+  const [user, setUser] = useState<Child | null>(() => {
+    // Try to restore cached user for instant display
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('kk_user_cache');
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < 5 * 60 * 1000) {
+            return data;
+          }
+        }
+      } catch {
+        // Ignore cache errors
+      }
+    }
+    return null;
+  });
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [goodCauses, setGoodCauses] = useState<GoodCause[] | null>(null);
   const [blogPosts, setBlogPosts] = useState<BlogPost[] | null>(null);
@@ -265,13 +305,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (payload) {
       const mapped = mapFamily(payload);
       setFamily(mapped);
+      // Cache family data for instant restore on next visit
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('kk_family_cache', JSON.stringify({
+            data: mapped,
+            timestamp: Date.now()
+          }));
+        } catch {
+          // Ignore cache errors (e.g., quota exceeded)
+        }
+      }
       if (user) {
         const updatedUser = mapped.children.find((child) => child.id === user.id);
         setUser(updatedUser ?? null);
+        // Cache user data
+        if (updatedUser && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('kk_user_cache', JSON.stringify({
+              data: updatedUser,
+              timestamp: Date.now()
+            }));
+          } catch {
+            // Ignore cache errors
+          }
+        }
       }
     } else {
       setFamily(null);
       setUser(null);
+      // Clear cache on logout
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('kk_family_cache');
+        localStorage.removeItem('kk_user_cache');
+      }
     }
   }, [user]);
 
@@ -309,12 +376,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const handleAction = useCallback(
     async <T extends object>(action: string, payload: unknown, onSuccess?: (data: T) => void) => {
+      const startTime = performance.now();
+      console.log(`🚀 [${action}] Starting...`);
+
       setIsLoading(true);
       try {
+        // Measure API call time
+        const apiStartTime = performance.now();
         const data = await callAppApi<T>(action, payload);
+        const apiDuration = performance.now() - apiStartTime;
+        console.log(`📡 [${action}] API call completed: ${apiDuration.toFixed(2)}ms`);
+
+        // Measure UI update time
+        const uiStartTime = performance.now();
         onSuccess?.(data);
+        const uiDuration = performance.now() - uiStartTime;
+        console.log(`🎨 [${action}] UI update completed: ${uiDuration.toFixed(2)}ms`);
+
+        const totalDuration = performance.now() - startTime;
+        console.log(`✅ [${action}] Total time: ${totalDuration.toFixed(2)}ms`);
+
         return data;
       } catch (error) {
+        const errorDuration = performance.now() - startTime;
+        console.error(`❌ [${action}] Failed after ${errorDuration.toFixed(2)}ms:`, error);
         const message = error instanceof Error ? error.message : 'Er ging iets mis.';
         notify('destructive', 'Fout', message);
         throw error;
@@ -326,7 +411,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loginParent = useCallback(async (email: string, password: string) => {
-    await handleAction<{ family: SerializableFamily }>('loginParent', { email, password }, ({ family }) => {
+    // Optimistic navigation - go to dashboard immediately while loading
+    setIsLoadingInBackground(true);
+    setScreen('parentDashboard');
+
+    try {
+      const startTime = performance.now();
+      console.log('🚀 [loginParent] Starting optimistic login...');
+
+      const data = await callAppApi<{ family: SerializableFamily }>('loginParent', { email, password });
+      const { family } = data;
+
+      const duration = performance.now() - startTime;
+      console.log(`✅ [loginParent] Completed in ${duration.toFixed(0)}ms`);
+
       applyFamily(family ?? null);
 
       // Check if tour should be shown (only on first login ever)
@@ -337,19 +435,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Check if family needs setup wizard (no children yet)
       if (!family?.children || family.children.length === 0) {
         setScreen('familySetup');
-      } else {
-        setScreen('parentDashboard');
       }
+      // Already on parentDashboard, no need to setScreen again
+
       notify('success', '🎉 Welkom terug!', 'Je bent succesvol ingelogd.');
       // Welcome celebration for parents
-      confetti({
+      void fireConfetti({
         particleCount: 120,
         spread: 90,
         origin: { y: 0.3 },
         colors: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444']
       });
-    });
-  }, [applyFamily, handleAction, notify, shouldShowTour]);
+    } catch (error) {
+      // Login failed - go back to login screen
+      const message = error instanceof Error ? error.message : 'Er ging iets mis.';
+      notify('destructive', 'Inloggen mislukt', message);
+      setScreen('parentLogin');
+    } finally {
+      setIsLoadingInBackground(false);
+    }
+  }, [applyFamily, notify, shouldShowTour]);
 
   // Handle post-login redirects - only for actual checkout flows
   useEffect(() => {
@@ -447,23 +552,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notify('destructive', 'Fout', 'Geen kind geselecteerd.');
       return;
     }
-    await handleAction<{ family: SerializableFamily }>('loginChild', {
-      familyId: family.id,
-      childId: user.id,
-      pin
-    }, ({ family: payload }) => {
-      applyFamily(payload ?? null);
-      setScreen('childDashboard');
+
+    // Optimistic navigation - go to dashboard immediately
+    setIsLoadingInBackground(true);
+    setScreen('childDashboard');
+
+    // Cache user data immediately for instant display
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('kk_user_cache', JSON.stringify({
+          data: user,
+          timestamp: Date.now()
+        }));
+      } catch {
+        // Ignore
+      }
+    }
+
+    try {
+      const startTime = performance.now();
+      console.log('🚀 [submitPin] Starting optimistic child login...');
+
+      const data = await callAppApi<{ family: SerializableFamily }>('loginChild', {
+        familyId: family.id,
+        childId: user.id,
+        pin
+      });
+
+      const duration = performance.now() - startTime;
+      console.log(`✅ [submitPin] Completed in ${duration.toFixed(0)}ms`);
+
+      applyFamily(data.family ?? null);
       notify('success', '🎉 Welkom!', `Hoi ${user.name}!`);
       // Welcome celebration for children
-      confetti({
+      void fireConfetti({
         particleCount: 60,
         spread: 50,
         origin: { y: 0.8 },
         colors: ['#f59e0b', '#10b981', '#3b82f6']
       });
-    });
-  }, [applyFamily, family, handleAction, notify, user]);
+    } catch (error) {
+      // Login failed - go back to PIN screen
+      const message = error instanceof Error ? error.message : 'Er ging iets mis.';
+      notify('destructive', 'Onjuiste pincode', message);
+      setScreen('childPin');
+    } finally {
+      setIsLoadingInBackground(false);
+    }
+  }, [applyFamily, family, notify, user]);
 
   const addChild = useCallback(async (name: string, pin: string, avatar: string) => {
     if (!family) return;
@@ -476,7 +612,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       applyFamily(payload ?? null);
       notify('success', '🎉 Welkom!', `${name} is toegevoegd aan jullie gezin!`);
       // Celebrate adding a new family member
-      confetti({
+      void fireConfetti({
         particleCount: 150,
         spread: 100,
         origin: { y: 0.5 },
@@ -544,7 +680,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       applyFamily(payload ?? null);
       notify('success', '🎉 Geweldig werk!', 'Klusje goedgekeurd - wat een prestatie!');
       // Celebrate with confetti when parents approve a chore
-      confetti({
+      void fireConfetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
@@ -612,7 +748,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       applyFamily(result.family ?? null);
       notify('success', '🎉 Top gedaan!', 'Klusje is ter controle verstuurd.');
       // Celebrate when children submit chores for approval
-      confetti({
+      void fireConfetti({
         particleCount: 80,
         spread: 60,
         origin: { y: 0.7 },
@@ -631,7 +767,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await handleAction<{ family: SerializableFamily }>('redeemReward', { childId: user.id, rewardId }, ({ family: payload }) => {
       applyFamily(payload ?? null);
       notify('success', 'Goed gedaan!', 'Je hebt de beloning ingewisseld.');
-      confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
+      void fireConfetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     });
   }, [applyFamily, handleAction, notify, user]);
 
@@ -767,7 +903,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, ({ family: payload }) => {
       applyFamily(payload ?? null);
       notify('success', 'Team Klusje Toegevoegd!', `"${name}" is toegevoegd aan de team klusjes.`);
-      confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+      void fireConfetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
     });
   }, [applyFamily, handleAction, notify]);
 
@@ -801,7 +937,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, ({ family: payload }) => {
       applyFamily(payload ?? null);
       notify('success', 'Team Klusje Voltooid! 🎉', 'Punten zijn verdeeld onder alle deelnemers.');
-      confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: ['#10b981', '#3b82f6', '#f59e0b'] });
+      void fireConfetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: ['#10b981', '#3b82f6', '#f59e0b'] });
     });
   }, [applyFamily, handleAction, notify]);
 
@@ -821,16 +957,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [handleAction]);
 
   const loginChildStep1 = useCallback(async (familyCode: string) => {
-    await handleAction<{ family: SerializableFamily }>('lookupFamilyByCode', { familyCode }, ({ family: payload }) => {
+    // Optimistic navigation - go to profile select immediately
+    setIsLoadingInBackground(true);
+    setScreen('childProfileSelect');
+
+    try {
+      const startTime = performance.now();
+      console.log('🚀 [loginChildStep1] Looking up family code...');
+
+      const data = await callAppApi<{ family: SerializableFamily }>('lookupFamilyByCode', { familyCode });
+      const { family: payload } = data;
+
+      const duration = performance.now() - startTime;
+      console.log(`✅ [loginChildStep1] Completed in ${duration.toFixed(0)}ms`);
+
       if (!payload) {
         notify('destructive', 'Fout', 'Gezinscode niet gevonden.');
+        setScreen('childLogin');
         return;
       }
+
       applyFamily(payload);
-      setScreen('childProfileSelect');
+      // getGoodCauses in background - don't block
       void getGoodCauses();
-    });
-  }, [applyFamily, getGoodCauses, handleAction, notify]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Er ging iets mis.';
+      notify('destructive', 'Fout', message);
+      setScreen('childLogin');
+    } finally {
+      setIsLoadingInBackground(false);
+    }
+  }, [applyFamily, getGoodCauses, notify]);
 
   const addGoodCause = useCallback(async (cause: Omit<GoodCause, 'id'>) => {
     await handleAction<{ goodCauses: SerializableGoodCause[] }>('saveGoodCause', {
@@ -1042,6 +1199,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentScreen,
     setScreen,
     isLoading,
+    isLoadingInBackground,
     activePlan,
     planDefinition,
     isPremium,
@@ -1145,6 +1303,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     getReviews,
     goodCauses,
     isLoading,
+    isLoadingInBackground,
     isPremium,
     loginChildStep1,
     loginParent,
