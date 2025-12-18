@@ -5,9 +5,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false, // Enable strict TypeScript checking
   },
-  eslint: {
-    ignoreDuringBuilds: true, // Disable ESLint during builds for Vercel deployment
-  },
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
   // Removed deprecated serverComponentsExternalPackages option
@@ -133,11 +130,17 @@ const nextConfig: NextConfig = {
   // Experimental features for better performance
   experimental: {
     scrollRestoration: true,
+    // Optimize imports for better tree-shaking
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-icons',
+      'date-fns',
+      'recharts',
+    ],
   },
 
   // Compression
   compress: true,
-
 };
 
 export default nextConfig;
